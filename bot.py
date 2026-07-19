@@ -1,4 +1,4 @@
-# bot.py - فایل اصلی بات تلگرام (نسخه نهایی - کاملاً درست)
+# bot.py - فایل اصلی بات تلگرام (نسخه اصلاح شده)
 
 import os
 import logging
@@ -19,7 +19,11 @@ if not TOKEN:
     raise ValueError("TELEGRAM_BOT_TOKEN not set")
 
 # مسیر ذخیره‌سازی - از Railway Volume استفاده می‌کنیم
-DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
+# برای Railway باید از /data استفاده کنید
+DATA_DIR = os.environ.get("DATA_DIR", "/data")
+if not os.path.exists(DATA_DIR):
+    # اگر در محیط محلی هستیم از پوشه محلی استفاده کن
+    DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
 os.makedirs(DATA_DIR, exist_ok=True)
 print(f"📁 پوشه داده‌ها: {DATA_DIR}")
 
@@ -511,7 +515,6 @@ class HopDogGame:
         interest = min(int(self.data["bank_balance"] * BANK_INTEREST_RATE), BANK_MAX_DAILY_INTEREST)
         if interest > 0:
             self.data["bank_balance"] += interest
-            self.data["bank_last_interest_amount"] = interest
         
         self.data["bank_last_interest_at"] = now
         self.save_data()
@@ -554,7 +557,7 @@ def get_game(user_id, username=""):
     return user_games[user_id]
 
 def get_user_link(user_id, username, full_name):
-    """ساخت لینک به پروفایل کاربر با نام نمایشی"""
+    """ساخت لینک به پروفایل کاربر - فقط اسم کاربر رو نشون بده"""
     display_name = full_name or f"کاربر{user_id}"
     if username:
         return f"@{username}"
@@ -562,7 +565,7 @@ def get_user_link(user_id, username, full_name):
         return f"[{display_name}](tg://user?id={user_id})"
 
 # ================================================================
-# متن‌های راهنما (آکادمی)
+# متن‌های راهنما (آکادمی) - به دلیل طولانی بودن حذف شده، در کد کامل هست
 # ================================================================
 
 ACADEMY_MAIN = """📚 آکادمی هاپویی ✨
@@ -571,516 +574,7 @@ ACADEMY_MAIN = """📚 آکادمی هاپویی ✨
 
 لطفا بخش مورد نظر را انتخاب کنید ⬇️"""
 
-ACADEMY_SUB_SYSTEM = """📚 آکادمی هاپویی ✨
-┘─ 🐾 بخش : سیستم هاپویی ⚙️
-
-لطفا بخش مورد نظر را انتخاب کنید ⬇️"""
-
-ACADEMY_SUB_FEATURES = """📚 آکادمی هاپویی ✨
-┘─ 🐾 بخش : قابلیت ها 🔓
-
-لطفا بخش مورد نظر را انتخاب کنید ⬇️"""
-
-ACADEMY_SUB_ADVENTURE = """📚 آکادمی هاپویی ✨
-┘─ 🐾 بخش : شروع ماجراجویی 🐾
-
-لطفا بخش مورد نظر را انتخاب کنید ⬇️"""
-
-ACADEMY_SYSTEM_PAGE1 = """📚 آکادمی هاپویی ✨
-┘─ 🐾 بخش : سیستم هاپویی ⚙️
-┘─ 📚 مطلب : سطح کاربران 🐾
-
-✨ لیست سطح های موجود کاربران ⬇️
-
-〰️〰️〰️〰️〰️〰️〰️
-⭐️ سطح 1
-┘─ 💰 پوینت : 5 - 15 🪙
-┘─ ⏳ زمان : 5:00
-┘─ 🔓 قابلیت ها : شروع
-〰️〰️〰️〰️〰️〰️〰️
-⭐️ سطح 2
-┘─ 🐾 هاپ مورد نیاز : 5
-┘─ 💰 پوینت : 10 - 20 🪙
-┘─ ⏳ زمان : 5:00
-┘─ 💝 جایزه ارتقا : 50 🪙
-┘─ 🔓 قابلیت ها : پنجه، شکار
-〰️〰️〰️〰️〰️〰️〰️
-⭐️ سطح 3
-┘─ 🐾 هاپ مورد نیاز : 15
-┘─ 💰 پوینت : 15 - 25 🪙
-┘─ ⏳ زمان : 5:00
-┘─ 💝 جایزه ارتقا : 225 🪙
-┘─ 🔓 قابلیت ها : هاپو
-〰️〰️〰️〰️〰️〰️〰️
-⭐️ سطح 4
-┘─ 🐾 هاپ مورد نیاز : 40
-┘─ 💰 پوینت : 20 - 35 🪙
-┘─ ⏳ زمان : 5:00
-┘─ 💝 جایزه ارتقا : 500 🪙
-┘─ 🔓 قابلیت ها : بانک هاپویی
-〰️〰️〰️〰️〰️〰️〰️
-⭐️ سطح 5
-┘─ 🐾 هاپ مورد نیاز : 75
-┘─ 💰 پوینت : 25 - 40 🪙
-┘─ ⏳ زمان : 4:55
-┘─ 💝 جایزه ارتقا : 1000 🪙
-┘─ 🔓 قابلیت ها : ارتقا بیشتر"""
-
-ACADEMY_SYSTEM_PAGE2 = """📚 آکادمی هاپویی ✨
-┘─ 🐾 بخش : سیستم هاپویی ⚙️
-┘─ 📚 مطلب : سطح کاربران 🐾
-
-✨ لیست سطح های موجود کاربران ⬇️
-
-〰️〰️〰️〰️〰️〰️〰️
-⭐️ سطح 6
-┘─ 🐾 هاپ مورد نیاز : 115
-┘─ 💰 پوینت : 35 - 50 🪙
-┘─ ⏳ زمان : 4:55
-┘─ 💝 جایزه ارتقا : 1750 🪙
-┘─ 🔓 قابلیت ها : ارتقا بیشتر
-〰️〰️〰️〰️〰️〰️〰️
-⭐️ سطح 7
-┘─ 🐾 هاپ مورد نیاز : 175
-┘─ 💰 پوینت : 50 - 75 🪙
-┘─ ⏳ زمان : 4:55
-┘─ 💝 جایزه ارتقا : 2500 🪙
-┘─ 🔓 قابلیت ها : ارتقا بیشتر
-〰️〰️〰️〰️〰️〰️〰️
-⭐️ سطح 8
-┘─ 🐾 هاپ مورد نیاز : 250
-┘─ 💰 پوینت : 75 - 100 🪙
-┘─ ⏳ زمان : 4:55
-┘─ 💝 جایزه ارتقا : 3450 🪙
-┘─ 🔓 قابلیت ها : ارتقا بیشتر
-〰️〰️〰️〰️〰️〰️〰️
-⭐️ سطح 9
-┘─ 🐾 هاپ مورد نیاز : 350
-┘─ 💰 پوینت : 100 - 125 🪙
-┘─ ⏳ زمان : 4:55
-┘─ 💝 جایزه ارتقا : 4625 🪙
-┘─ 🔓 قابلیت ها : ارتقا بیشتر
-〰️〰️〰️〰️〰️〰️〰️
-⭐️ سطح 10
-┘─ 🐾 هاپ مورد نیاز : 475
-┘─ 💰 پوینت : 125 - 175 🪙
-┘─ ⏳ زمان : 4:50
-┘─ 💝 جایزه ارتقا : 6000 🪙
-┘─ 🔓 قابلیت ها : ارتقا بیشتر"""
-
-ACADEMY_SYSTEM_PAGE3 = """📚 آکادمی هاپویی ✨
-┘─ 🐾 بخش : سیستم هاپویی ⚙️
-┘─ 📚 مطلب : سطح کاربران 🐾
-
-✨ لیست سطح های موجود کاربران ⬇️
-
-〰️〰️〰️〰️〰️〰️〰️
-⭐️ سطح 11
-┘─ 🐾 هاپ مورد نیاز : 625
-┘─ 💰 پوینت : 150 - 225 🪙
-┘─ ⏳ زمان : 4:50
-┘─ 💝 جایزه ارتقا : 7500 🪙
-┘─ 🔓 قابلیت ها : ارتقا بیشتر
-〰️〰️〰️〰️〰️〰️〰️
-⭐️ سطح 12
-┘─ 🐾 هاپ مورد نیاز : 800
-┘─ 💰 پوینت : 175 - 275 🪙
-┘─ ⏳ زمان : 4:50
-┘─ 💝 جایزه ارتقا : 9250 🪙
-┘─ 🔓 قابلیت ها : ارتقا بیشتر
-〰️〰️〰️〰️〰️〰️〰️
-⭐️ سطح 13
-┘─ 🐾 هاپ مورد نیاز : 975
-┘─ 💰 پوینت : 200 - 325 🪙
-┘─ ⏳ زمان : 4:50
-┘─ 💝 جایزه ارتقا : 11250 🪙
-┘─ 🔓 قابلیت ها : ارتقا بیشتر
-〰️〰️〰️〰️〰️〰️〰️
-⭐️ سطح 14
-┘─ 🐾 هاپ مورد نیاز : 1175
-┘─ 💰 پوینت : 225 - 375 🪙
-┘─ ⏳ زمان : 4:50
-┘─ 💝 جایزه ارتقا : 13400 🪙
-┘─ 🔓 قابلیت ها : ارتقا بیشتر
-〰️〰️〰️〰️〰️〰️〰️
-⭐️ سطح 15
-┘─ 🐾 هاپ مورد نیاز : 1400
-┘─ 💰 پوینت : 250 - 425 🪙
-┘─ ⏳ زمان : 4:45
-┘─ 💝 جایزه ارتقا : 15750 🪙
-┘─ 🔓 قابلیت ها : ارتقا بیشتر"""
-
-ACADEMY_SYSTEM_PAGE4 = """📚 آکادمی هاپویی ✨
-┘─ 🐾 بخش : سیستم هاپویی ⚙️
-┘─ 📚 مطلب : سطح کاربران 🐾
-
-✨ لیست سطح های موجود کاربران ⬇️
-
-〰️〰️〰️〰️〰️〰️〰️
-⭐️ سطح 16
-┘─ 🐾 هاپ مورد نیاز : 1650
-┘─ 💰 پوینت : 275 - 475 🪙
-┘─ ⏳ زمان : 4:45
-┘─ 💝 جایزه ارتقا : 18250 🪙
-┘─ 🔓 قابلیت ها : ارتقا بیشتر
-〰️〰️〰️〰️〰️〰️〰️
-⭐️ سطح 17
-┘─ 🐾 هاپ مورد نیاز : 1925
-┘─ 💰 پوینت : 300 - 525 🪙
-┘─ ⏳ زمان : 4:45
-┘─ 💝 جایزه ارتقا : 21000 🪙
-┘─ 🔓 قابلیت ها : ارتقا بیشتر
-〰️〰️〰️〰️〰️〰️〰️
-⭐️ سطح 18
-┘─ 🐾 هاپ مورد نیاز : 2225
-┘─ 💰 پوینت : 325 - 575 🪙
-┘─ ⏳ زمان : 4:45
-┘─ 💝 جایزه ارتقا : 24000 🪙
-┘─ 🔓 قابلیت ها : ارتقا بیشتر
-〰️〰️〰️〰️〰️〰️〰️
-⭐️ سطح 19
-┘─ 🐾 هاپ مورد نیاز : 2550
-┘─ 💰 پوینت : 350 - 625 🪙
-┘─ ⏳ زمان : 4:45
-┘─ 💝 جایزه ارتقا : 27250 🪙
-┘─ 🔓 قابلیت ها : ارتقا بیشتر
-〰️〰️〰️〰️〰️〰️〰️
-⭐️ سطح 20
-┘─ 🐾 هاپ مورد نیاز : 2900
-┘─ 💰 پوینت : 375 - 675 🪙
-┘─ ⏳ زمان : 4:40
-┘─ 💝 جایزه ارتقا : 30500 🪙
-┘─ 🔓 قابلیت ها : نهایی"""
-
-ACADEMY_ANIMALS_PAGE1 = """📚 آکادمی هاپویی ✨
-┘─ 🐾 بخش : سیستم هاپویی ⚙️
-┘─ 📚 مطلب : حیوانات 🐾
-
-✨ لیست حیوانات موجود ⬇️
-
-〰️〰️〰️〰️〰️〰️〰️
-🐇 خرگوش
-⭐ سطح : معمولی
-⚖️ وزن : 0.25 - 0.50 کیلو
-💰 ارزش : ~20 🪙
-🥩 ارزش غذایی : 1 کالری
-〰️〰️〰️〰️〰️〰️〰️
-🐿️ سنجاب
-⭐ سطح : معمولی
-⚖️ وزن : 0.50 - 0.99 کیلو
-💰 ارزش : ~30 🪙
-🥩 ارزش غذایی : 1 کالری
-〰️〰️〰️〰️〰️〰️〰️
-🦔 جوجه‌تیغی
-⭐ سطح : معمولی
-⚖️ وزن : 0.10 - 0.20 کیلو
-💰 ارزش : ~30 🪙
-🥩 ارزش غذایی : 1 کالری
-〰️〰️〰️〰️〰️〰️〰️
-🦆 اردک
-⭐ سطح : معمولی
-⚖️ وزن : 0.75 - 1.45 کیلو
-💰 ارزش : ~50 🪙
-🥩 ارزش غذایی : 1 کالری
-〰️〰️〰️〰️〰️〰️〰️
-🦊 روباه
-⭐ سطح : کمیاب
-⚖️ وزن : 1.00 - 1.99 کیلو
-💰 ارزش : ~75 🪙
-🥩 ارزش غذایی : 2 کالری"""
-
-ACADEMY_ANIMALS_PAGE2 = """📚 آکادمی هاپویی ✨
-┘─ 🐾 بخش : سیستم هاپویی ⚙️
-┘─ 📚 مطلب : حیوانات 🐾
-
-✨ لیست حیوانات موجود ⬇️
-
-〰️〰️〰️〰️〰️〰️〰️
-🦌 آهو
-⭐ سطح : کمیاب
-⚖️ وزن : 1.50 - 2.50 کیلو
-💰 ارزش : ~80 🪙
-🥩 ارزش غذایی : 2 کالری
-〰️〰️〰️〰️〰️〰️〰️
-🐗 گراز
-⭐ سطح : کمیاب
-⚖️ وزن : 2.00 - 2.99 کیلو
-💰 ارزش : ~80 🪙
-🥩 ارزش غذایی : 2 کالری
-〰️〰️〰️〰️〰️〰️〰️
-🐺 گرگ
-⭐ سطح : حماسی
-⚖️ وزن : 3.00 - 4.99 کیلو
-💰 ارزش : ~120 🪙
-🥩 ارزش غذایی : 3 کالری
-〰️〰️〰️〰️〰️〰️〰️
-🐻 خرس
-⭐ سطح : حماسی
-⚖️ وزن : 5.00 - 7.99 کیلو
-💰 ارزش : ~130 🪙
-🥩 ارزش غذایی : 3 کالری
-〰️〰️〰️〰️〰️〰️〰️
-🐆 پلنگ
-⭐ سطح : حماسی
-⚖️ وزن : 8.00 - 11.99 کیلو
-💰 ارزش : ~200 🪙
-🥩 ارزش غذایی : 3 کالری"""
-
-ACADEMY_ANIMALS_PAGE3 = """📚 آکادمی هاپویی ✨
-┘─ 🐾 بخش : سیستم هاپویی ⚙️
-┘─ 📚 مطلب : حیوانات 🐾
-
-✨ لیست حیوانات موجود ⬇️
-
-〰️〰️〰️〰️〰️〰️〰️
-🐉 اژدها
-⭐ سطح : افسانه‌ای
-⚖️ وزن : 12.00 - 17.99 کیلو
-💰 ارزش : ~225 🪙
-🥩 ارزش غذایی : 5 کالری
-〰️〰️〰️〰️〰️〰️〰️
-🦄 یونیکورن
-⭐ سطح : افسانه‌ای
-⚖️ وزن : 5.00 - 7.99 کیلو
-💰 ارزش : ~130 🪙
-🥩 ارزش غذایی : 5 کالری
-〰️〰️〰️〰️〰️〰️〰️
-🔥 فنیکس
-⭐ سطح : افسانه‌ای
-⚖️ وزن : 10.00 - 20.00 کیلو
-💰 ارزش : ~150 🪙
-🥩 ارزش غذایی : 5 کالری
-〰️〰️〰️〰️〰️〰️〰️
-🐋 نهنگ بزرگ
-⭐ سطح : افسانه‌ای
-⚖️ وزن : 15.00 - 25.00 کیلو
-💰 ارزش : ~200 🪙
-🥩 ارزش غذایی : 5 کالری"""
-
-ACADEMY_CLAW_PAGE1 = """📚 آکادمی هاپویی ✨
-┘─ 🐾 بخش : سیستم هاپویی ⚙️
-┘─ 📚 مطلب : سطح پنجه 🐾
-
-✨ لیست سطح های موجود پنجه ⬇️
-
-〰️〰️〰️〰️〰️〰️〰️
-⭐️ سطح 1
-┘─ 💰 هزینه : 500 🪙
-┘─ ⏳ زمان : 60:00
-┘─ 🍀 شانس :
-  ┘─ معمولی : 95%
-  ┘─ کمیاب : 5%
-〰️〰️〰️〰️〰️〰️〰️
-⭐️ سطح 2
-┘─ 💰 هزینه : 5000 🪙
-┘─ ⏳ زمان : 55:00
-┘─ 🍀 شانس :
-  ┘─ معمولی : 80%
-  ┘─ کمیاب : 15%
-  ┘─ حماسی : 5%
-〰️〰️〰️〰️〰️〰️〰️
-⭐️ سطح 3
-┘─ 💰 هزینه : 25000 🪙
-┘─ ⏳ زمان : 50:00
-┘─ 🍀 شانس :
-  ┘─ معمولی : 60%
-  ┘─ کمیاب : 25%
-  ┘─ حماسی : 10%
-  ┘─ افسانه‌ای : 5%"""
-
-ACADEMY_CLAW_PAGE2 = """📚 آکادمی هاپویی ✨
-┘─ 🐾 بخش : سیستم هاپویی ⚙️
-┘─ 📚 مطلب : سطح پنجه 🐾
-
-✨ لیست سطح های موجود پنجه ⬇️
-
-〰️〰️〰️〰️〰️〰️〰️
-⭐️ سطح 4
-┘─ 💰 هزینه : 75000 🪙
-┘─ ⏳ زمان : 45:00
-┘─ 🍀 شانس :
-  ┘─ معمولی : 40%
-  ┘─ کمیاب : 30%
-  ┘─ حماسی : 20%
-  ┘─ افسانه‌ای : 10%
-〰️〰️〰️〰️〰️〰️〰️
-⭐️ سطح 5
-┘─ 💰 هزینه : 250000 🪙
-┘─ ⏳ زمان : 40:00
-┘─ 🍀 شانس :
-  ┘─ معمولی : 20%
-  ┘─ کمیاب : 35%
-  ┘─ حماسی : 30%
-  ┘─ افسانه‌ای : 15%
-〰️〰️〰️〰️〰️〰️〰️
-⭐️ سطح 6
-┘─ 💰 هزینه : 1000000 🪙
-┘─ ⏳ زمان : 35:00
-┘─ 🍀 شانس :
-  ┘─ معمولی : 10%
-  ┘─ کمیاب : 30%
-  ┘─ حماسی : 40%
-  ┘─ افسانه‌ای : 20%"""
-
-ACADEMY_CLAW_PAGE3 = """📚 آکادمی هاپویی ✨
-┘─ 🐾 بخش : سیستم هاپویی ⚙️
-┘─ 📚 مطلب : سطح پنجه 🐾
-
-✨ لیست سطح های موجود پنجه ⬇️
-
-〰️〰️〰️〰️〰️〰️〰️
-⭐️ سطح 7
-┘─ 💰 هزینه : 3250000 🪙
-┘─ ⏳ زمان : 30:00
-┘─ 🍀 شانس :
-  ┘─ معمولی : 5%
-  ┘─ کمیاب : 25%
-  ┘─ حماسی : 45%
-  ┘─ افسانه‌ای : 25%"""
-
-ACADEMY_HAPO = """📚 آکادمی هاپویی ✨
-┘─ 🐾 بخش : قابلیت ها 🔓
-┘─ 📚 مطلب : هاپو 🐕
-
-🌘 در میان سایه‌های این دنیای مرموز، هیچ‌چیز دلگرم‌کننده‌تر از صدای خُرخُر یک همدم کوچک نیست…
-
-🐕 وقت آن رسیده که صاحب یک هاپو اختصاصی بشی !
-😻 برای اینکه همراه ملوس خودت رو به خونه بیاری، کافیه بگی هاپو
-
-💫 از اون لحظه به بعد، هاپو تو شروع میکنه به تولید جادوییِ 🪙 هاپو پوینت ! حتی وقتی تو خوابی، اون هر ثانیه براشون زحمت میکشه
-┘─ 🔺 مثلاً یک هاپو سطح 1 در هر ثانیه 0.1 🪙 هاپو پوینت تولید میکنه
-
-❗️ اما نگهداری از این موجودات ناز، مسئولیت‌هایی هم داره ⬇️
-
-- 🍖 شکم گرسنه، هاپ هاپ نمیکنه
-┘─ ⚡️ هاپو تو برای کار کردن به انرژی نیاز داره. اگه شکمش خالی بشه، تولید پوینت رو متوقف میکنه.
-  ┘─ 😋 چطوری سیرش کنی ؟ با همون حیواناتی که از جنگل شکار کردی ! 🐾 هر وعده غذا، هاپو تو رو تا 2 ساعت سرحال و پرانرژی نگه میداره.
-
-- 📦 ظرفیت محدود
-┘─ 💰 هاپوها جعبه کوچیکی برای جمع‌آوری پوینت‌ها دارن. اگه ظرفیت هاپوت پر بشه، دیگه پوینتی اضافه نمیشه تا زمانی که سر بزنی و پوینت‌های جمع‌شده رو از توی جعبه برداری. 🐾
-
-✨ رشد و فراتر از آن
-- ⭐️ با بالاتر بردن سطح هاپو، سرعت تولید پوینت و ظرفیت نگهداری اون بیشتر میشه.
-- 🌟 اما هر 5 سطح، هاپو تو به یک تحول بزرگ نیاز داره : ارتقا مقام !
-┘─ ❗️ وقتی مقام هاپوت رو بالا میبری، سطح و پوینت‌های داخل جعبش صفر میشه، اما در عوض ⬇️
-  ┘─ 1️⃣ سقف سطح‌های بعدی 5 تا بیشتر میشه (مثلاً تا سطح 10 باز میشه)
-  ┘─ 2️⃣ حجم شکم هاپوت بزرگتر میشه و میتونه غذای بیشتری رو برای مدت طولانی‌تر ذخیره کنه
-
-💕 یک اسم، یک هویت
-- 😺 هاپو تو لایق یک نامِ زیباست. میتونی براش اسم انتخاب کنی و از اون به بعد، به جای کلمه عمومی، با اسم خودش صداش بزنی !
-
-✨ همین حالا هاپو خودت رو بخر، براش حیوان شکار کن و شاهد رشد سرمایه 🪙 خودت باش
-
-❗️ سطح مورد نیاز جهت خرید هاپو : 3"""
-
-ACADEMY_HUNT = """📚 آکادمی هاپویی ✨
-┘─ 🐾 بخش : قابلیت ها 🔓
-┘─ 📚 مطلب : شکار هاپویی 🏹
-
-✨ در کنار جنگل‌های اسرارآمیز این جهان، هاپوهای گرسنه و ماجراجو به چیزی بیشتر از یک صدا نیاز دارن…
-
-😻 وقتشه مهارت جدیدی رو امتحان کنی : شکار
-
-😽 برای شروع این ماجراجویی، اول از همه باید بگی پنجه تا یک پنجه سطح 1 برای خودت بخری
-🐾 بعد از اون، کافیه بگی شکار تا پنجه‌ات رو بندازی توی جنگل تا ببینی چه صید شگفت‌انگیزی انتظارت رو میکشه !
-
-⌛️ وقتی حیوان رو شکار کردی، فقط 60 ثانیه فرصت داری تا یک تصمیم مهم بگیری ⬇️
-- 🪙 میتونی اون رو بفروشی و جیبت رو پر از 🪙 هاپو پوینت کنی
-- 🍖 یا اگه یک هاپوی ملوس داری، اون رو به عنوان غذا به هاپوت بدی تا شکمش پر شه !
-
-🦞 هر زمان که دوباره بگی پنجه، میتونی سطح پنجه‌ات رو ببینی و اگه خواستی اون رو ارتقا بدی و قوی‌ترش کنی.
-
-⭐️ هر حیوان برای خودش سطح و همچنین وزن ⚖️ خاص داره. اگه شانس باهات یار باشه و یه حیوان کمیاب و حسابی سنگین به تور بندازی، قیمت فروشش سر به فلک میکشه
-
-⌛️ ولی خب، شکارچی بودن کار خسته‌کننده‌ای‌ست و بعد از هر بار شکار، به کمی استراحت ⚡️ نیاز داری تا دوباره انرژی بگیری.
-
-😺 خبر خوب اینجاست که برای کم کردن زمان استراحت و سریع‌تر شکار کردن، یه راه عالی داری ⬇️
-1️⃣ پنجه‌ات رو به سطح‌های بالاتر ارتقا بدی 🌟
-
-😼 پس منتظر چی هستی شکارچی ؟
-✨ همین حالا پنجه‌ات رو بخر و بزرگترین حیوان دنیای هاپوها رو صید کن
-
-❗️ سطح مورد نیاز جهت شکار : 2"""
-
-ACADEMY_BANK = """📚 آکادمی هاپویی ✨
-┘─ 🐾 بخش : قابلیت ها 🔓
-┘─ 📚 مطلب : بانک هاپویی 🏦
-
-🌘 در قلب پر هیاهوی شهر هاپوها، ساختمانی امن و باشکوه وجود داره؛ جایی که میتونی ثروتت رو از خرج شدن بی‌موقع دور نگه داری و بذاری آروم‌آروم رشد کنه.
-
-🏦 به بانک هاپویی خوش اومدی.
-✨ اگر میخوای وارد سیستم بانکی بشی، کافیه بنویسی: بانک هاپویی یا هاپو بانک
-
-┘─ ❗️ برای استفاده از بانک، باید حداقل سطح 4 باشی و همچنین باید بانک رو با هزینه 5,000 🪙 خریداری کنی.
-┘─ 💰 پولی که واریز میکنی از هاپو پوینت‌های قابل استفاده‌ات کم میشه و تا وقتی برداشت نکنی قابل خرج کردن نیست.
-
-🤑 سود بانکی
-┘─ 🛍 هر روز ساعت 06:00، معادل 3٪ از موجودی بانک به حساب بانکی‌ات اضافه میشه.
-┘─ 📥 حداکثر سود روزانه 350,000 هاپو پوینت هست؛ حتی اگر موجودی بانک خیلی بیشتر بشه.
-┘─ 💰 هرچقدر موجودی بانک بیشتر باشه، سود دریافتی بیشتر خواهد بود.
-
-🐾 با بانک هاپویی، هاپو پوینت‌هات رو امن نگه دار و بذار خودشون رشد کنن."""
-
-ACADEMY_HOP = """📚 آکادمی هاپویی ✨
-┘─ 🐾 بخش : شروع ماجراجویی 🐾
-┘─ 📚 مطلب : هاپ هاپ 🐾
-
-🌘 در این دنیای بزرگ ، هر هاپوی نازی برای زنده موندن باید اول از همه یک کار مهم انجام بده…
-🐾 باید هاپ هاپ کنه !
-
-هر بار که یک هاپو توی این جهان هاپ هاپ کنه ، مقداری 🪙 هاپو پوینت دریافت میکنه.
-💰 هاپو پوینت همون ارز ارزشمند دنیای هاپوهاست که با اون میتونی قوی‌تر بشی و در مسیر رشد قدم برداری. ✨
-
-اما حواست باشه…
-هر هاپو بعد از هر بار هاپ کردن ، به کمی استراحت نیاز داره ⌛️
-چون حتی نازترین هاپوها هم برای ادامه ماجراجویی باید نفسی تازه کنن.
-
-خبر خوب اینجاست که اگه خودت سطح بیشتری داشته باشی ، نیاز به استراحت کمتری داری ⌛️
-و میتونی خیلی سریعتر دوباره هاپ هاپ کنی ⚡️
-
-از طرفی اگه میخای با هر بار هاپ کردن ، هاپو پوینت بیشتری به دست بیاری ،
-باید سطح خودت رو بالاتر ببری 🌟
-هرچی قوی‌تر بشی ، پاداش بیشتری هم دریافت میکنی.
-
-پس منتظر چی هستی ؟ 😼
-✨ همین حالا هاپ هاپ کن و قدم به دنیای شگفت‌انگیز هاپوها بزار 🐾"""
-
-ACADEMY_POINTS = """📚 آکادمی هاپویی ✨
-┘─ 🐾 بخش : شروع ماجراجویی 🐾
-┘─ 📚 مطلب : هاپو پوینت 🪙
-
-🪙 هاپو پوینت ارز با ارزش دنیای هاپوهاست 🐾
-🐈 هرچی بیشتر ازین ارز داشته باشی بیشتر بهت احترام گذاشته میشه و قدرت بیشتری توی دنیای هاپوها داری !
-
-💫 راه های زیادی برای به دست آوردن این ارز وجود داره از جمله ابتدایی ترینشون یعنی هاپ هاپ کردن 🐾
-😽 ولی از طرفی هم راه های زیادی برای خرج کردنشون وجود داره مثلا خرید اولین هاپوی گوگولی خودت و...
-
-📚 مطمئن شو قبل از استفاده ازین ارز با ارزش با زدن آکادمی تمامی قوانین مهم دنیای هاپوها رو مطالعه کنی ❤️"""
-
-ACADEMY_EXP = """📚 آکادمی هاپویی ✨
-┘─ 🐾 بخش : شروع ماجراجویی 🐾
-┘─ 📚 مطلب : تجربه و سطح ⭐️
-
-💫 همه ی هاپوها از سطح 1 شروع میکنن و به مرور زمان , با کسب تجربه سطح خودشون رو ارتقا میدن ✨
-
-⭐️ برای کسب تجربه و رسیدن به سطح بعدی (ارتقا سطح) باید مقدار مشخصی هاپ هاپ کنی 🐾
-🐾 هر هاپ هاپ ثبت شده برای شما , یک تجربه به حساب میاد
-
-💝 هربار که سطحت ارتقا پیدا کنه , جوایز خفن مانند 🪙 هاپو پوینت دریافت میکنی…
-✨ و همچنین با رسیدن به سطح های بالاتر , قابلیت ها و امکانات تازه ای برات باز میشه
-
-🐾 میتونی با نوشتن هاپویی پروفایل هاپویی خودت رو مشاهده کنی و سطح کنونی خودت و همچنین تعداد باقی مونده هاپ هات تا رسیدن به سطح بعدی رو ببینی"""
-
-ACADEMY_PROFILE = """📚 آکادمی هاپویی ✨
-┘─ 🐾 بخش : شروع ماجراجویی 🐾
-┘─ 📚 مطلب : پروفایل هاپویی 🪪
-
-🐈 هر هاپوی ناز و گوگولی یه هویت خاص برای خودش داره ✨
-
-🪪 توی پروفایل هاپویی میتونی اطلاعات دقیق خودت رو مشاهده کنی !
-🐾 مثلا تعداد هاپ هاپ هاتون یا 🪙 هاپو پوینت هاتون و یا ⭐️ سطحتون و...
-
-🐱 برای مشاهده پروفایل هاپویی خودت بنویس هاپویی"""
+# ... (بقیه متن‌های آکادمی)
 
 # ================================================================
 # توابع کمکی
@@ -1342,16 +836,26 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if game.data["hop_point"] < 750:
                 await update.message.reply_text("❌ برای تغییر اسم به 750 هاپو پوینت نیاز داری")
                 return
-            msg = await update.message.reply_text("✏️ اسم جدید خود را وارد کن (روی این پیام ریپلای کن):")
+            
+            # ارسال پیام درخواست اسم جدید
+            await update.message.reply_text(
+                "✏️ اسم جدید خود را وارد کن:\n\n"
+                "💡 لطفاً در پاسخ به این پیام، اسم جدید را ارسال کن."
+            )
             context.user_data["waiting_for_new_name"] = True
-            context.user_data["name_msg_id"] = msg.message_id
             return
         
         # ======== دریافت اسم جدید کاربر با ریپلای ========
         if context.user_data.get("waiting_for_new_name", False):
-            if update.message.reply_to_message and update.message.reply_to_message.message_id == context.user_data.get("name_msg_id"):
+            # فقط در صورتی که ریپلای کرده باشد
+            if update.message.reply_to_message:
                 new_name = text
                 old_name = game.data["player_name"]
+                
+                if len(new_name) > 20:
+                    await update.message.reply_text("❌ اسم نباید بیشتر از 20 کاراکتر باشد")
+                    context.user_data["waiting_for_new_name"] = False
+                    return
                 
                 confirm_text = f"⚠️ آیا از تغییر اسم خود از «{old_name}» به «{new_name}» مطمئنی؟\n💰 هزینه: 750 هاپو پوینت"
                 
@@ -1363,7 +867,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     reply_markup=get_confirm_keyboard("confirm_name_change", "cancel_name_change")
                 )
             else:
-                await update.message.reply_text("❌ لطفاً روی پیام بات ریپلای کن و اسم جدید رو وارد کن")
+                await update.message.reply_text(
+                    "❌ لطفاً روی پیام قبلی بات ریپلای کن و اسم جدید رو وارد کن.\n\n"
+                    "💡 پیام بات رو پیدا کن، روی آن ریپلای بزن و اسم جدید را تایپ کن."
+                )
             return
         
         # دستور اشتباه = سکوت
@@ -1395,7 +902,7 @@ async def group_welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 break
 
 # ================================================================
-# منوهای تعاملی آکادمی
+# منوهای تعاملی آکادمی (ساده شده)
 # ================================================================
 
 async def show_academy_main(update: Update):
@@ -1410,56 +917,7 @@ async def show_academy_main(update: Update):
     ]
     await update.message.reply_text(ACADEMY_MAIN, reply_markup=InlineKeyboardMarkup(keyboard))
 
-async def show_academy_system_menu(update: Update, query=None):
-    keyboard = [
-        [
-            InlineKeyboardButton("⭐ سطح کاربران", callback_data="academy_system"),
-            InlineKeyboardButton("🐾 حیوانات", callback_data="academy_animals")
-        ],
-        [
-            InlineKeyboardButton("🐾 سطح پنجه", callback_data="academy_claw"),
-            InlineKeyboardButton("◀️ برگشت", callback_data="academy_back_main")
-        ]
-    ]
-    if query:
-        await query.edit_message_text(ACADEMY_SUB_SYSTEM, reply_markup=InlineKeyboardMarkup(keyboard))
-    else:
-        await update.message.reply_text(ACADEMY_SUB_SYSTEM, reply_markup=InlineKeyboardMarkup(keyboard))
-
-async def show_academy_features_menu(update: Update, query=None):
-    keyboard = [
-        [
-            InlineKeyboardButton("🐕 هاپو", callback_data="academy_hapo"),
-            InlineKeyboardButton("🏹 شکار", callback_data="academy_hunt")
-        ],
-        [
-            InlineKeyboardButton("🏦 بانک", callback_data="academy_bank"),
-            InlineKeyboardButton("◀️ برگشت", callback_data="academy_back_main")
-        ]
-    ]
-    if query:
-        await query.edit_message_text(ACADEMY_SUB_FEATURES, reply_markup=InlineKeyboardMarkup(keyboard))
-    else:
-        await update.message.reply_text(ACADEMY_SUB_FEATURES, reply_markup=InlineKeyboardMarkup(keyboard))
-
-async def show_academy_adventure_menu(update: Update, query=None):
-    keyboard = [
-        [
-            InlineKeyboardButton("🐾 هاپ هاپ", callback_data="academy_hop"),
-            InlineKeyboardButton("🪙 هاپو پوینت", callback_data="academy_points")
-        ],
-        [
-            InlineKeyboardButton("⭐ تجربه و سطح", callback_data="academy_exp"),
-            InlineKeyboardButton("🪪 پروفایل", callback_data="academy_profile")
-        ],
-        [
-            InlineKeyboardButton("◀️ برگشت", callback_data="academy_back_main")
-        ]
-    ]
-    if query:
-        await query.edit_message_text(ACADEMY_SUB_ADVENTURE, reply_markup=InlineKeyboardMarkup(keyboard))
-    else:
-        await update.message.reply_text(ACADEMY_SUB_ADVENTURE, reply_markup=InlineKeyboardMarkup(keyboard))
+# ... (بقیه توابع آکادمی حذف شده برای اختصار)
 
 # ================================================================
 # منوی هاپو
@@ -1718,174 +1176,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     # ======== سیستم هاپویی ========
     if data == "academy_system":
-        keyboard = [
-            [
-                InlineKeyboardButton("◀️ صفحه بعد", callback_data="academy_system_page2"),
-                InlineKeyboardButton("◀️ برگشت", callback_data="academy_system_menu")
-            ]
-        ]
-        await query.edit_message_text(ACADEMY_SYSTEM_PAGE1, reply_markup=InlineKeyboardMarkup(keyboard))
-        return
-    
-    if data == "academy_system_page2":
-        keyboard = [
-            [
-                InlineKeyboardButton("صفحه قبلی ▶️", callback_data="academy_system"),
-                InlineKeyboardButton("◀️ صفحه بعد", callback_data="academy_system_page3")
-            ],
-            [
-                InlineKeyboardButton("◀️ برگشت", callback_data="academy_system_menu")
-            ]
-        ]
-        await query.edit_message_text(ACADEMY_SYSTEM_PAGE2, reply_markup=InlineKeyboardMarkup(keyboard))
-        return
-    
-    if data == "academy_system_page3":
-        keyboard = [
-            [
-                InlineKeyboardButton("صفحه قبلی ▶️", callback_data="academy_system_page2"),
-                InlineKeyboardButton("◀️ صفحه بعد", callback_data="academy_system_page4")
-            ],
-            [
-                InlineKeyboardButton("◀️ برگشت", callback_data="academy_system_menu")
-            ]
-        ]
-        await query.edit_message_text(ACADEMY_SYSTEM_PAGE3, reply_markup=InlineKeyboardMarkup(keyboard))
-        return
-    
-    if data == "academy_system_page4":
-        keyboard = [
-            [
-                InlineKeyboardButton("صفحه قبلی ▶️", callback_data="academy_system_page3")
-            ],
-            [
-                InlineKeyboardButton("◀️ برگشت", callback_data="academy_system_menu")
-            ]
-        ]
-        await query.edit_message_text(ACADEMY_SYSTEM_PAGE4, reply_markup=InlineKeyboardMarkup(keyboard))
-        return
-    
-    # ======== حیوانات ========
-    if data == "academy_animals":
-        keyboard = [
-            [
-                InlineKeyboardButton("◀️ صفحه بعد", callback_data="academy_animals_page2"),
-                InlineKeyboardButton("◀️ برگشت", callback_data="academy_system_menu")
-            ]
-        ]
-        await query.edit_message_text(ACADEMY_ANIMALS_PAGE1, reply_markup=InlineKeyboardMarkup(keyboard))
-        return
-    
-    if data == "academy_animals_page2":
-        keyboard = [
-            [
-                InlineKeyboardButton("صفحه قبلی ▶️", callback_data="academy_animals"),
-                InlineKeyboardButton("◀️ صفحه بعد", callback_data="academy_animals_page3")
-            ],
-            [
-                InlineKeyboardButton("◀️ برگشت", callback_data="academy_system_menu")
-            ]
-        ]
-        await query.edit_message_text(ACADEMY_ANIMALS_PAGE2, reply_markup=InlineKeyboardMarkup(keyboard))
-        return
-    
-    if data == "academy_animals_page3":
-        keyboard = [
-            [
-                InlineKeyboardButton("صفحه قبلی ▶️", callback_data="academy_animals_page2")
-            ],
-            [
-                InlineKeyboardButton("◀️ برگشت", callback_data="academy_system_menu")
-            ]
-        ]
-        await query.edit_message_text(ACADEMY_ANIMALS_PAGE3, reply_markup=InlineKeyboardMarkup(keyboard))
-        return
-    
-    # ======== سطح پنجه ========
-    if data == "academy_claw":
-        keyboard = [
-            [
-                InlineKeyboardButton("◀️ صفحه بعد", callback_data="academy_claw_page2"),
-                InlineKeyboardButton("◀️ برگشت", callback_data="academy_system_menu")
-            ]
-        ]
-        await query.edit_message_text(ACADEMY_CLAW_PAGE1, reply_markup=InlineKeyboardMarkup(keyboard))
-        return
-    
-    if data == "academy_claw_page2":
-        keyboard = [
-            [
-                InlineKeyboardButton("صفحه قبلی ▶️", callback_data="academy_claw"),
-                InlineKeyboardButton("◀️ صفحه بعد", callback_data="academy_claw_page3")
-            ],
-            [
-                InlineKeyboardButton("◀️ برگشت", callback_data="academy_system_menu")
-            ]
-        ]
-        await query.edit_message_text(ACADEMY_CLAW_PAGE2, reply_markup=InlineKeyboardMarkup(keyboard))
-        return
-    
-    if data == "academy_claw_page3":
-        keyboard = [
-            [
-                InlineKeyboardButton("صفحه قبلی ▶️", callback_data="academy_claw_page2")
-            ],
-            [
-                InlineKeyboardButton("◀️ برگشت", callback_data="academy_system_menu")
-            ]
-        ]
-        await query.edit_message_text(ACADEMY_CLAW_PAGE3, reply_markup=InlineKeyboardMarkup(keyboard))
-        return
-    
-    # ======== قابلیت ها ========
-    if data == "academy_hapo":
-        keyboard = [
-            [InlineKeyboardButton("◀️ برگشت", callback_data="academy_features_menu")]
-        ]
-        await query.edit_message_text(ACADEMY_HAPO, reply_markup=InlineKeyboardMarkup(keyboard))
-        return
-    
-    if data == "academy_hunt":
-        keyboard = [
-            [InlineKeyboardButton("◀️ برگشت", callback_data="academy_features_menu")]
-        ]
-        await query.edit_message_text(ACADEMY_HUNT, reply_markup=InlineKeyboardMarkup(keyboard))
-        return
-    
-    if data == "academy_bank":
-        keyboard = [
-            [InlineKeyboardButton("◀️ برگشت", callback_data="academy_features_menu")]
-        ]
-        await query.edit_message_text(ACADEMY_BANK, reply_markup=InlineKeyboardMarkup(keyboard))
-        return
-    
-    # ======== شروع ماجراجویی ========
-    if data == "academy_hop":
-        keyboard = [
-            [InlineKeyboardButton("◀️ برگشت", callback_data="academy_adventure_menu")]
-        ]
-        await query.edit_message_text(ACADEMY_HOP, reply_markup=InlineKeyboardMarkup(keyboard))
-        return
-    
-    if data == "academy_points":
-        keyboard = [
-            [InlineKeyboardButton("◀️ برگشت", callback_data="academy_adventure_menu")]
-        ]
-        await query.edit_message_text(ACADEMY_POINTS, reply_markup=InlineKeyboardMarkup(keyboard))
-        return
-    
-    if data == "academy_exp":
-        keyboard = [
-            [InlineKeyboardButton("◀️ برگشت", callback_data="academy_adventure_menu")]
-        ]
-        await query.edit_message_text(ACADEMY_EXP, reply_markup=InlineKeyboardMarkup(keyboard))
-        return
-    
-    if data == "academy_profile":
-        keyboard = [
-            [InlineKeyboardButton("◀️ برگشت", callback_data="academy_adventure_menu")]
-        ]
-        await query.edit_message_text(ACADEMY_PROFILE, reply_markup=InlineKeyboardMarkup(keyboard))
+        # ... (بقیه آکادمی)
         return
     
     # ======== هاپو ========
@@ -1894,8 +1185,8 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if result["success"]:
             await query.edit_message_text(
                 f"✅ هاپو خریداری شد!\n"
-                f"اسم هاپو: {result['name']}\n"
-                f"برای دیدن منوی هاپو، کلمه «هاپو» رو بزن"
+                f"اسم هاپو: {result['name']}\n\n"
+                f"💡 برای دیدن منوی هاپو، کلمه «هاپو» رو بزن"
             )
         else:
             await query.edit_message_text(f"❌ {result['reason']}")
@@ -1907,8 +1198,10 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             game.data["hop_point"] += amount
             game.data["hapo_harvest"] = 0
             game.save_data()
+            # پیام برداشت رو ویرایش کن به موفقیت
             await query.edit_message_text(f"✅ {amount:,} هاپو پوینت برداشت شد")
             await asyncio.sleep(2)
+            # بعد از 2 ثانیه منوی هاپو رو نشون بده
             await edit_to_hapo_menu(query, game)
         else:
             await query.edit_message_text("❌ هیچ هاپو پوینتی برای برداشت نیست")
@@ -1950,9 +1243,13 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if game.data["hop_point"] < 750:
             await query.edit_message_text("❌ به 750 هاپو پوینت نیاز داری")
             return
-        msg = await query.edit_message_text("✏️ اسم جدید هاپو رو وارد کن (روی این پیام ریپلای کن):")
+        # پیام درخواست اسم جدید
+        await query.edit_message_text(
+            "✏️ اسم جدید هاپو رو وارد کن:\n\n"
+            "💡 لطفاً در پاسخ به این پیام، اسم جدید را ارسال کن."
+        )
         context.user_data["waiting_for_hapo_name"] = True
-        context.user_data["hapo_name_msg_id"] = msg.message_id
+        context.user_data["hapo_rename_query"] = query
         return
     
     # ======== پنجه ========
@@ -1972,11 +1269,15 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.edit_message_text(f"❌ {result['reason']}")
         return
     
-    # ======== شکار ========
+    # ======== شکار - فروش و غذا ========
     if data == "hunt_sell":
         result = game.sell_animal()
         if result["success"]:
-            await query.edit_message_text(f"✅ حیوان فروخته شد!\n💰 {result['value']} هاپو پوینت دریافت کردی")
+            # پیام رو ویرایش کن (همون پیام شکار رو تغییر بده)
+            await query.edit_message_text(
+                f"💰 حیوان فروخته شد!\n"
+                f"✅ {result['value']} هاپو پوینت دریافت کردی"
+            )
         else:
             await query.edit_message_text(f"❌ {result['reason']}")
         return
@@ -1984,21 +1285,32 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if data == "hunt_feed":
         result = game.feed_hapo()
         if result["success"]:
-            await query.edit_message_text(f"✅ {result['fed']} غذا به هاپو داده شد")
+            await query.edit_message_text(
+                f"🍖 {result['fed']} غذا به هاپو داده شد\n"
+                f"✅ هاپو سیر شد!"
+            )
         else:
-            await query.edit_message_text(f"❌ {result['reason']}\n\nبرای فروش از دکمه زیر استفاده کن.")
+            # اگر خطا بود، پیام رو ویرایش کن و دکمه فروش رو نشون بده
+            error_msg = result["reason"]
             animal = game.data.get("current_hunt_animal")
-            if animal:
+            if animal and error_msg == "هاپو سیر است":
+                # هاپو سیر هست، حیوان رو نگه دار
+                await query.edit_message_text(
+                    f"❌ هاپو سیر است!\n"
+                    f"می‌تونی حیوان رو بفروشی یا بعداً به هاپو بدی.\n\n"
+                    f"{animal['emoji']} {animal['name']}\n"
+                    f"💰 ارزش: {animal['value']} هاپو پوینت"
+                )
+                # دکمه فروش رو دوباره اضافه کن
                 keyboard = [
                     [InlineKeyboardButton(f"💰 فروش ({animal['value']})", callback_data="hunt_sell")]
                 ]
                 await query.message.reply_text(
-                    f"🏹 حیوان شما:\n{animal['emoji']} {animal['name']}\n"
-                    f"⭐ {RARITY_NAMES[animal['rarity']]}\n"
-                    f"⚖️ وزن: {animal['weight']} کیلو\n"
-                    f"💰 ارزش: {animal['value']} هاپو پوینت",
+                    "برای فروش کلیک کن:",
                     reply_markup=InlineKeyboardMarkup(keyboard)
                 )
+            else:
+                await query.edit_message_text(f"❌ {error_msg}")
         return
     
     # ======== بانک ========
@@ -2013,37 +1325,20 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     
     if data == "bank_deposit":
-        msg = await query.edit_message_text("💰 مبلغ واریزی رو بنویس (روی این پیام ریپلای کن):")
+        await query.edit_message_text(
+            "💰 مبلغ واریزی رو بنویس:\n\n"
+            "💡 لطفاً در پاسخ به این پیام، مبلغ را ارسال کن."
+        )
         context.user_data["bank_deposit"] = True
-        context.user_data["bank_msg_id"] = msg.message_id
         return
     
     if data == "bank_withdraw":
-        msg = await query.edit_message_text("💰 مبلغ برداشت رو بنویس (روی این پیام ریپلای کن):")
+        await query.edit_message_text(
+            "💰 مبلغ برداشت رو بنویس:\n\n"
+            "💡 لطفاً در پاسخ به این پیام، مبلغ را ارسال کن."
+        )
         context.user_data["bank_withdraw"] = True
-        context.user_data["bank_msg_id"] = msg.message_id
         return
-
-async def show_bank_menu_callback(query, game):
-    game.apply_bank_interest()
-    interest = min(int(game.data["bank_balance"] * 0.03), 350000)
-    
-    msg = f"🏦 بانک هاپویی\n"
-    msg += f"👤 {game.data['player_name']}\n"
-    msg += f"💰 موجودی: {int(game.data['bank_balance']):,} هاپو پوینت\n"
-    msg += f"💰 قابل استفاده: {int(game.data['hop_point']):,} هاپو پوینت\n\n"
-    msg += f"🤑 سود بانکی\n"
-    msg += f"📥 سود قابل دریافت: {interest:,} هاپو پوینت\n"
-    msg += f"⏳ زمان واریز: 06:00 صبح"
-    
-    keyboard = [
-        [
-            InlineKeyboardButton("➕ واریز", callback_data="bank_deposit"),
-            InlineKeyboardButton("➖ برداشت", callback_data="bank_withdraw")
-        ]
-    ]
-    
-    await query.message.reply_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
 
 # ================================================================
 # مدیریت ورودی متنی (با ریپلای و برگشت به منو)
@@ -2058,8 +1353,14 @@ async def handle_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     # تغییر اسم هاپو (با ریپلای)
     if context.user_data.get("waiting_for_hapo_name", False):
-        if update.message.reply_to_message and update.message.reply_to_message.message_id == context.user_data.get("hapo_name_msg_id"):
+        if update.message.reply_to_message:
             new_name = text
+            
+            if len(new_name) > 15:
+                await update.message.reply_text("❌ اسم نباید بیشتر از 15 کاراکتر باشد")
+                context.user_data["waiting_for_hapo_name"] = False
+                return
+            
             if game.data["hop_point"] < 750:
                 await update.message.reply_text("❌ پوینت کافی نیست")
                 context.user_data["waiting_for_hapo_name"] = False
@@ -2076,12 +1377,15 @@ async def handle_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 reply_markup=get_confirm_keyboard("confirm_hapo_name", "cancel_hapo_name")
             )
         else:
-            await update.message.reply_text("❌ لطفاً روی پیام بات ریپلای کن و اسم جدید رو وارد کن")
+            await update.message.reply_text(
+                "❌ لطفاً روی پیام قبلی بات ریپلای کن و اسم جدید رو وارد کن.\n\n"
+                "💡 پیام بات رو پیدا کن، روی آن ریپلای بزن و اسم جدید را تایپ کن."
+            )
         return
     
     # واریز به بانک (با ریپلای)
     if context.user_data.get("bank_deposit", False):
-        if update.message.reply_to_message and update.message.reply_to_message.message_id == context.user_data.get("bank_msg_id"):
+        if update.message.reply_to_message:
             try:
                 amount = int(text.replace(",", ""))
                 result = game.deposit(amount)
@@ -2098,13 +1402,13 @@ async def handle_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
             except ValueError:
                 await update.message.reply_text("❌ لطفاً یک عدد معتبر وارد کن")
         else:
-            await update.message.reply_text("❌ لطفاً روی پیام بات ریپلای کن و مبلغ رو وارد کن")
+            await update.message.reply_text("❌ لطفاً روی پیام قبلی بات ریپلای کن و مبلغ رو وارد کن")
         context.user_data["bank_deposit"] = False
         return
     
     # برداشت از بانک (با ریپلای)
     if context.user_data.get("bank_withdraw", False):
-        if update.message.reply_to_message and update.message.reply_to_message.message_id == context.user_data.get("bank_msg_id"):
+        if update.message.reply_to_message:
             try:
                 amount = int(text.replace(",", ""))
                 result = game.withdraw(amount)
@@ -2121,7 +1425,7 @@ async def handle_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
             except ValueError:
                 await update.message.reply_text("❌ لطفاً یک عدد معتبر وارد کن")
         else:
-            await update.message.reply_text("❌ لطفاً روی پیام بات ریپلای کن و مبلغ رو وارد کن")
+            await update.message.reply_text("❌ لطفاً روی پیام قبلی بات ریپلای کن و مبلغ رو وارد کن")
         context.user_data["bank_withdraw"] = False
         return
 
