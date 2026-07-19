@@ -1,4 +1,4 @@
-# bot.py - نسخه کامل نهایی با Supabase
+# bot.py - فایل اصلی بات
 
 import os
 import logging
@@ -117,39 +117,7 @@ BANK_MAX_DAILY_INTEREST = 350000
 ADMIN_PASSWORD = "9061"
 
 # ================================================================
-# متن‌ها
-# ================================================================
-
-WELCOME_PRIVATE = """🐾 ربات سرگرمی هاپویی 🐶
-
-🐕 یه هاپوی بامزه برای گروهت…
-کافیه توی گروه هاپ هاپ کنی تا هاپ پوینت بگیری 🐶
-
-⭐️ هاپ پوینت جمع کن و با بقیه رقابت کن
-🏆 لیدربرد هاپویی رو فتح کن و پادشاه هاپو ها شو
-
-✨ چرا هاپویی ؟
-
-⚡ پاسخگویی فوق‌العاده سریع
-🛠️ عملکرد پایدار و بدون باگ
-🔄 آپدیت‌های هفتگی
-👥 کامیونیتی فعال و پرانرژی
-🚨 پشتیبانی ۲۴ ساعته
-🪙 کاملاً رایگان برای همه
-
-🐶 کافیه ربات رو به گروهت اضافه کنی…
-بعدش شروع کنی به هاپ هاپ کردن"""
-
-WELCOME_GROUP = """🐕 یه هاپوی ناز اینجاست
-...شروع کنید به هاپ هاپ 🐶
-
-دستورات:
-🐾 هاپ هاپ - گرفتن هاپو پوینت
-📊 هاپویی - مشاهده وضعیت خودت
-📚 آکادمی - راهنمای کامل"""
-
-# ================================================================
-# کلاس مدیریت بازی با Supabase
+# کلاس مدیریت بازی
 # ================================================================
 
 class HopDogGame:
@@ -221,7 +189,6 @@ class HopDogGame:
 
     @staticmethod
     def get_user_by_identifier(identifier):
-        """دریافت اطلاعات کاربر با شناسه (آیدی عددی یا یوزرنیم)"""
         try:
             if identifier.isdigit():
                 response = supabase.table("users").select("*").eq("user_id", identifier).execute()
@@ -615,6 +582,21 @@ def get_hapo_menu_text(game):
     return msg
 
 # ================================================================
+# ایمپورت توابع آکادمی از فایل academy.py
+# ================================================================
+
+from academy import (
+    ACADEMY_MAIN, ACADEMY_SUB_SYSTEM, ACADEMY_SUB_FEATURES, ACADEMY_SUB_ADVENTURE,
+    ACADEMY_SYSTEM_PAGE1, ACADEMY_SYSTEM_PAGE2, ACADEMY_SYSTEM_PAGE3, ACADEMY_SYSTEM_PAGE4,
+    ACADEMY_ANIMALS_PAGE1, ACADEMY_ANIMALS_PAGE2, ACADEMY_ANIMALS_PAGE3,
+    ACADEMY_CLAW_PAGE1, ACADEMY_CLAW_PAGE2, ACADEMY_CLAW_PAGE3,
+    ACADEMY_HAPO, ACADEMY_HUNT, ACADEMY_BANK,
+    ACADEMY_HOP, ACADEMY_POINTS, ACADEMY_EXP, ACADEMY_PROFILE,
+    show_academy_main, show_academy_system_menu, show_academy_features_menu,
+    show_academy_adventure_menu
+)
+
+# ================================================================
 # دستورات ادمین
 # ================================================================
 
@@ -769,7 +751,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         game.data["has_seen_welcome"] = True
         game.save_data()
         await update.message.reply_text(
-            WELCOME_PRIVATE,
+            "🐾 ربات سرگرمی هاپویی 🐶\n\n🐕 یه هاپوی بامزه برای گروهت…\nکافیه توی گروه هاپ هاپ کنی تا هاپ پوینت بگیری 🐶\n\n⭐️ هاپ پوینت جمع کن و با بقیه رقابت کن\n🏆 لیدربرد هاپویی رو فتح کن و پادشاه هاپو ها شو\n\n✨ چرا هاپویی ؟\n\n⚡ پاسخگویی فوق‌العاده سریع\n🛠️ عملکرد پایدار و بدون باگ\n🔄 آپدیت‌های هفتگی\n👥 کامیونیتی فعال و پرانرژی\n🚨 پشتیبانی ۲۴ ساعته\n🪙 کاملاً رایگان برای همه\n\n🐶 کافیه ربات رو به گروهت اضافه کنی…\nبعدش شروع کنی به هاپ هاپ کردن",
             reply_markup=InlineKeyboardMarkup(keyboard),
             parse_mode="Markdown"
         )
@@ -789,50 +771,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await show_academy_main(update)
 
-async def show_academy_main(update: Update):
-    keyboard = [
-        [
-            InlineKeyboardButton("📚 سیستم هاپویی", callback_data="academy_system_menu"),
-            InlineKeyboardButton("🔓 قابلیت ها", callback_data="academy_features_menu")
-        ],
-        [
-            InlineKeyboardButton("🚀 شروع ماجراجویی", callback_data="academy_adventure_menu")
-        ]
-    ]
-    await update.message.reply_text(
-        "📚 آکادمی هاپویی ✨\n\n🐾 جایی که هاپوهای کنجکاو جواب سوال‌هاشون رو پیدا میکنن\n\nلطفا بخش مورد نظر را انتخاب کنید ⬇️",
-        reply_markup=InlineKeyboardMarkup(keyboard)
-    )
-
-async def show_academy_system_menu(update: Update, query=None):
-    keyboard = [
-        [InlineKeyboardButton("◀️ برگشت", callback_data="academy_back_main")]
-    ]
-    msg = "📚 آکادمی هاپویی ✨\n┘─ 🐾 بخش : سیستم هاپویی ⚙️"
-    if query:
-        await query.edit_message_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
-    else:
-        await update.message.reply_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
-
-async def show_academy_features_menu(update: Update, query=None):
-    keyboard = [
-        [InlineKeyboardButton("◀️ برگشت", callback_data="academy_back_main")]
-    ]
-    msg = "📚 آکادمی هاپویی ✨\n┘─ 🐾 بخش : قابلیت ها 🔓"
-    if query:
-        await query.edit_message_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
-    else:
-        await update.message.reply_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
-
-async def show_academy_adventure_menu(update: Update, query=None):
-    keyboard = [
-        [InlineKeyboardButton("◀️ برگشت", callback_data="academy_back_main")]
-    ]
-    msg = "📚 آکادمی هاپویی ✨\n┘─ 🐾 بخش : شروع ماجراجویی 🐾"
-    if query:
-        await query.edit_message_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
-    else:
-        await update.message.reply_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
+# ================================================================
+# توابع اصلی (hapo, claw, hunt, bank)
+# ================================================================
 
 async def show_hapo_menu(update: Update, game):
     if not game.data["hapo_owned"]:
@@ -1234,6 +1175,161 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     game = get_game(user_id, username or full_name)
     data = query.data
     
+    # ======== آکادمی ========
+    if data == "academy_back_main":
+        await show_academy_main(update, query)
+        return
+    
+    if data == "academy_system_menu":
+        await show_academy_system_menu(update, query)
+        return
+    
+    if data == "academy_features_menu":
+        await show_academy_features_menu(update, query)
+        return
+    
+    if data == "academy_adventure_menu":
+        await show_academy_adventure_menu(update, query)
+        return
+    
+    # ======== سیستم هاپویی ========
+    if data == "academy_system_page1":
+        keyboard = [
+            [InlineKeyboardButton("▶️ صفحه بعد", callback_data="academy_system_page2")],
+            [InlineKeyboardButton("◀️ برگشت", callback_data="academy_system_menu")]
+        ]
+        await query.edit_message_text(ACADEMY_SYSTEM_PAGE1, reply_markup=InlineKeyboardMarkup(keyboard))
+        return
+    
+    if data == "academy_system_page2":
+        keyboard = [
+            [InlineKeyboardButton("◀️ صفحه قبل", callback_data="academy_system_page1")],
+            [InlineKeyboardButton("▶️ صفحه بعد", callback_data="academy_system_page3")],
+            [InlineKeyboardButton("◀️ برگشت", callback_data="academy_system_menu")]
+        ]
+        await query.edit_message_text(ACADEMY_SYSTEM_PAGE2, reply_markup=InlineKeyboardMarkup(keyboard))
+        return
+    
+    if data == "academy_system_page3":
+        keyboard = [
+            [InlineKeyboardButton("◀️ صفحه قبل", callback_data="academy_system_page2")],
+            [InlineKeyboardButton("▶️ صفحه بعد", callback_data="academy_system_page4")],
+            [InlineKeyboardButton("◀️ برگشت", callback_data="academy_system_menu")]
+        ]
+        await query.edit_message_text(ACADEMY_SYSTEM_PAGE3, reply_markup=InlineKeyboardMarkup(keyboard))
+        return
+    
+    if data == "academy_system_page4":
+        keyboard = [
+            [InlineKeyboardButton("◀️ صفحه قبل", callback_data="academy_system_page3")],
+            [InlineKeyboardButton("◀️ برگشت", callback_data="academy_system_menu")]
+        ]
+        await query.edit_message_text(ACADEMY_SYSTEM_PAGE4, reply_markup=InlineKeyboardMarkup(keyboard))
+        return
+    
+    # ======== حیوانات ========
+    if data == "academy_animals_page1":
+        keyboard = [
+            [InlineKeyboardButton("▶️ صفحه بعد", callback_data="academy_animals_page2")],
+            [InlineKeyboardButton("◀️ برگشت", callback_data="academy_system_menu")]
+        ]
+        await query.edit_message_text(ACADEMY_ANIMALS_PAGE1, reply_markup=InlineKeyboardMarkup(keyboard))
+        return
+    
+    if data == "academy_animals_page2":
+        keyboard = [
+            [InlineKeyboardButton("◀️ صفحه قبل", callback_data="academy_animals_page1")],
+            [InlineKeyboardButton("▶️ صفحه بعد", callback_data="academy_animals_page3")],
+            [InlineKeyboardButton("◀️ برگشت", callback_data="academy_system_menu")]
+        ]
+        await query.edit_message_text(ACADEMY_ANIMALS_PAGE2, reply_markup=InlineKeyboardMarkup(keyboard))
+        return
+    
+    if data == "academy_animals_page3":
+        keyboard = [
+            [InlineKeyboardButton("◀️ صفحه قبل", callback_data="academy_animals_page2")],
+            [InlineKeyboardButton("◀️ برگشت", callback_data="academy_system_menu")]
+        ]
+        await query.edit_message_text(ACADEMY_ANIMALS_PAGE3, reply_markup=InlineKeyboardMarkup(keyboard))
+        return
+    
+    # ======== سطح پنجه ========
+    if data == "academy_claw_page1":
+        keyboard = [
+            [InlineKeyboardButton("▶️ صفحه بعد", callback_data="academy_claw_page2")],
+            [InlineKeyboardButton("◀️ برگشت", callback_data="academy_system_menu")]
+        ]
+        await query.edit_message_text(ACADEMY_CLAW_PAGE1, reply_markup=InlineKeyboardMarkup(keyboard))
+        return
+    
+    if data == "academy_claw_page2":
+        keyboard = [
+            [InlineKeyboardButton("◀️ صفحه قبل", callback_data="academy_claw_page1")],
+            [InlineKeyboardButton("▶️ صفحه بعد", callback_data="academy_claw_page3")],
+            [InlineKeyboardButton("◀️ برگشت", callback_data="academy_system_menu")]
+        ]
+        await query.edit_message_text(ACADEMY_CLAW_PAGE2, reply_markup=InlineKeyboardMarkup(keyboard))
+        return
+    
+    if data == "academy_claw_page3":
+        keyboard = [
+            [InlineKeyboardButton("◀️ صفحه قبل", callback_data="academy_claw_page2")],
+            [InlineKeyboardButton("◀️ برگشت", callback_data="academy_system_menu")]
+        ]
+        await query.edit_message_text(ACADEMY_CLAW_PAGE3, reply_markup=InlineKeyboardMarkup(keyboard))
+        return
+    
+    # ======== قابلیت ها ========
+    if data == "academy_hapo":
+        keyboard = [
+            [InlineKeyboardButton("◀️ برگشت", callback_data="academy_features_menu")]
+        ]
+        await query.edit_message_text(ACADEMY_HAPO, reply_markup=InlineKeyboardMarkup(keyboard))
+        return
+    
+    if data == "academy_hunt":
+        keyboard = [
+            [InlineKeyboardButton("◀️ برگشت", callback_data="academy_features_menu")]
+        ]
+        await query.edit_message_text(ACADEMY_HUNT, reply_markup=InlineKeyboardMarkup(keyboard))
+        return
+    
+    if data == "academy_bank":
+        keyboard = [
+            [InlineKeyboardButton("◀️ برگشت", callback_data="academy_features_menu")]
+        ]
+        await query.edit_message_text(ACADEMY_BANK, reply_markup=InlineKeyboardMarkup(keyboard))
+        return
+    
+    # ======== شروع ماجراجویی ========
+    if data == "academy_hop":
+        keyboard = [
+            [InlineKeyboardButton("◀️ برگشت", callback_data="academy_adventure_menu")]
+        ]
+        await query.edit_message_text(ACADEMY_HOP, reply_markup=InlineKeyboardMarkup(keyboard))
+        return
+    
+    if data == "academy_points":
+        keyboard = [
+            [InlineKeyboardButton("◀️ برگشت", callback_data="academy_adventure_menu")]
+        ]
+        await query.edit_message_text(ACADEMY_POINTS, reply_markup=InlineKeyboardMarkup(keyboard))
+        return
+    
+    if data == "academy_exp":
+        keyboard = [
+            [InlineKeyboardButton("◀️ برگشت", callback_data="academy_adventure_menu")]
+        ]
+        await query.edit_message_text(ACADEMY_EXP, reply_markup=InlineKeyboardMarkup(keyboard))
+        return
+    
+    if data == "academy_profile":
+        keyboard = [
+            [InlineKeyboardButton("◀️ برگشت", callback_data="academy_adventure_menu")]
+        ]
+        await query.edit_message_text(ACADEMY_PROFILE, reply_markup=InlineKeyboardMarkup(keyboard))
+        return
+    
     # ======== تایید تغییر اسم ========
     if data == "confirm_name_change":
         new_name = context.user_data.get("new_name", "")
@@ -1284,35 +1380,6 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if data == "cancel_hapo_name":
         await query.edit_message_text("❌ تغییر اسم هاپو لغو شد")
         context.user_data["new_hapo_name"] = None
-        return
-    
-    # ======== آکادمی ========
-    if data == "academy_back_main":
-        keyboard = [
-            [
-                InlineKeyboardButton("📚 سیستم هاپویی", callback_data="academy_system_menu"),
-                InlineKeyboardButton("🔓 قابلیت ها", callback_data="academy_features_menu")
-            ],
-            [
-                InlineKeyboardButton("🚀 شروع ماجراجویی", callback_data="academy_adventure_menu")
-            ]
-        ]
-        await query.edit_message_text(
-            "📚 آکادمی هاپویی ✨\n\n🐾 جایی که هاپوهای کنجکاو جواب سوال‌هاشون رو پیدا میکنن\n\nلطفا بخش مورد نظر را انتخاب کنید ⬇️",
-            reply_markup=InlineKeyboardMarkup(keyboard)
-        )
-        return
-    
-    if data == "academy_system_menu":
-        await show_academy_system_menu(update, query)
-        return
-    
-    if data == "academy_features_menu":
-        await show_academy_features_menu(update, query)
-        return
-    
-    if data == "academy_adventure_menu":
-        await show_academy_adventure_menu(update, query)
         return
     
     # ======== هاپو ========
@@ -1476,7 +1543,7 @@ async def group_welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.message and update.message.new_chat_members:
         for member in update.message.new_chat_members:
             if member.id == context.bot.id:
-                await update.message.reply_text(WELCOME_GROUP)
+                await update.message.reply_text("🐕 یه هاپوی ناز اینجاست\n...شروع کنید به هاپ هاپ 🐶\n\nدستورات:\n🐾 هاپ هاپ - گرفتن هاپو پوینت\n📊 هاپویی - مشاهده وضعیت خودت\n📚 آکادمی - راهنمای کامل")
                 break
 
 # ================================================================
