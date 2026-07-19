@@ -6,15 +6,16 @@ from datetime import datetime
 from data import *
 
 class HopDogGame:
-    def __init__(self, user_id):
+    def __init__(self, user_id, username=""):
         self.user_id = user_id
+        self.username = username
         self.data = self.load_data()
         if not self.data:
             self.reset_data()
 
     def reset_data(self):
         self.data = {
-            "player_name": "",
+            "player_name": self.username or f"کاربر{self.user_id}",
             "hop_point": 0,
             "last_hop_time": 0,
             "level": 1,
@@ -34,7 +35,7 @@ class HopDogGame:
             "bank_balance": 0,
             "bank_last_interest_at": 0,
             "bank_last_interest_amount": 0,
-            "waiting_for_name": True,
+            "has_seen_welcome": False,
         }
         self.save_data()
 
@@ -78,7 +79,6 @@ class HopDogGame:
         self.data["last_hop_time"] = now
         self.data["hop_count"] += 1
         
-        # بررسی ارتقا سطح
         required = self.get_required_for_level(self.data["level"])
         if self.data["level"] < MAX_LEVEL and self.data["hop_count"] >= required:
             self.data["hop_count"] = 0
@@ -292,7 +292,6 @@ class HopDogGame:
             self.data["bank_last_interest_at"] = now
             return
         
-        # محاسبه سود بر اساس موجودی فعلی
         interest = min(int(self.data["bank_balance"] * BANK_INTEREST_RATE), BANK_MAX_DAILY_INTEREST)
         if interest > 0:
             self.data["bank_balance"] += interest
