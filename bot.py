@@ -1,4 +1,4 @@
-# bot.py - با دیتابیس Supabase
+# bot.py - نسخه نهایی با Supabase + حل مشکل ریپلای
 
 import os
 import logging
@@ -7,7 +7,7 @@ import json
 import asyncio
 from datetime import datetime
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, ContextTypes, filters
+from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, ContextTypes, filters, ConversationHandler
 from supabase import create_client, Client
 
 # ================================================================
@@ -19,7 +19,6 @@ TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 if not TOKEN:
     raise ValueError("TELEGRAM_BOT_TOKEN not set")
 
-# 🔗 اتصال به Supabase
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
 if not SUPABASE_URL or not SUPABASE_KEY:
@@ -28,7 +27,7 @@ if not SUPABASE_URL or not SUPABASE_KEY:
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # ================================================================
-# داده‌های ثابت (همون قبلی)
+# داده‌های ثابت
 # ================================================================
 
 LEVEL_DATA = {
@@ -118,6 +117,16 @@ BANK_MAX_DAILY_INTEREST = 350000
 ADMIN_PASSWORD = "9061"
 
 # ================================================================
+# وضعیت‌های Conversation
+# ================================================================
+
+WAITING_FOR_NAME = 1
+WAITING_FOR_HAPO_NAME = 2
+WAITING_FOR_DEPOSIT = 3
+WAITING_FOR_WITHDRAW = 4
+WAITING_FOR_ADMIN = 5
+
+# ================================================================
 # متن‌ها
 # ================================================================
 
@@ -155,50 +164,46 @@ WELCOME_GROUP = """🐕 یه هاپوی ناز اینجاست
 
 class HopDogGame:
     def __init__(self, user_id, username=""):
-        self.user_id = user_id
+        self.user_id = str(user_id)
         self.username = username
         self.data = self.load_data()
         if not self.data:
             self.reset_data()
 
     def load_data(self):
-        """بارگذاری دیتا از Supabase"""
         try:
-            response = supabase.table("users").select("*").eq("user_id", str(self.user_id)).execute()
+            response = supabase.table("users").select("*").eq("user_id", self.user_id).execute()
             if response.data and len(response.data) > 0:
                 data = response.data[0]
-                # تبدیل فیلدهای JSON
                 if "current_hunt_animal" in data and data["current_hunt_animal"]:
-                    data["current_hunt_animal"] = json.loads(data["current_hunt_animal"])
+                    try:
+                        data["current_hunt_animal"] = json.loads(data["current_hunt_animal"])
+                    except:
+                        data["current_hunt_animal"] = None
                 return data
             return None
         except Exception as e:
-            logging.error(f"Error loading data from Supabase: {e}")
+            logging.error(f"Error loading data: {e}")
             return None
 
     def save_data(self):
-        """ذخیره دیتا در Supabase"""
         try:
             data_to_save = {**self.data}
-            # تبدیل فیلدهای JSON به string
             if "current_hunt_animal" in data_to_save and data_to_save["current_hunt_animal"]:
                 data_to_save["current_hunt_animal"] = json.dumps(data_to_save["current_hunt_animal"])
-            
-            # حذف کلیدهای اضافی
             if "created_at" in data_to_save:
                 del data_to_save["created_at"]
+            data_to_save["last_updated"] = datetime.now().isoformat()
             
-            # Upsert: اگه وجود داشت آپدیت کن، اگه نداشت ایجاد کن
-            response = supabase.table("users").upsert(data_to_save).execute()
+            supabase.table("users").upsert(data_to_save).execute()
             return True
         except Exception as e:
-            logging.error(f"Error saving data to Supabase: {e}")
+            logging.error(f"Error saving data: {e}")
             return False
 
     def reset_data(self):
-        """ریست کردن دیتا به حالت اولیه"""
         self.data = {
-            "user_id": str(self.user_id),
+            "user_id": self.user_id,
             "player_name": self.username or f"کاربر{self.user_id}",
             "hop_point": 0,
             "last_hop_time": 0,
@@ -223,35 +228,6 @@ class HopDogGame:
             "last_updated": datetime.now().isoformat()
         }
         self.save_data()
-
-    def _ensure_fields(self, data):
-        """اطمینان از وجود همه فیلدها"""
-        default_fields = {
-            "player_name": self.username or f"کاربر{self.user_id}",
-            "hop_point": 0,
-            "last_hop_time": 0,
-            "level": 1,
-            "hop_count": 0,
-            "is_admin": False,
-            "claw_level": 0,
-            "last_hunt_time": 0,
-            "hunt_active": False,
-            "hapo_owned": False,
-            "hapo_name": "",
-            "hapo_rank": 0,
-            "hapo_level": 1,
-            "hapo_food": 4,
-            "hapo_harvest": 0,
-            "hapo_last_update": datetime.now().timestamp(),
-            "bank_opened": False,
-            "bank_balance": 0,
-            "bank_last_interest_at": 0,
-            "has_seen_welcome": False,
-            "current_hunt_animal": None,
-        }
-        for key, value in default_fields.items():
-            if key not in data:
-                data[key] = value
 
     def get_level_data(self, level):
         return LEVEL_DATA.get(level, LEVEL_DATA[1])
@@ -551,7 +527,7 @@ class HopDogGame:
         return {"success": True, "new_balance": self.data["bank_balance"]}
 
 # ================================================================
-# دیکشنری کاربران (کش)
+# دیکشنری کاربران
 # ================================================================
 
 user_games = {}
@@ -562,7 +538,6 @@ def get_game(user_id, username=""):
     return user_games[user_id]
 
 def get_user_link(user_id, username, full_name):
-    """ساخت لینک به پروفایل کاربر با نام نمایشی"""
     display_name = full_name or f"کاربر{user_id}"
     if username:
         return f"@{username}"
@@ -628,11 +603,795 @@ def get_hapo_menu_text(game):
     return msg
 
 # ================================================================
-# بقیه کد (همون قبلی) - به دلیل طولانی شدن، بخش‌های تکراری حذف شده
-# اما همه توابع به همین شکل کار میکنن
+# دستورات بات
 # ================================================================
 
-# ... (بقیه توابع مثل آکادمی، منوها، هندلرها، و ...)
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    username = update.effective_user.username
+    full_name = update.effective_user.full_name or f"کاربر{user_id}"
+    
+    display_name = get_user_link(user_id, username, full_name)
+    game = get_game(user_id, username or full_name)
+    
+    keyboard = [
+        [InlineKeyboardButton("➕ افزودن به گروه", url=f"https://t.me/{context.bot.username}?startgroup=start")]
+    ]
+    
+    if not game.data.get("has_seen_welcome", False):
+        game.data["has_seen_welcome"] = True
+        game.save_data()
+        await update.message.reply_text(
+            WELCOME_PRIVATE,
+            reply_markup=InlineKeyboardMarkup(keyboard),
+            parse_mode="Markdown"
+        )
+    else:
+        await update.message.reply_text(
+            f"🐾 سلام {display_name}!\n"
+            "به هاپ داگ خوش اومدی 🐕\n\n"
+            "دستورات:\n"
+            "🐾 هاپ هاپ - گرفتن هاپو پوینت\n"
+            "📊 هاپویی - مشاهده وضعیت خودت\n"
+            "📚 آکادمی - راهنمای کامل\n"
+            "🔒 برای دستورات ادمین، از پیوی بات استفاده کنید.",
+            reply_markup=InlineKeyboardMarkup(keyboard),
+            parse_mode="Markdown"
+        )
+
+async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await show_academy_main(update)
+
+async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    context.user_data.clear()
+    await update.message.reply_text("✅ لغو شد.")
+
+# ================================================================
+# هندلرهای Conversation برای حل مشکل ریپلای
+# ================================================================
+
+async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    username = update.effective_user.username
+    full_name = update.effective_user.full_name or f"کاربر{user_id}"
+    game = get_game(user_id, username or full_name)
+    text = update.message.text.strip()
+    text_lower = text.lower()
+    is_private = update.message.chat.type == "private"
+    is_group = update.message.chat.type in ["group", "supergroup"]
+    
+    # ======== ذخیره اطلاعات گروه ========
+    if is_group:
+        try:
+            chat_id = update.message.chat.id
+            chat_title = update.message.chat.title
+            groups_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "groups.json")
+            groups_data = {}
+            if os.path.exists(groups_file):
+                with open(groups_file, "r", encoding="utf-8") as f:
+                    groups_data = json.load(f)
+            groups_data[str(chat_id)] = {
+                "title": chat_title,
+                "added_at": datetime.now().isoformat()
+            }
+            with open(groups_file, "w", encoding="utf-8") as f:
+                json.dump(groups_data, f, ensure_ascii=False, indent=2)
+        except:
+            pass
+    
+    # ======== بررسی اینکه آیا کاربر در حالت انتظار ورودی هست ========
+    if context.user_data.get("waiting_for_name"):
+        await process_name_input(update, context)
+        return
+    
+    if context.user_data.get("waiting_for_hapo_name"):
+        await process_hapo_name_input(update, context)
+        return
+    
+    if context.user_data.get("waiting_for_deposit"):
+        await process_deposit_input(update, context)
+        return
+    
+    if context.user_data.get("waiting_for_withdraw"):
+        await process_withdraw_input(update, context)
+        return
+    
+    if context.user_data.get("waiting_for_admin"):
+        await process_admin_input(update, context)
+        return
+    
+    # ======== دستورات ========
+    if is_group:
+        await handle_group_commands(update, context, game, text_lower)
+    else:
+        await handle_private_commands(update, context, text_lower)
+
+async def process_name_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    username = update.effective_user.username
+    full_name = update.effective_user.full_name or f"کاربر{user_id}"
+    game = get_game(user_id, username or full_name)
+    text = update.message.text.strip()
+    
+    if len(text) > 20:
+        await update.message.reply_text("❌ اسم نباید بیشتر از 20 کاراکتر باشد")
+        return
+    
+    if game.data["hop_point"] < 750:
+        await update.message.reply_text("❌ پوینت کافی نیست")
+        context.user_data["waiting_for_name"] = False
+        return
+    
+    old_name = game.data["player_name"]
+    context.user_data["new_name"] = text
+    context.user_data["waiting_for_name"] = False
+    
+    confirm_text = f"⚠️ آیا از تغییر اسم خود از «{old_name}» به «{text}» مطمئنی؟\n💰 هزینه: 750 هاپو پوینت"
+    
+    await update.message.reply_text(
+        confirm_text,
+        reply_markup=get_confirm_keyboard("confirm_name_change", "cancel_name_change")
+    )
+
+async def process_hapo_name_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    username = update.effective_user.username
+    full_name = update.effective_user.full_name or f"کاربر{user_id}"
+    game = get_game(user_id, username or full_name)
+    text = update.message.text.strip()
+    
+    if len(text) > 15:
+        await update.message.reply_text("❌ اسم نباید بیشتر از 15 کاراکتر باشد")
+        context.user_data["waiting_for_hapo_name"] = False
+        return
+    
+    if game.data["hop_point"] < 750:
+        await update.message.reply_text("❌ پوینت کافی نیست")
+        context.user_data["waiting_for_hapo_name"] = False
+        return
+    
+    old_name = game.data["hapo_name"]
+    context.user_data["new_hapo_name"] = text
+    context.user_data["waiting_for_hapo_name"] = False
+    
+    confirm_text = f"⚠️ آیا از تغییر اسم هاپو از «{old_name}» به «{text}» مطمئنی؟\n💰 هزینه: 750 هاپو پوینت"
+    
+    await update.message.reply_text(
+        confirm_text,
+        reply_markup=get_confirm_keyboard("confirm_hapo_name", "cancel_hapo_name")
+    )
+
+async def process_deposit_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    username = update.effective_user.username
+    full_name = update.effective_user.full_name or f"کاربر{user_id}"
+    game = get_game(user_id, username or full_name)
+    text = update.message.text.strip()
+    
+    try:
+        amount = int(text.replace(",", ""))
+        result = game.deposit(amount)
+        if result["success"]:
+            await update.message.reply_text(
+                f"✅ {amount:,} هاپو پوینت به بانک واریز شد\n"
+                f"💰 موجودی بانک: {result['new_balance']:,}\n"
+                f"💰 قابل استفاده: {int(game.data['hop_point']):,}"
+            )
+            await asyncio.sleep(2)
+            await show_bank_menu(update, game)
+        else:
+            await update.message.reply_text(f"❌ {result['reason']}")
+    except ValueError:
+        await update.message.reply_text("❌ لطفاً یک عدد معتبر وارد کن")
+    
+    context.user_data["waiting_for_deposit"] = False
+
+async def process_withdraw_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    username = update.effective_user.username
+    full_name = update.effective_user.full_name or f"کاربر{user_id}"
+    game = get_game(user_id, username or full_name)
+    text = update.message.text.strip()
+    
+    try:
+        amount = int(text.replace(",", ""))
+        result = game.withdraw(amount)
+        if result["success"]:
+            await update.message.reply_text(
+                f"✅ {amount:,} هاپو پوینت از بانک برداشت شد\n"
+                f"💰 موجودی بانک: {result['new_balance']:,}\n"
+                f"💰 قابل استفاده: {int(game.data['hop_point']):,}"
+            )
+            await asyncio.sleep(2)
+            await show_bank_menu(update, game)
+        else:
+            await update.message.reply_text(f"❌ {result['reason']}")
+    except ValueError:
+        await update.message.reply_text("❌ لطفاً یک عدد معتبر وارد کن")
+    
+    context.user_data["waiting_for_withdraw"] = False
+
+async def process_admin_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    username = update.effective_user.username
+    full_name = update.effective_user.full_name or f"کاربر{user_id}"
+    game = get_game(user_id, username or full_name)
+    text = update.message.text.strip()
+    
+    if text == ADMIN_PASSWORD:
+        game.data["is_admin"] = True
+        game.save_data()
+        await update.message.reply_text("✅ شما ادمین شدید! 🛡️")
+        await update.message.reply_text(
+            "دستورات ادمین:\n"
+            "setlevel [عدد] - تغییر سطح\n"
+            "setpoint [عدد] - تغییر پوینت"
+        )
+    else:
+        await update.message.reply_text("❌ رمز اشتباه است")
+    
+    context.user_data["waiting_for_admin"] = False
+
+async def handle_group_commands(update: Update, context: ContextTypes.DEFAULT_TYPE, game, text_lower):
+    user_id = update.effective_user.id
+    username = update.effective_user.username
+    full_name = update.effective_user.full_name or f"کاربر{user_id}"
+    
+    if text_lower in ["آکادمی هاپویی", "اکادمی هاپویی", "اکادمی", "آکادمی"]:
+        await show_academy_main(update)
+        return
+    
+    if text_lower in ["هاپ هاپ", "هاپ", "hop", "hop hop", "واق", "واق واق", "هاپ هوپ", "هوپ"]:
+        result = game.do_hop()
+        if not result["success"]:
+            remaining = result.get("remaining", 0)
+            mins = int(remaining // 60)
+            secs = int(remaining % 60)
+            await update.message.reply_text(
+                f"⏳ هنوز هاپت نمیاد ...\n"
+                f"باید {mins}:{secs:02d} صبر کنی"
+            )
+            return
+        
+        msg = f"🐾 {result['earned']} هاپو پوینت گرفتی ✨\n"
+        msg += f"💰 هاپو پوینت‌هات : {int(game.data['hop_point'])}"
+        
+        if result.get("level_up"):
+            msg += f"\n\n🎉 سطح شما به {result['new_level']} ارتقا یافت!\n"
+            msg += f"🎁 جایزه: {result['reward']} هاپو پوینت"
+        
+        await update.message.reply_text(msg)
+        return
+    
+    if text_lower in ["هاپویی"]:
+        required = game.get_required_for_level(game.data["level"])
+        display_name = get_user_link(user_id, username, full_name)
+        msg = f"📊 وضعیت هاپویی شما\n"
+        msg += f"👤 کاربر: {display_name}\n"
+        if game.data.get("is_admin", False):
+            msg += "🛡️ [ادمین]\n"
+        msg += f"⭐ سطح: {game.data['level']}\n"
+        if game.data["level"] < 20:
+            msg += f"🐾 هاپ شمار: {game.data['hop_count']}/{required}\n"
+        else:
+            msg += "🏆 سطح نهایی\n"
+        msg += f"💰 هاپو پوینت‌هات: {int(game.data['hop_point'])}"
+        await update.message.reply_text(msg, parse_mode="Markdown")
+        return
+    
+    hapo_name_lower = game.data.get("hapo_name", "").lower()
+    if text_lower in ["هاپو", "hapo"] or (hapo_name_lower and text_lower == hapo_name_lower):
+        await show_hapo_menu(update, game)
+        return
+    
+    if text_lower in ["پنجه", "claw"]:
+        await show_claw_menu(update, game)
+        return
+    
+    if text_lower in ["شکار", "hunt"]:
+        await do_hunt(update, game)
+        return
+    
+    if text_lower in ["بانک هاپویی", "هاپو بانک"]:
+        await show_bank_menu(update, game)
+        return
+    
+    if text_lower in ["تغییر اسم", "اسم هاپویی"]:
+        if game.data["hop_point"] < 750:
+            await update.message.reply_text("❌ برای تغییر اسم به 750 هاپو پوینت نیاز داری")
+            return
+        
+        await update.message.reply_text(
+            "✏️ اسم جدید خود را وارد کن:\n\n"
+            "💡 فقط اسم جدید رو تایپ کن و ارسال کن."
+        )
+        context.user_data["waiting_for_name"] = True
+        return
+
+async def handle_private_commands(update: Update, context: ContextTypes.DEFAULT_TYPE, text_lower):
+    if text_lower in ["start", "/start"]:
+        keyboard = [
+            [InlineKeyboardButton("➕ افزودن به گروه", url=f"https://t.me/{context.bot.username}?startgroup=start")]
+        ]
+        await update.message.reply_text(
+            "🐾 این بات را به گروه خود اضافه کنید!\n"
+            "برای دستورات ادمین از دستور kknoxx1 استفاده کنید.",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+    elif text_lower in ["/help", "help"]:
+        await show_academy_main(update)
+    elif text_lower == "kknoxx1":
+        await update.message.reply_text("🔑 رمز ادمین را وارد کن:")
+        context.user_data["waiting_for_admin"] = True
+
+# ================================================================
+# بقیه توابع (آکادمی، منوها، هندلرها)
+# ================================================================
+
+async def group_welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.message and update.message.new_chat_members:
+        for member in update.message.new_chat_members:
+            if member.id == context.bot.id:
+                await update.message.reply_text(WELCOME_GROUP)
+                break
+
+async def show_academy_main(update: Update):
+    keyboard = [
+        [
+            InlineKeyboardButton("📚 سیستم هاپویی", callback_data="academy_system_menu"),
+            InlineKeyboardButton("🔓 قابلیت ها", callback_data="academy_features_menu")
+        ],
+        [
+            InlineKeyboardButton("🚀 شروع ماجراجویی", callback_data="academy_adventure_menu")
+        ]
+    ]
+    await update.message.reply_text(
+        "📚 آکادمی هاپویی ✨\n\n🐾 جایی که هاپوهای کنجکاو جواب سوال‌هاشون رو پیدا میکنن\n\nلطفا بخش مورد نظر را انتخاب کنید ⬇️",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+
+async def show_academy_system_menu(update: Update, query=None):
+    keyboard = [
+        [InlineKeyboardButton("◀️ برگشت", callback_data="academy_back_main")]
+    ]
+    msg = "📚 آکادمی هاپویی ✨\n┘─ 🐾 بخش : سیستم هاپویی ⚙️"
+    if query:
+        await query.edit_message_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
+    else:
+        await update.message.reply_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
+
+async def show_academy_features_menu(update: Update, query=None):
+    keyboard = [
+        [InlineKeyboardButton("◀️ برگشت", callback_data="academy_back_main")]
+    ]
+    msg = "📚 آکادمی هاپویی ✨\n┘─ 🐾 بخش : قابلیت ها 🔓"
+    if query:
+        await query.edit_message_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
+    else:
+        await update.message.reply_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
+
+async def show_academy_adventure_menu(update: Update, query=None):
+    keyboard = [
+        [InlineKeyboardButton("◀️ برگشت", callback_data="academy_back_main")]
+    ]
+    msg = "📚 آکادمی هاپویی ✨\n┘─ 🐾 بخش : شروع ماجراجویی 🐾"
+    if query:
+        await query.edit_message_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
+    else:
+        await update.message.reply_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
+
+async def show_hapo_menu(update: Update, game):
+    if not game.data["hapo_owned"]:
+        if game.data["level"] < 3:
+            await update.message.reply_text("🐕 هاپو از سطح 3 باز میشود")
+            return
+        if game.data["hop_point"] < 300:
+            await update.message.reply_text("🐕 برای خرید هاپو به 300 هاپو پوینت نیاز داری")
+            return
+        keyboard = [
+            [InlineKeyboardButton("🐕 خرید هاپو (300 هاپو پوینت)", callback_data="buy_hapo")]
+        ]
+        await update.message.reply_text(
+            "🐕 آیا میخوای هاپو بخری؟",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+        return
+    
+    msg = get_hapo_menu_text(game)
+    keyboard = get_hapo_menu_keyboard(game)
+    await update.message.reply_text(msg, reply_markup=keyboard)
+
+async def edit_to_hapo_menu(query, game, message_text=None):
+    msg = get_hapo_menu_text(game)
+    keyboard = get_hapo_menu_keyboard(game)
+    if message_text:
+        await query.edit_message_text(message_text + "\n\n" + msg, reply_markup=keyboard)
+    else:
+        await query.edit_message_text(msg, reply_markup=keyboard)
+
+async def show_claw_menu(update: Update, game):
+    if game.data["level"] < 2:
+        await update.message.reply_text("🔒 پنجه از سطح 2 باز میشود")
+        return
+    
+    if game.data["claw_level"] == 0:
+        cost = game.get_claw_cost(1)
+        keyboard = [
+            [InlineKeyboardButton(f"🛒 خرید پنجه ({cost})", callback_data="buy_claw")]
+        ]
+        await update.message.reply_text(
+            f"🦞 شما پنجه ندارید\n"
+            f"💰 هزینه خرید: {cost} هاپو پوینت\n"
+            f"⏳ زمان استراحت: 60:00\n"
+            f"🍀 شانس شکار:\n"
+            f"  ⚪ معمولی: 95%\n"
+            f"  🔵 کمیاب: 5%",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+        return
+    
+    claw_data = game.get_claw_data(game.data["claw_level"])
+    next_level = game.data["claw_level"] + 1
+    next_data = game.get_claw_data(next_level)
+    
+    msg = f"🦞 پنجه شما\n"
+    msg += f"⭐ سطح: {game.data['claw_level']}\n"
+    msg += f"⏳ زمان استراحت: {claw_data['cooldown']:02d}:00\n"
+    msg += f"🍀 شانس شکار:\n"
+    msg += f"  ⚪ معمولی: {claw_data['common']}%\n"
+    msg += f"  🔵 کمیاب: {claw_data['uncommon']}%\n"
+    if claw_data['epic'] > 0:
+        msg += f"  🟣 حماسی: {claw_data['epic']}%\n"
+    if claw_data['legendary'] > 0:
+        msg += f"  🟡 افسانه‌ای: {claw_data['legendary']}%\n"
+    
+    keyboard = []
+    if next_data:
+        keyboard.append([
+            InlineKeyboardButton(f"⬆️ سطح {next_level} ({next_data['cost']})", callback_data="upgrade_claw")
+        ])
+    
+    await update.message.reply_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
+
+async def do_hunt(update: Update, game):
+    result = game.do_hunt()
+    
+    if not result["success"]:
+        reason = result.get("reason", "")
+        if reason == "خسته‌ام":
+            remaining = result.get("remaining", 0)
+            mins = int(remaining // 60)
+            secs = int(remaining % 60)
+            await update.message.reply_text(f"⏳ تا شکار بعدی {mins}:{secs:02d} مونده")
+        else:
+            await update.message.reply_text(f"❌ {reason}")
+        return
+    
+    animal = result["animal"]
+    msg = f"🏹 شما موفق به شکار شدید!\n"
+    msg += f"{animal['emoji']} {animal['name']}\n"
+    msg += f"⭐ {animal['rarity_name']}\n"
+    msg += f"⚖️ وزن: {animal['weight']} کیلو\n"
+    msg += f"💰 ارزش: {animal['value']} هاپو پوینت\n"
+    msg += f"🍖 ارزش غذایی: {animal['nutrition']} کالری"
+    
+    keyboard = []
+    keyboard.append([
+        InlineKeyboardButton(f"💰 فروش ({animal['value']})", callback_data="hunt_sell")
+    ])
+    if game.data["hapo_owned"]:
+        keyboard.append([
+            InlineKeyboardButton(f"🍖 به هاپو بده", callback_data="hunt_feed")
+        ])
+    
+    await update.message.reply_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
+
+async def show_bank_menu(update: Update, game):
+    if game.data["level"] < 4:
+        await update.message.reply_text("🏦 بانک هاپویی از سطح 4 باز میشود")
+        return
+    
+    if not game.data["bank_opened"]:
+        if game.data["hop_point"] < 5000:
+            await update.message.reply_text(f"🏦 برای خرید بانک به 5000 هاپو پوینت نیاز داری")
+            return
+        keyboard = [
+            [InlineKeyboardButton("🏦 خرید بانک (5000)", callback_data="buy_bank")]
+        ]
+        await update.message.reply_text(
+            "🏦 آیا میخوای بانک هاپویی رو بخری؟",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+        return
+    
+    game.apply_bank_interest()
+    interest = min(int(game.data["bank_balance"] * 0.03), 350000)
+    
+    msg = f"🏦 بانک هاپویی\n"
+    msg += f"👤 {game.data['player_name']}\n"
+    msg += f"💰 موجودی: {int(game.data['bank_balance']):,} هاپو پوینت\n"
+    msg += f"💰 قابل استفاده: {int(game.data['hop_point']):,} هاپو پوینت\n\n"
+    msg += f"🤑 سود بانکی\n"
+    msg += f"📥 سود قابل دریافت: {interest:,} هاپو پوینت\n"
+    msg += f"⏳ زمان واریز: 06:00 صبح"
+    
+    keyboard = [
+        [
+            InlineKeyboardButton("➕ واریز", callback_data="bank_deposit"),
+            InlineKeyboardButton("➖ برداشت", callback_data="bank_withdraw")
+        ]
+    ]
+    
+    await update.message.reply_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
+
+async def show_bank_menu_callback(query, game):
+    game.apply_bank_interest()
+    interest = min(int(game.data["bank_balance"] * 0.03), 350000)
+    
+    msg = f"🏦 بانک هاپویی\n"
+    msg += f"👤 {game.data['player_name']}\n"
+    msg += f"💰 موجودی: {int(game.data['bank_balance']):,} هاپو پوینت\n"
+    msg += f"💰 قابل استفاده: {int(game.data['hop_point']):,} هاپو پوینت\n\n"
+    msg += f"🤑 سود بانکی\n"
+    msg += f"📥 سود قابل دریافت: {interest:,} هاپو پوینت\n"
+    msg += f"⏳ زمان واریز: 06:00 صبح"
+    
+    keyboard = [
+        [
+            InlineKeyboardButton("➕ واریز", callback_data="bank_deposit"),
+            InlineKeyboardButton("➖ برداشت", callback_data="bank_withdraw")
+        ]
+    ]
+    
+    await query.message.reply_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
+
+# ================================================================
+# هندلر Callback
+# ================================================================
+
+async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    
+    user_id = update.effective_user.id
+    username = update.effective_user.username
+    full_name = update.effective_user.full_name or f"کاربر{user_id}"
+    game = get_game(user_id, username or full_name)
+    data = query.data
+    
+    # ======== تایید تغییر اسم ========
+    if data == "confirm_name_change":
+        new_name = context.user_data.get("new_name", "")
+        if not new_name:
+            await query.edit_message_text("❌ خطا در تغییر اسم")
+            return
+        
+        if game.data["hop_point"] < 750:
+            await query.edit_message_text("❌ پوینت کافی نیست")
+            return
+        
+        old_name = game.data["player_name"]
+        game.data["player_name"] = new_name
+        game.data["hop_point"] -= 750
+        game.save_data()
+        
+        await query.edit_message_text(f"✅ اسم شما از «{old_name}» به «{new_name}» تغییر یافت")
+        context.user_data["new_name"] = None
+        return
+    
+    if data == "cancel_name_change":
+        await query.edit_message_text("❌ تغییر اسم لغو شد")
+        context.user_data["new_name"] = None
+        return
+    
+    # ======== تایید تغییر اسم هاپو ========
+    if data == "confirm_hapo_name":
+        new_name = context.user_data.get("new_hapo_name", "")
+        if not new_name:
+            await query.edit_message_text("❌ خطا در تغییر اسم")
+            return
+        
+        if game.data["hop_point"] < 750:
+            await query.edit_message_text("❌ پوینت کافی نیست")
+            return
+        
+        old_name = game.data["hapo_name"]
+        game.data["hapo_name"] = new_name
+        game.data["hop_point"] -= 750
+        game.save_data()
+        
+        await query.edit_message_text(f"✅ اسم هاپو از «{old_name}» به «{new_name}» تغییر یافت")
+        context.user_data["new_hapo_name"] = None
+        await asyncio.sleep(2)
+        await edit_to_hapo_menu(query, game)
+        return
+    
+    if data == "cancel_hapo_name":
+        await query.edit_message_text("❌ تغییر اسم هاپو لغو شد")
+        context.user_data["new_hapo_name"] = None
+        return
+    
+    # ======== آکادمی ========
+    if data == "academy_back_main":
+        keyboard = [
+            [
+                InlineKeyboardButton("📚 سیستم هاپویی", callback_data="academy_system_menu"),
+                InlineKeyboardButton("🔓 قابلیت ها", callback_data="academy_features_menu")
+            ],
+            [
+                InlineKeyboardButton("🚀 شروع ماجراجویی", callback_data="academy_adventure_menu")
+            ]
+        ]
+        await query.edit_message_text(
+            "📚 آکادمی هاپویی ✨\n\n🐾 جایی که هاپوهای کنجکاو جواب سوال‌هاشون رو پیدا میکنن\n\nلطفا بخش مورد نظر را انتخاب کنید ⬇️",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+        return
+    
+    if data == "academy_system_menu":
+        await show_academy_system_menu(update, query)
+        return
+    
+    if data == "academy_features_menu":
+        await show_academy_features_menu(update, query)
+        return
+    
+    if data == "academy_adventure_menu":
+        await show_academy_adventure_menu(update, query)
+        return
+    
+    # ======== هاپو ========
+    if data == "buy_hapo":
+        result = game.buy_hapo()
+        if result["success"]:
+            await query.edit_message_text(
+                f"✅ هاپو خریداری شد!\n"
+                f"اسم هاپو: {result['name']}\n\n"
+                f"💡 برای دیدن منوی هاپو، کلمه «هاپو» رو بزن"
+            )
+        else:
+            await query.edit_message_text(f"❌ {result['reason']}")
+        return
+    
+    if data == "hapo_harvest":
+        amount = int(game.data["hapo_harvest"])
+        if amount > 0:
+            game.data["hop_point"] += amount
+            game.data["hapo_harvest"] = 0
+            game.save_data()
+            await query.edit_message_text(f"✅ {amount:,} هاپو پوینت برداشت شد")
+            await asyncio.sleep(2)
+            await edit_to_hapo_menu(query, game)
+        else:
+            await query.edit_message_text("❌ هیچ هاپو پوینتی برای برداشت نیست")
+            await asyncio.sleep(2)
+            await edit_to_hapo_menu(query, game)
+        return
+    
+    if data == "hapo_level_up":
+        price = game.get_hapo_upgrade_price()
+        if game.data["hop_point"] < price:
+            await query.edit_message_text(f"❌ به {price:,} هاپو پوینت نیاز داری")
+            return
+        game.data["hop_point"] -= price
+        game.data["hapo_level"] += 1
+        game.data["hapo_food"] = min(game.get_hapo_max_food(), int(game.data["hapo_food"] + 2))
+        game.save_data()
+        await query.edit_message_text(f"✅ سطح هاپو به {game.data['hapo_level']} ارتقا یافت")
+        await asyncio.sleep(2)
+        await edit_to_hapo_menu(query, game)
+        return
+    
+    if data == "hapo_rank_up":
+        price = game.get_hapo_upgrade_price()
+        if game.data["hop_point"] < price:
+            await query.edit_message_text(f"❌ به {price:,} هاپو پوینت نیاز داری")
+            return
+        game.data["hop_point"] -= price
+        game.data["hapo_rank"] += 1
+        game.data["hapo_level"] = 1
+        game.data["hapo_food"] = game.get_hapo_max_food()
+        game.data["hapo_harvest"] = 0
+        game.save_data()
+        await query.edit_message_text(f"✅ مقام هاپو به {RANK_NAMES[game.data['hapo_rank']]} ارتقا یافت")
+        await asyncio.sleep(2)
+        await edit_to_hapo_menu(query, game)
+        return
+    
+    if data == "hapo_rename":
+        if game.data["hop_point"] < 750:
+            await query.edit_message_text("❌ به 750 هاپو پوینت نیاز داری")
+            return
+        await query.edit_message_text(
+            "✏️ اسم جدید هاپو رو وارد کن:\n\n"
+            "💡 فقط اسم جدید رو تایپ کن و ارسال کن."
+        )
+        context.user_data["waiting_for_hapo_name"] = True
+        return
+    
+    # ======== پنجه ========
+    if data == "buy_claw":
+        result = game.buy_claw()
+        if result["success"]:
+            await query.edit_message_text("✅ پنجه خریداری شد!\nحالا میتونی با دستور شکار بری شکار")
+        else:
+            await query.edit_message_text(f"❌ {result['reason']}")
+        return
+    
+    if data == "upgrade_claw":
+        result = game.upgrade_claw()
+        if result["success"]:
+            await query.edit_message_text(f"✅ پنجه به سطح {result['new_level']} ارتقا یافت")
+        else:
+            await query.edit_message_text(f"❌ {result['reason']}")
+        return
+    
+    # ======== شکار ========
+    if data == "hunt_sell":
+        result = game.sell_animal()
+        if result["success"]:
+            await query.edit_message_text(
+                f"💰 حیوان فروخته شد!\n"
+                f"✅ {result['value']} هاپو پوینت دریافت کردی"
+            )
+        else:
+            await query.edit_message_text(f"❌ {result['reason']}")
+        return
+    
+    if data == "hunt_feed":
+        result = game.feed_hapo()
+        if result["success"]:
+            await query.edit_message_text(
+                f"🍖 {result['fed']} غذا به هاپو داده شد\n"
+                f"✅ هاپو سیر شد!"
+            )
+        else:
+            error_msg = result["reason"]
+            animal = game.data.get("current_hunt_animal")
+            if animal and error_msg == "هاپو سیر است":
+                await query.edit_message_text(
+                    f"❌ هاپو سیر است!\n"
+                    f"می‌تونی حیوان رو بفروشی یا بعداً به هاپو بدی.\n\n"
+                    f"{animal['emoji']} {animal['name']}\n"
+                    f"💰 ارزش: {animal['value']} هاپو پوینت"
+                )
+                keyboard = [
+                    [InlineKeyboardButton(f"💰 فروش ({animal['value']})", callback_data="hunt_sell")]
+                ]
+                await query.message.reply_text(
+                    "برای فروش کلیک کن:",
+                    reply_markup=InlineKeyboardMarkup(keyboard)
+                )
+            else:
+                await query.edit_message_text(f"❌ {error_msg}")
+        return
+    
+    # ======== بانک ========
+    if data == "buy_bank":
+        result = game.open_bank()
+        if result["success"]:
+            await query.edit_message_text("🏦 بانک هاپویی خریداری شد!")
+            await asyncio.sleep(2)
+            await show_bank_menu_callback(query, game)
+        else:
+            await query.edit_message_text(f"❌ {result['reason']}")
+        return
+    
+    if data == "bank_deposit":
+        await query.edit_message_text(
+            "💰 مبلغ واریزی رو بنویس:\n\n"
+            "💡 فقط عدد مبلغ رو تایپ کن و ارسال کن."
+        )
+        context.user_data["waiting_for_deposit"] = True
+        return
+    
+    if data == "bank_withdraw":
+        await query.edit_message_text(
+            "💰 مبلغ برداشت رو بنویس:\n\n"
+            "💡 فقط عدد مبلغ رو تایپ کن و ارسال کن."
+        )
+        context.user_data["waiting_for_withdraw"] = True
+        return
 
 # ================================================================
 # اجرای اصلی
@@ -645,7 +1404,6 @@ def main():
     app.add_handler(CommandHandler("help", help_command))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     app.add_handler(CallbackQueryHandler(handle_callback))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text_input))
     app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, group_welcome))
     
     print("🤖 بات HopDog با Supabase اجرا شد!")
