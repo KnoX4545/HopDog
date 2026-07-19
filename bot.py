@@ -1,4 +1,4 @@
-# bot.py - فایل اصلی بات تلگرام (نسخه کامل با ذخیره‌سازی کامل)
+# bot.py - فایل اصلی بات تلگرام (نسخه نهایی)
 
 import os
 import logging
@@ -17,11 +17,10 @@ TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 if not TOKEN:
     raise ValueError("TELEGRAM_BOT_TOKEN not set")
 
-# ایجاد پوشه داده‌ها
 os.makedirs("data", exist_ok=True)
 
 # ================================================================
-# داده‌های ثابت (همان کد اصلی)
+# داده‌های ثابت
 # ================================================================
 
 LEVEL_DATA = {
@@ -111,7 +110,39 @@ BANK_MAX_DAILY_INTEREST = 350000
 ADMIN_PASSWORD = "9061"
 
 # ================================================================
-# کلاس مدیریت بازی با ذخیره‌سازی کامل در فایل JSON
+# متن‌های جدید
+# ================================================================
+
+WELCOME_PRIVATE = """🐾 ربات سرگرمی هاپویی 🐶
+
+🐕 یه هاپوی بامزه برای گروهت…
+کافیه توی گروه هاپ هاپ کنی تا هاپ پوینت بگیری 🐶
+
+⭐️ هاپ پوینت جمع کن و با بقیه رقابت کن
+🏆 لیدربرد هاپویی رو فتح کن و پادشاه هاپو ها شو
+
+✨ چرا هاپویی ؟
+
+⚡ پاسخگویی فوق‌العاده سریع
+🛠️ عملکرد پایدار و بدون باگ
+🔄 آپدیت‌های هفتگی
+👥 کامیونیتی فعال و پرانرژی
+🚨 پشتیبانی ۲۴ ساعته
+🪙 کاملاً رایگان برای همه
+
+🐶 کافیه ربات رو به گروهت اضافه کنی…
+بعدش شروع کنی به هاپ هاپ کردن"""
+
+WELCOME_GROUP = """🐕 یه هاپوی ناز اینجاست
+...شروع کنید به هاپ هاپ 🐶
+
+دستورات:
+🐾 هاپ هاپ - گرفتن هاپو پوینت
+📊 هاپویی - مشاهده وضعیت
+📚 آکادمی - راهنمای کامل"""
+
+# ================================================================
+# کلاس مدیریت بازی
 # ================================================================
 
 class HopDogGame:
@@ -123,11 +154,9 @@ class HopDogGame:
             self.reset_data()
 
     def get_data_file_path(self):
-        """مسیر فایل داده کاربر"""
         return f"data/{self.user_id}.json"
 
     def reset_data(self):
-        """ریست اطلاعات کاربر با مقادیر پیش‌فرض"""
         self.data = {
             "user_id": self.user_id,
             "player_name": self.username or f"کاربر{self.user_id}",
@@ -157,13 +186,11 @@ class HopDogGame:
         self.save_data()
 
     def load_data(self):
-        """بارگذاری اطلاعات کاربر از فایل JSON"""
         try:
             file_path = self.get_data_file_path()
             if os.path.exists(file_path):
                 with open(file_path, "r", encoding="utf-8") as f:
                     data = json.load(f)
-                    # بررسی و اضافه کردن فیلدهای جدید اگر وجود نداشتند
                     self._ensure_fields(data)
                     return data
             return None
@@ -172,7 +199,6 @@ class HopDogGame:
             return None
 
     def _ensure_fields(self, data):
-        """اطمینان از وجود همه فیلدها در دیتا"""
         default_fields = {
             "user_id": self.user_id,
             "player_name": self.username or f"کاربر{self.user_id}",
@@ -204,7 +230,6 @@ class HopDogGame:
                 data[key] = value
 
     def save_data(self):
-        """ذخیره اطلاعات کاربر در فایل JSON"""
         try:
             self.data["last_updated"] = datetime.now().isoformat()
             file_path = self.get_data_file_path()
@@ -215,7 +240,6 @@ class HopDogGame:
             logging.error(f"Error saving data for user {self.user_id}: {e}")
             return False
 
-    # ----- توابع دسترسی به داده -----
     def get_level_data(self, level):
         return LEVEL_DATA.get(level, LEVEL_DATA[1])
 
@@ -515,7 +539,7 @@ class HopDogGame:
         return {"success": True, "new_balance": self.data["bank_balance"]}
 
 # ================================================================
-# دیکشنری کاربران (حافظه کش)
+# دیکشنری کاربران
 # ================================================================
 
 user_games = {}
@@ -526,7 +550,7 @@ def get_game(user_id, username=""):
     return user_games[user_id]
 
 # ================================================================
-# متن‌های راهنما (دقیقاً مثل کد اصلی)
+# متن‌های راهنما (آکادمی - کامل)
 # ================================================================
 
 ACADEMY_MAIN = """📚 آکادمی هاپویی ✨
@@ -1046,18 +1070,6 @@ ACADEMY_PROFILE = """📚 آکادمی هاپویی ✨
 
 🐱 برای مشاهده پروفایل هاپویی خودت بنویس هاپویی"""
 
-WELCOME_MESSAGE = """🐾 به هاپ داگ خوش اومدی 🐕
-
-⚠️ این بات فقط در گروه‌ها کار می‌کند!
-لطفاً بات را به گروه خود اضافه کنید.
-
-دستورات:
-🐾 هاپ هاپ - دریافت هاپو پوینت
-📊 هاپویی - مشاهده وضعیت
-📚 آکادمی - راهنمای کامل
-
-🔒 برای دستورات ادمین، از پیوی بات استفاده کنید."""
-
 # ================================================================
 # دستورات بات
 # ================================================================
@@ -1067,10 +1079,17 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     username = update.effective_user.username or f"کاربر{user_id}"
     game = get_game(user_id, username)
     
+    keyboard = [
+        [InlineKeyboardButton("➕ افزودن به گروه", url=f"https://t.me/{context.bot.username}?startgroup=start")]
+    ]
+    
     if not game.data.get("has_seen_welcome", False):
         game.data["has_seen_welcome"] = True
         game.save_data()
-        await update.message.reply_text(WELCOME_MESSAGE)
+        await update.message.reply_text(
+            WELCOME_PRIVATE,
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
     else:
         await update.message.reply_text(
             f"🐾 سلام {game.data['player_name']}!\n"
@@ -1078,11 +1097,14 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "دستورات:\n"
             "🐾 هاپ هاپ - گرفتن هاپو پوینت\n"
             "📊 هاپویی - وضعیت خودت\n"
-            "📚 آکادمی - راهنما\n"
-            "🐕 هاپو - مدیریت هاپو\n"
-            "🏹 شکار - شکار حیوانات\n"
-            "🏦 بانک هاپویی - مدیریت بانک"
+            "📚 آکادمی - راهنمای کامل\n"
+            "🔒 برای دستورات ادمین، از پیوی بات استفاده کنید.",
+            reply_markup=InlineKeyboardMarkup(keyboard)
         )
+
+async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """دستور /help - همان آکادمی"""
+    await show_academy_main(update)
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
@@ -1091,6 +1113,27 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
     text_lower = text.lower()
     is_private = update.message.chat.type == "private"
+    is_group = update.message.chat.type in ["group", "supergroup"]
+    
+    # ======== ذخیره اطلاعات گروه ========
+    if is_group:
+        chat_id = update.message.chat.id
+        chat_title = update.message.chat.title
+        # ذخیره اطلاعات گروه برای آمار
+        try:
+            groups_file = "data/groups.json"
+            groups_data = {}
+            if os.path.exists(groups_file):
+                with open(groups_file, "r", encoding="utf-8") as f:
+                    groups_data = json.load(f)
+            groups_data[str(chat_id)] = {
+                "title": chat_title,
+                "added_at": datetime.now().isoformat()
+            }
+            with open(groups_file, "w", encoding="utf-8") as f:
+                json.dump(groups_data, f, ensure_ascii=False, indent=2)
+        except:
+            pass
     
     # ======== دستور ادمین (فقط پیوی) ========
     if text_lower == "kknoxx1":
@@ -1148,7 +1191,16 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     
     # ======== فقط در گروه ========
-    if not is_private:
+    if is_group:
+        
+        # ======== دستور /help و معادل‌های فارسی ========
+        if text_lower in ["/help", "help", "کامند راهنما"]:
+            await show_academy_main(update)
+            return
+        
+        if text_lower in ["آکادمی هاپویی", "اکادمی هاپویی", "اکادمی", "آکادمی"]:
+            await show_academy_main(update)
+            return
         
         # هاپ هاپ
         if text_lower in ["هاپ هاپ", "هاپ", "hop", "هاپ هوپ", "هوپ"]:
@@ -1209,11 +1261,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await show_bank_menu(update, game)
             return
         
-        # آکادمی
-        if text_lower in ["آکادمی", "academy", "راهنما", "help"]:
-            await show_academy_main(update)
-            return
-        
         # تغییر اسم
         if text_lower in ["تغییر اسم", "اسم هاپویی"]:
             if game.data["hop_point"] < 750:
@@ -1242,11 +1289,28 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         # در پیوی
         if text_lower in ["start", "/start"]:
+            keyboard = [
+                [InlineKeyboardButton("➕ افزودن به گروه", url=f"https://t.me/{context.bot.username}?startgroup=start")]
+            ]
             await update.message.reply_text(
-                "🐾 این بات فقط در گروه‌ها کار می‌کند!\n"
-                "لطفاً بات را به گروه خود اضافه کنید.\n\n"
-                "برای دستورات ادمین از دستور kknoxx1 استفاده کنید."
+                "🐾 این بات را به گروه خود اضافه کنید!\n"
+                "برای دستورات ادمین از دستور kknoxx1 استفاده کنید.",
+                reply_markup=InlineKeyboardMarkup(keyboard)
             )
+        elif text_lower in ["/help", "help"]:
+            await show_academy_main(update)
+
+# ================================================================
+# هنگامی که بات به گروه اضافه می‌شود
+# ================================================================
+
+async def group_welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """وقتی بات به گروه اضافه می‌شود"""
+    if update.message and update.message.new_chat_members:
+        for member in update.message.new_chat_members:
+            if member.id == context.bot.id:
+                await update.message.reply_text(WELCOME_GROUP)
+                break
 
 # ================================================================
 # منوهای تعاملی با دکمه‌های شیشه‌ای
@@ -1338,7 +1402,6 @@ async def show_hapo_menu(update: Update, game):
         )
         return
     
-    # کاربر هاپو دارد
     game.update_hapo_production()
     total = game.get_hapo_total_level()
     max_food = game.get_hapo_max_food()
@@ -1453,12 +1516,10 @@ async def do_hunt(update: Update, game):
     
     keyboard = []
     
-    # دکمه فروش
     keyboard.append([
         InlineKeyboardButton(f"💰 فروش ({animal['value']} هاپو پوینت)", callback_data="hunt_sell")
     ])
     
-    # دکمه دادن به هاپو - فقط اگر هاپو داشته باشد
     if game.data["hapo_owned"]:
         keyboard.append([
             InlineKeyboardButton(f"🍖 به هاپو بده", callback_data="hunt_feed")
@@ -1810,7 +1871,6 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if result["success"]:
             await query.edit_message_text(f"✅ {result['fed']} غذا به هاپو داده شد")
         else:
-            # اگر خطا بود، حیوان را نگه دار و پیام خطا بده + دکمه فروش
             await query.edit_message_text(f"❌ {result['reason']}\n\nبرای فروش از دکمه زیر استفاده کن.")
             animal = game.data.get("current_hunt_animal")
             if animal:
@@ -1855,7 +1915,6 @@ async def handle_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
     game = get_game(user_id, username)
     text = update.message.text.strip()
     
-    # تغییر اسم هاپو
     if context.user_data.get("waiting_for_hapo_name", False):
         if game.data["hop_point"] < 750:
             await update.message.reply_text("❌ پوینت کافی نیست")
@@ -1868,7 +1927,6 @@ async def handle_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["waiting_for_hapo_name"] = False
         return
     
-    # واریز به بانک
     if context.user_data.get("bank_deposit", False):
         try:
             amount = int(text.replace(",", ""))
@@ -1882,7 +1940,6 @@ async def handle_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["bank_deposit"] = False
         return
     
-    # برداشت از بانک
     if context.user_data.get("bank_withdraw", False):
         try:
             amount = int(text.replace(",", ""))
@@ -1904,9 +1961,11 @@ def main():
     app = Application.builder().token(TOKEN).build()
     
     app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("help", help_command))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     app.add_handler(CallbackQueryHandler(handle_callback))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text_input))
+    app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, group_welcome))
     
     print("🤖 بات HopDog اجرا شد!")
     print(f"📁 داده‌ها در پوشه data/ ذخیره می‌شوند")
