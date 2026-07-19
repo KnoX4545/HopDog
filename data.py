@@ -1,6 +1,5 @@
 # data.py - داده‌های ثابت بازی
 
-# داده‌های سطح
 LEVEL_DATA = {
     1: {"required": 0, "minPoints": 5, "maxPoints": 15, "cooldown": 300, "reward": 0, "features": ["شروع ماجراجویی"]},
     2: {"required": 5, "minPoints": 10, "maxPoints": 20, "cooldown": 300, "reward": 50, "features": ["پنجه", "شکار"]},
@@ -25,11 +24,9 @@ LEVEL_DATA = {
 }
 MAX_LEVEL = 20
 
-# اسامی هاپو
 HAPO_NAMES = ['رکس', 'لوسی', 'بارنی', 'مکس', 'بلا', 'چارلی', 'راکی', 'مولی', 'تدی', 'لونا', 'سیمبا', 'نلا', 'بادی', 'مایلو', 'کوکو', 'روبی', 'اسکار', 'جک', 'دِیزی', 'تایسون']
 RANK_NAMES = ['تازه‌وارد', 'حرفه‌ای', 'استاد', 'افسانه', 'بی‌نهایت']
 
-# ظرفیت و تولید هاپو
 HAPO_CAPACITY = {i: 500 * i for i in range(1, 26)}
 HAPO_CAPACITY.update({5: 20000, 10: 50000, 15: 150000, 20: 400000, 25: 650000})
 
@@ -44,7 +41,6 @@ HAPO_LEVEL_PRICES = {
     21: 25000000, 22: 30000000, 23: 35000000, 24: 40000000, 25: 50000000
 }
 
-# داده‌های پنجه
 CLAW_DATA = {
     1: {"cost": 500, "cooldown": 60, "common": 95, "uncommon": 5, "epic": 0, "legendary": 0},
     2: {"cost": 5000, "cooldown": 55, "common": 80, "uncommon": 15, "epic": 5, "legendary": 0},
@@ -56,7 +52,6 @@ CLAW_DATA = {
 }
 MAX_CLAW_LEVEL = 7
 
-# حیوانات
 ANIMALS = {
     "common": [
         {"name": "خرگوش", "emoji": "🐇", "weightMin": 0.25, "weightMax": 0.50, "multiplier": 80, "nutrition": 1},
@@ -85,9 +80,10 @@ ANIMALS = {
 RARITY_NAMES = {"common": "معمولی", "uncommon": "کمیاب", "epic": "حماسی", "legendary": "افسانه‌ای"}
 RARITY_COLORS = {"common": "⚪", "uncommon": "🔵", "epic": "🟣", "legendary": "🟡"}
 
-# بانک
 BANK_REQUIRED_LEVEL = 4
 BANK_PURCHASE_COST = 5000
 BANK_INTEREST_RATE = 0.03
 BANK_MAX_DAILY_INTEREST = 350000
 BANK_INTEREST_HOUR = 6
+
+ADMIN_PASSWORD = "9061"
