@@ -990,15 +990,17 @@ async def send_street_hapo_notification(context: ContextTypes.DEFAULT_TYPE):
 
 
 async def street_hapo_timer(street_hapo, context):
-    """تایمر برای پایان زمان هاپوی خیابونی"""
+    """تایمر برای پایان زمان هاپوی خیابونی - فقط در صورتی که رویداد هنوز فعال باشد"""
     await asyncio.sleep(STREET_HAPO_DECISION_TIME)
     
+    # اگر رویداد غیرفعال است یا نجات پیدا کرده، کاری نکن
     if not street_hapo.active:
         return
     
     if street_hapo.data.get("rescued", False):
         return
     
+    # اگر زمان گذشته و نجات نیافته، فرار
     street_hapo.data["status"] = "expired"
     street_hapo.active = False
     street_hapo.save_status()
@@ -1036,16 +1038,16 @@ async def handle_street_hapo_rescue(update: Update, context: ContextTypes.DEFAUL
         await query.message.reply_text("🐶 هیچ هاپوی خیابونی در دسترس نیست!")
         return
     
+    if street_hapo.data.get("rescued", False):
+        await query.answer("❌ این هاپوی خیابونی قبلاً نجات پیدا کرده!")
+        await query.message.reply_text("❌ این هاپوی خیابونی قبلاً نجات پیدا کرده!")
+        return
+    
     if street_hapo.is_expired():
         street_hapo.active = False
         street_hapo.save_status()
         await query.answer("⏰ هاپوی خیابونی فرار کرد!")
         await query.message.reply_text("⏰ هاپوی خیابونی فرار کرد!")
-        return
-    
-    if street_hapo.data.get("rescued", False):
-        await query.answer("❌ این هاپوی خیابونی قبلاً نجات پیدا کرده!")
-        await query.message.reply_text("❌ این هاپوی خیابونی قبلاً نجات پیدا کرده!")
         return
     
     # ======== چک کردن اینکه شانسی مونده ========
@@ -1063,7 +1065,6 @@ async def handle_street_hapo_rescue(update: Update, context: ContextTypes.DEFAUL
         # ======== موفقیت ========
         keyboard = [[InlineKeyboardButton("🎉 تبریک!", callback_data="street_hapo_ignore")]]
         
-        # ✅ اصلاح: تبدیل به عدد قبل از نمایش
         rescued_count = game.data.get("street_hapo_rescued", 0)
         if isinstance(rescued_count, str):
             rescued_count = int(rescued_count) if rescued_count.isdigit() else 0
@@ -1085,11 +1086,22 @@ async def handle_street_hapo_rescue(update: Update, context: ContextTypes.DEFAUL
         except:
             pass
         
+        # حذف دکمه از پیام اصلی (اختیاری)
+        try:
+            await query.message.edit_reply_markup(reply_markup=None)
+        except:
+            pass
+        
     elif result.get("died", False):
         # ======== هاپو مرد ========
         msg = f"💀 {result['message']}\n\n"
         msg += f"🔄 تعداد تلاش‌ها: {result['attempt']}/{STREET_HAPO_MAX_ATTEMPTS}"
         await query.message.reply_text(msg)
+        
+        try:
+            await query.message.edit_reply_markup(reply_markup=None)
+        except:
+            pass
         
     elif not result.get("success", False):
         # ======== خطا (مثلاً پوینت کافی نیست) ========
