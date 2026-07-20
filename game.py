@@ -1,4 +1,4 @@
-# game.py - کلاس اصلی بازی
+# game.py - کلاس اصلی بازی (نسخه اصلاح شده)
 
 import random
 import json
@@ -195,15 +195,24 @@ class HopDogGame:
         return {"text": "عاشقتم", "speed": 1.5}
 
     def update_hapo_production(self):
+        """به‌روزرسانی تولید هاپو - حداکثر ۲۴ ساعت"""
         now = datetime.now().timestamp()
         elapsed = now - self.data["hapo_last_update"]
+        
+        # حداکثر ۲۴ ساعت برای جلوگیری از تولید یکباره زیاد
+        MAX_ELAPSED = 24 * 3600
+        if elapsed > MAX_ELAPSED:
+            elapsed = MAX_ELAPSED
+        
         capacity = self.get_hapo_capacity()
         status = self.get_hapo_food_status()
         
+        # تولید فقط اگر غذا داره
         if self.data["hapo_food"] > 0 and self.data["hapo_harvest"] < capacity:
             gained = self.get_hapo_production() * status["speed"] * elapsed
             self.data["hapo_harvest"] = min(capacity, self.data["hapo_harvest"] + gained)
         
+        # کاهش غذا (هر ۱۲ ساعت = ۶ واحد غذا کم میشه)
         if self.data["hapo_food"] > 0:
             decay = int((elapsed / (12 * 3600)) * 6)
             if decay > 0:
@@ -486,28 +495,42 @@ class HopDogGame:
         self.save_data()
 
     def apply_bank_interest(self):
+        """اعمال سود بانکی - هر ۲۴ ساعت یکبار"""
         if not self.data["bank_opened"]:
             return
         
         now = datetime.now().timestamp()
+        
+        # اگر تا حالا سودی تعلق نگرفته
         if self.data["bank_last_interest_at"] == 0:
             self.data["bank_last_interest_at"] = now
+            self.save_data()
             return
         
-        interest = min(int(self.data["bank_balance"] * BANK_INTEREST_RATE), BANK_MAX_DAILY_INTEREST)
-        if interest > 0:
-            self.data["bank_balance"] += interest
-            self.add_bank_transaction("سود بانکی", interest, f"سود {int(BANK_INTEREST_RATE*100)}%")
+        # چک کردن اینکه ۲۴ ساعت گذشته یا نه
+        elapsed = now - self.data["bank_last_interest_at"]
         
-        self.data["bank_last_interest_at"] = now
-        self.save_data()
+        if elapsed >= 24 * 3600:  # 24 ساعت
+            # محاسبه سود
+            interest = min(int(self.data["bank_balance"] * BANK_INTEREST_RATE), BANK_MAX_DAILY_INTEREST)
+            if interest > 0:
+                self.data["bank_balance"] += interest
+                self.add_bank_transaction("سود بانکی", interest, f"سود روزانه {int(BANK_INTEREST_RATE*100)}%")
+            
+            # به‌روزرسانی زمان آخرین سود
+            self.data["bank_last_interest_at"] = now
+            self.save_data()
+            return
+        
+        # اگر ۲۴ ساعت نگذشته، کاری نکن
+        return
 
     def get_next_interest_time(self):
         from datetime import timedelta
-        now = datetime.now()
-        next_time = now.replace(hour=BANK_INTEREST_HOUR, minute=0, second=0, microsecond=0)
-        if next_time <= now:
-            next_time = next_time + timedelta(days=1)
+        last_time = self.data.get("bank_last_interest_at", 0)
+        if last_time == 0:
+            return datetime.now()
+        next_time = datetime.fromtimestamp(last_time) + timedelta(days=1)
         return next_time
 
     def deposit(self, amount):
