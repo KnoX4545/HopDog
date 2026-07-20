@@ -9,7 +9,6 @@ from config import SUPABASE_URL, SUPABASE_KEY
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 def get_user_data(user_id):
-    """دریافت اطلاعات کاربر از دیتابیس"""
     try:
         response = supabase.table("users").select("*").eq("user_id", str(user_id)).execute()
         if response.data and len(response.data) > 0:
@@ -26,6 +25,13 @@ def get_user_data(user_id):
                     data["bank_transactions"] = []
             else:
                 data["bank_transactions"] = []
+            if "jail_voted" in data and data["jail_voted"]:
+                try:
+                    data["jail_voted"] = json.loads(data["jail_voted"])
+                except:
+                    data["jail_voted"] = []
+            else:
+                data["jail_voted"] = []
             return data
         return None
     except Exception as e:
@@ -33,13 +39,14 @@ def get_user_data(user_id):
         return None
 
 def save_user_data(user_id, data):
-    """ذخیره اطلاعات کاربر در دیتابیس"""
     try:
         data_to_save = {**data}
         if "current_hunt_animal" in data_to_save and data_to_save["current_hunt_animal"]:
             data_to_save["current_hunt_animal"] = json.dumps(data_to_save["current_hunt_animal"])
         if "bank_transactions" in data_to_save and data_to_save["bank_transactions"]:
             data_to_save["bank_transactions"] = json.dumps(data_to_save["bank_transactions"])
+        if "jail_voted" in data_to_save and data_to_save["jail_voted"]:
+            data_to_save["jail_voted"] = json.dumps(data_to_save["jail_voted"])
         if "created_at" in data_to_save:
             del data_to_save["created_at"]
         data_to_save["last_updated"] = datetime.now().isoformat()
@@ -51,7 +58,6 @@ def save_user_data(user_id, data):
         return False
 
 def get_user_by_identifier(identifier):
-    """دریافت اطلاعات کاربر با شناسه (آیدی عددی یا یوزرنیم)"""
     try:
         if identifier.isdigit():
             response = supabase.table("users").select("*").eq("user_id", identifier).execute()
@@ -72,7 +78,6 @@ def get_user_by_identifier(identifier):
         return None
 
 def get_user_by_card(card_number):
-    """دریافت اطلاعات کاربر با شماره کارت (منحصر به فرد)"""
     try:
         response = supabase.table("users").select("*").eq("bank_card_number", card_number).execute()
         if response.data and len(response.data) > 0:
@@ -83,7 +88,6 @@ def get_user_by_card(card_number):
         return None
 
 def is_card_unique(card_number):
-    """بررسی منحصر به فرد بودن شماره کارت"""
     try:
         response = supabase.table("users").select("user_id").eq("bank_card_number", card_number).execute()
         return len(response.data) == 0
