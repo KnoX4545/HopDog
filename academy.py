@@ -1,4 +1,4 @@
-# academy.py - متن‌های آکادمی (نسخه نهایی)
+# academy.py - نسخه نهایی کامل آکادمی
 
 # ================================================================
 # متن‌های آکادمی
@@ -403,6 +403,7 @@ ACADEMY_HAPO = """📚 آکادمی هاپویی ✨
 ┘─ ❗️ وقتی مقام هاپوت رو بالا میبری، سطح و پوینت‌های داخل جعبش صفر میشه، اما در عوض ⬇️
   ┘─ 1️⃣ سقف سطح‌های بعدی 5 تا بیشتر میشه (مثلاً تا سطح 10 باز میشه)
   ┘─ 2️⃣ حجم شکم هاپوت بزرگتر میشه و میتونه غذای بیشتری رو برای مدت طولانی‌تر ذخیره کنه
+  ┘─ 3️⃣ سرعت تولید هاپو افزایش می‌یابد
 
 💕 یک اسم، یک هویت
 - 😺 هاپو تو لایق یک نامِ زیباست. میتونی براش اسم انتخاب کنی و از اون به بعد، به جای کلمه عمومی، با اسم خودش صداش بزنی !
@@ -425,6 +426,7 @@ ACADEMY_HUNT = """📚 آکادمی هاپویی ✨
 ⌛️ وقتی حیوان رو شکار کردی، فقط 60 ثانیه فرصت داری تا یک تصمیم مهم بگیری ⬇️
 - 🪙 میتونی اون رو بفروشی و جیبت رو پر از 🪙 هاپو پوینت کنی
 - 🍖 یا اگه یک هاپوی ملوس داری، اون رو به عنوان غذا به هاپوت بدی تا شکمش پر شه !
+- ❌ اگه تا 60 ثانیه تصمیم نگیری، حیوان فرار میکنه! 🦌
 
 🦞 هر زمان که دوباره بگی پنجه، میتونی سطح پنجه‌ات رو ببینی و اگه خواستی اون رو ارتقا بدی و قوی‌ترش کنی.
 
@@ -479,6 +481,7 @@ ACADEMY_TRANSFER = """📚 آکادمی هاپویی ✨
 ┘─ حداکثر مقدار انتقال: 500,000 هاپو پوینت
 ┘─ فقط میتونی به کاربرانی انتقال بدی که سطحشون بالاتر از 2 باشه
 ┘─ ⌛️ بعد از هر انتقال باید 30 ثانیه صبر کنی تا دوباره بتونی انتقال انجام بدی
+┘─ 🔒 اگه پروفایل کاربر قفل باشه، نمیتونی بهش انتقال بدی
 
 🔺 پس اگر میخوای به دوستت کمک کنی ، بدهی‌ ات رو صاف کنی ، یا حتی جایزه‌ ای به کسی بدی… این بهترین راهشه !"""
 
@@ -620,12 +623,12 @@ async def show_academy_adventure_menu(update: Update, query=None):
         await query.edit_message_text(ACADEMY_SUB_ADVENTURE, reply_markup=InlineKeyboardMarkup(keyboard))
     else:
         await update.message.reply_text(ACADEMY_SUB_ADVENTURE, reply_markup=InlineKeyboardMarkup(keyboard))
+
 # ================================================================
-# ادامه توابع آکادمی برای Callback
+# توابع صفحه‌بندی
 # ================================================================
 
 async def show_academy_system_pages(update: Update, query, page):
-    """نمایش صفحات سیستم هاپویی"""
     pages = {
         1: ACADEMY_SYSTEM_PAGE1,
         2: ACADEMY_SYSTEM_PAGE2,
@@ -660,7 +663,6 @@ async def show_academy_system_pages(update: Update, query, page):
     )
 
 async def show_academy_animals_pages(update: Update, query, page):
-    """نمایش صفحات حیوانات"""
     pages = {
         1: ACADEMY_ANIMALS_PAGE1,
         2: ACADEMY_ANIMALS_PAGE2,
@@ -694,7 +696,6 @@ async def show_academy_animals_pages(update: Update, query, page):
     )
 
 async def show_academy_claw_pages(update: Update, query, page):
-    """نمایش صفحات سطح پنجه"""
     pages = {
         1: ACADEMY_CLAW_PAGE1,
         2: ACADEMY_CLAW_PAGE2,
@@ -727,12 +728,7 @@ async def show_academy_claw_pages(update: Update, query, page):
         reply_markup=InlineKeyboardMarkup([keyboard])
     )
 
-# ================================================================
-# نمایش صفحات قابلیت ها
-# ================================================================
-
 async def show_feature_page(update: Update, query, feature):
-    """نمایش صفحات قابلیت‌ها"""
     pages = {
         "hapo": ACADEMY_HAPO,
         "hunt": ACADEMY_HUNT,
@@ -747,12 +743,7 @@ async def show_feature_page(update: Update, query, feature):
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
-# ================================================================
-# نمایش صفحات شروع ماجراجویی
-# ================================================================
-
 async def show_adventure_page(update: Update, query, page):
-    """نمایش صفحات شروع ماجراجویی"""
     pages = {
         "hop": ACADEMY_HOP,
         "points": ACADEMY_POINTS,
