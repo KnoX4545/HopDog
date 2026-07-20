@@ -55,7 +55,10 @@ class HopDogGame:
             # چک کردن خودکار آزادی
             if data.get("jailed", False):
                 now = datetime.now().timestamp()
-                if now >= data.get("jail_until", 0):
+                jail_until = data.get("jail_until", 0)
+                if isinstance(jail_until, str):
+                    jail_until = float(jail_until)
+                if now >= jail_until:
                     data["jailed"] = False
                     data["jail_reason"] = ""
                     data["jail_until"] = 0
@@ -131,8 +134,13 @@ class HopDogGame:
         now = datetime.now().timestamp()
         cooldown = self.get_cooldown_for_level(self.data["level"])
         
-        if self.data["last_hop_time"] > 0 and (now - self.data["last_hop_time"]) < cooldown:
-            remaining = cooldown - (now - self.data["last_hop_time"])
+        # تبدیل به عدد
+        last_hop_time = self.data["last_hop_time"]
+        if isinstance(last_hop_time, str):
+            last_hop_time = float(last_hop_time)
+        
+        if last_hop_time > 0 and (now - last_hop_time) < cooldown:
+            remaining = cooldown - (now - last_hop_time)
             return {"success": False, "remaining": remaining}
         
         level_data = self.get_level_data(self.data["level"])
@@ -360,7 +368,11 @@ class HopDogGame:
         
         if self.data.get("current_hunt_animal") and self.data.get("hunt_time", 0) > 0:
             now = datetime.now().timestamp()
-            elapsed = now - self.data["hunt_time"]
+            # تبدیل به عدد
+            hunt_time = self.data["hunt_time"]
+            if isinstance(hunt_time, str):
+                hunt_time = float(hunt_time)
+            elapsed = now - hunt_time
             if elapsed < HUNT_DECISION_TIMER:
                 remaining = HUNT_DECISION_TIMER - elapsed
                 return {
@@ -378,8 +390,14 @@ class HopDogGame:
         
         cooldown = self.get_claw_cooldown(self.data["claw_level"]) * 60
         now = datetime.now().timestamp()
-        if self.data["last_hunt_time"] > 0 and (now - self.data["last_hunt_time"]) < cooldown:
-            remaining = cooldown - (now - self.data["last_hunt_time"])
+        
+        # تبدیل به عدد
+        last_hunt_time = self.data["last_hunt_time"]
+        if isinstance(last_hunt_time, str):
+            last_hunt_time = float(last_hunt_time)
+        
+        if last_hunt_time > 0 and (now - last_hunt_time) < cooldown:
+            remaining = cooldown - (now - last_hunt_time)
             return {"success": False, "reason": "خسته‌ام", "remaining": remaining}
         
         self.data["last_hunt_time"] = now
@@ -405,7 +423,11 @@ class HopDogGame:
         
         if self.data.get("hunt_time", 0) > 0:
             now = datetime.now().timestamp()
-            if (now - self.data["hunt_time"]) > HUNT_DECISION_TIMER:
+            # تبدیل به عدد
+            hunt_time = self.data["hunt_time"]
+            if isinstance(hunt_time, str):
+                hunt_time = float(hunt_time)
+            if (now - hunt_time) > HUNT_DECISION_TIMER:
                 animal_name = animal.get("name", "حیوان")
                 self.data["current_hunt_animal"] = None
                 self.data["hunt_time"] = 0
@@ -428,7 +450,11 @@ class HopDogGame:
         
         if self.data.get("hunt_time", 0) > 0:
             now = datetime.now().timestamp()
-            if (now - self.data["hunt_time"]) > HUNT_DECISION_TIMER:
+            # تبدیل به عدد
+            hunt_time = self.data["hunt_time"]
+            if isinstance(hunt_time, str):
+                hunt_time = float(hunt_time)
+            if (now - hunt_time) > HUNT_DECISION_TIMER:
                 animal_name = animal.get("name", "حیوان")
                 self.data["current_hunt_animal"] = None
                 self.data["hunt_time"] = 0
@@ -514,8 +540,13 @@ class HopDogGame:
             self.save_data()
             return
         
+        # تبدیل به عدد
+        bank_last_interest_at = self.data["bank_last_interest_at"]
+        if isinstance(bank_last_interest_at, str):
+            bank_last_interest_at = float(bank_last_interest_at)
+        
         # چک کردن اینکه ۲۴ ساعت گذشته یا نه
-        elapsed = now - self.data["bank_last_interest_at"]
+        elapsed = now - bank_last_interest_at
         
         if elapsed >= 24 * 3600:  # 24 ساعت
             # محاسبه سود
@@ -537,6 +568,8 @@ class HopDogGame:
         last_time = self.data.get("bank_last_interest_at", 0)
         if last_time == 0:
             return datetime.now()
+        if isinstance(last_time, str):
+            last_time = float(last_time)
         next_time = datetime.fromtimestamp(last_time) + timedelta(days=1)
         return next_time
 
@@ -639,6 +672,8 @@ class HopDogGame:
         
         now = datetime.now().timestamp()
         last_transfer = self.data.get("last_transfer_time", 0)
+        if isinstance(last_transfer, str):
+            last_transfer = float(last_transfer)
         if last_transfer > 0 and (now - last_transfer) < TRANSFER_COOLDOWN:
             remaining = TRANSFER_COOLDOWN - (now - last_transfer)
             return {"success": False, "reason": f"بین انتقال‌ها باید {TRANSFER_COOLDOWN} ثانیه صبر کنی. {int(remaining)} ثانیه مونده"}
@@ -698,7 +733,10 @@ class HopDogGame:
         if not self.data.get("jailed", False):
             return False
         now = datetime.now().timestamp()
-        if now >= self.data.get("jail_until", 0):
+        jail_until = self.data.get("jail_until", 0)
+        if isinstance(jail_until, str):
+            jail_until = float(jail_until)
+        if now >= jail_until:
             self.data["jailed"] = False
             self.data["jail_reason"] = ""
             self.data["jail_until"] = 0
@@ -713,7 +751,10 @@ class HopDogGame:
         if not self.data.get("jailed", False):
             return 0
         now = datetime.now().timestamp()
-        remaining = self.data.get("jail_until", 0) - now
+        jail_until = self.data.get("jail_until", 0)
+        if isinstance(jail_until, str):
+            jail_until = float(jail_until)
+        remaining = jail_until - now
         return max(0, int(remaining))
 
     def jail_user(self, reason, duration, fine):
@@ -743,6 +784,8 @@ class HopDogGame:
             return {"success": False, "reason": "شما در زندان نیستید"}
         
         fine = self.data.get("jail_fine", 0)
+        if isinstance(fine, str):
+            fine = int(fine)
         if self.data["hop_point"] < fine:
             return {"success": False, "reason": f"پوینت کافی نیست. نیاز به {fine:,} هاپو پوینت"}
         
@@ -851,7 +894,10 @@ class StreetHapo:
         if self.data.get("rescued", False):
             return False
         now = datetime.now().timestamp()
-        return now >= self.data.get("expires_at", 0)
+        expires_at = self.data.get("expires_at", 0)
+        if isinstance(expires_at, str):
+            expires_at = float(expires_at)
+        return now >= expires_at
     
     def get_attempt_cost(self):
         """دریافت هزینه تلاش بعدی"""
@@ -865,7 +911,10 @@ class StreetHapo:
         if not self.active or self.data.get("rescued", False):
             return 0
         now = datetime.now().timestamp()
-        remaining = self.data.get("expires_at", 0) - now
+        expires_at = self.data.get("expires_at", 0)
+        if isinstance(expires_at, str):
+            expires_at = float(expires_at)
+        remaining = expires_at - now
         return max(0, int(remaining))
     
     def attempt_rescue(self, user_id, user_name, game):
