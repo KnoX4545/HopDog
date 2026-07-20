@@ -1018,7 +1018,7 @@ async def street_hapo_timer(street_hapo, context):
 
 
 async def handle_street_hapo_rescue(update: Update, context: ContextTypes.DEFAULT_TYPE, query):
-    """هندلر دکمه نجات هاپوی خیابونی - پیام اصلی ادیت نمیشه"""
+    """هندلر دکمه نجات هاپوی خیابونی - همیشه پیام جدید"""
     user_id = update.effective_user.id
     username = update.effective_user.username
     full_name = update.effective_user.full_name or f"کاربر{user_id}"
@@ -1048,26 +1048,26 @@ async def handle_street_hapo_rescue(update: Update, context: ContextTypes.DEFAUL
         await query.message.reply_text("❌ این هاپوی خیابونی قبلاً نجات پیدا کرده!")
         return
     
+    # ======== چک کردن اینکه شانسی مونده ========
+    attempts = street_hapo.data.get("attempts", 0)
+    if attempts >= STREET_HAPO_MAX_ATTEMPTS:
+        await query.answer("❌ همه شانس‌ها از دست رفته!")
+        await query.message.reply_text("❌ همه شانس‌ها از دست رفته! هاپوی خیابونی نتونست نجات پیدا کنه... 😢")
+        return
+    
     # ======== تلاش برای نجات ========
     result = street_hapo.attempt_rescue(user_id, full_name, game)
     
-    attempts = street_hapo.data.get("attempts", 0)
-    total_attempts = STREET_HAPO_MAX_ATTEMPTS
-    
+    # ======== همیشه یه پیام جدید بفرست ========
     if result.get("success", False) and result.get("rescued", False):
         # ======== موفقیت ========
         keyboard = [[InlineKeyboardButton("🎉 تبریک!", callback_data="street_hapo_ignore")]]
-        
         msg = f"🎉 {full_name} هاپوی خیابونی رو نجات داد!\n\n"
         msg += f"💰 {result['reward']} 🪙 هاپو پوینت جایزه گرفتی!\n"
         msg += f"🐶 تعداد هاپوهای نجات داده شده: {game.data.get('street_hapo_rescued', 0)}\n\n"
-        msg += f"🔄 تعداد تلاش‌ها: {attempts}/{total_attempts}"
+        msg += f"🔄 تعداد تلاش‌ها: {result['attempt']}/{STREET_HAPO_MAX_ATTEMPTS}"
         
-        # ✅ پیام جدید بفرست (پیام اصلی دست نخورده میمونه)
-        await query.message.reply_text(
-            msg,
-            reply_markup=InlineKeyboardMarkup(keyboard)
-        )
+        await query.message.reply_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
         
         try:
             await context.bot.send_message(
@@ -1082,23 +1082,24 @@ async def handle_street_hapo_rescue(update: Update, context: ContextTypes.DEFAUL
     elif result.get("died", False):
         # ======== هاپو مرد ========
         msg = f"💀 {result['message']}\n\n"
-        msg += f"🔄 تعداد تلاش‌ها: {attempts}/{total_attempts}"
-        
-        # ✅ پیام جدید بفرست
+        msg += f"🔄 تعداد تلاش‌ها: {result['attempt']}/{STREET_HAPO_MAX_ATTEMPTS}"
         await query.message.reply_text(msg)
         
     elif not result.get("success", False):
-        # ======== خطا ========
+        # ======== خطا (مثلاً پوینت کافی نیست) ========
         await query.answer(result.get("reason", "خطا!"))
+        if "پوینت کافی نیست" in result.get("reason", "") or "کافی نیست" in result.get("reason", ""):
+            await query.message.reply_text(f"❌ {result['reason']}")
         
     else:
-        # ======== تلاش ناموفق ولی هاپو زنده‌ست ========
+        # ======== تلاش ناموفق (هاپو زنده‌ست) ========
         remaining = result.get("remaining_attempts", 0)
         cost = street_hapo.get_attempt_cost()
         remaining_time = street_hapo.get_remaining_time()
+        current_attempt = result.get("attempt", 0)
         
         msg = f"❌ {result['message']}\n\n"
-        msg += f"🔄 تلاش‌های انجام شده: {attempts}/{total_attempts}\n"
+        msg += f"🔄 تلاش {current_attempt}/{STREET_HAPO_MAX_ATTEMPTS}\n"
         msg += f"⏳ زمان باقی‌مونده: {remaining_time} ثانیه\n"
         
         keyboard = []
@@ -1108,15 +1109,14 @@ async def handle_street_hapo_rescue(update: Update, context: ContextTypes.DEFAUL
         else:
             msg += f"❌ همه شانس‌ها از دست رفته!"
         
-        # ✅ پیام جدید بفرست (پیام اصلی دست نخورده میمونه)
         await query.message.reply_text(
             msg,
             reply_markup=InlineKeyboardMarkup(keyboard) if keyboard else None
         )
     
-    # ✅ پیام اصلی رو ادیت نکن! فقط دکمه رو غیرفعال کن
+    # ======== پیام اصلی رو دست نزن ========
     try:
-        await query.answer()  # فقط کلیک رو تایید کن
+        await query.answer()
     except:
         pass
 
