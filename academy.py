@@ -1,10 +1,10 @@
-# academy.py - متن‌های آکادمی (بخش پروفایل اصلاح شده)
+# academy.py - متن‌های آکادمی (نسخه نهایی)
 
 # ================================================================
 # متن‌های آکادمی
 # ================================================================
 
-ACADEMY_MAIN = """📚 آکادمی هاپویی ✨
+ACADEMY_MAIN = """🏫 آکادمی هاپویی ✨
 
 🐾 جایی که هاپوهای کنجکاو جواب سوال‌هاشون رو پیدا میکنن
 
@@ -16,7 +16,7 @@ ACADEMY_SUB_SYSTEM = """📚 آکادمی هاپویی ✨
 لطفا بخش مورد نظر را انتخاب کنید ⬇️"""
 
 ACADEMY_SUB_FEATURES = """📚 آکادمی هاپویی ✨
-┘─ 🐾 بخش : قابلیت ها 🔓
+┘─ 🐾 بخش : قابلیت های هاپویی ✨
 
 لطفا بخش مورد نظر را انتخاب کنید ⬇️"""
 
@@ -42,14 +42,14 @@ ACADEMY_SYSTEM_PAGE1 = """📚 آکادمی هاپویی ✨
 ┘─ 💰 پوینت : 10 - 20 🪙
 ┘─ ⏳ زمان : 5:00
 ┘─ 💝 جایزه ارتقا : 50 🪙
-┘─ 🔓 قابلیت ها : پنجه، شکار
+┘─ 🔓 قابلیت ها : پنجه، شکار، دریافت هاپو پوینت
 〰️〰️〰️〰️〰️〰️〰️
 ⭐️ سطح 3
 ┘─ 🐾 هاپ مورد نیاز : 15
 ┘─ 💰 پوینت : 15 - 25 🪙
 ┘─ ⏳ زمان : 5:00
 ┘─ 💝 جایزه ارتقا : 225 🪙
-┘─ 🔓 قابلیت ها : هاپو
+┘─ 🔓 قابلیت ها : هاپو، انتقال هاپویی
 〰️〰️〰️〰️〰️〰️〰️
 ⭐️ سطح 4
 ┘─ 🐾 هاپ مورد نیاز : 40
@@ -378,13 +378,12 @@ ACADEMY_CLAW_PAGE3 = """📚 آکادمی هاپویی ✨
   ┘─ افسانه‌ای : 25%"""
 
 ACADEMY_HAPO = """📚 آکادمی هاپویی ✨
-┘─ 🐾 بخش : قابلیت ها 🔓
+┘─ 🐾 بخش : قابلیت های هاپویی ✨
 ┘─ 📚 مطلب : هاپو 🐕
 
 🌘 در میان سایه‌های این دنیای مرموز، هیچ‌چیز دلگرم‌کننده‌تر از صدای خُرخُر یک همدم کوچک نیست…
 
 🐕 وقت آن رسیده که صاحب یک هاپو اختصاصی بشی !
-😻 برای اینکه همراه ملوس خودت رو به خونه بیاری، کافیه بگی هاپو
 
 💫 از اون لحظه به بعد، هاپو تو شروع میکنه به تولید جادوییِ 🪙 هاپو پوینت ! حتی وقتی تو خوابی، اون هر ثانیه براشون زحمت میکشه
 ┘─ 🔺 مثلاً یک هاپو سطح 1 در هر ثانیه 0.1 🪙 هاپو پوینت تولید میکنه
@@ -413,7 +412,7 @@ ACADEMY_HAPO = """📚 آکادمی هاپویی ✨
 ❗️ سطح مورد نیاز جهت خرید هاپو : 3"""
 
 ACADEMY_HUNT = """📚 آکادمی هاپویی ✨
-┘─ 🐾 بخش : قابلیت ها 🔓
+┘─ 🐾 بخش : قابلیت های هاپویی ✨
 ┘─ 📚 مطلب : شکار هاپویی 🏹
 
 ✨ در کنار جنگل‌های اسرارآمیز این جهان، هاپوهای گرسنه و ماجراجو به چیزی بیشتر از یک صدا نیاز دارن…
@@ -442,7 +441,7 @@ ACADEMY_HUNT = """📚 آکادمی هاپویی ✨
 ❗️ سطح مورد نیاز جهت شکار : 2"""
 
 ACADEMY_BANK = """📚 آکادمی هاپویی ✨
-┘─ 🐾 بخش : قابلیت ها 🔓
+┘─ 🐾 بخش : قابلیت های هاپویی ✨
 ┘─ 📚 مطلب : بانک هاپویی 🏦
 
 🌘 در قلب پر هیاهوی شهر هاپوها، ساختمانی امن و باشکوه وجود داره؛ جایی که میتونی ثروتت رو از خرج شدن بی‌موقع دور نگه داری و بذاری آروم‌آروم رشد کنه.
@@ -459,6 +458,29 @@ ACADEMY_BANK = """📚 آکادمی هاپویی ✨
 ┘─ 💰 هرچقدر موجودی بانک بیشتر باشه، سود دریافتی بیشتر خواهد بود.
 
 🐾 با بانک هاپویی، هاپو پوینت‌هات رو امن نگه دار و بذار خودشون رشد کنن."""
+
+ACADEMY_TRANSFER = """📚 آکادمی هاپویی ✨
+┘─ 🐾 بخش : قابلیت های هاپویی ✨
+┘─ 📚 مطلب : انتقال هاپویی 🧲
+
+🌘 در دنیای هاپو ها ، گاهی وقت‌ ها لازم میشه کمی از ثروتت رو با بقیه به اشتراک بذاری…
+
+🧲 اینجاست که قابلیت «انتقال هاپویی» وارد میشه !
+
+💰 اگر بخوای مقداری از "هاپو پوینت"🪙 های خودت رو به یک هاپوی دیگه انتقال بدی ، فقط کافیه از این دستور استفاده کنی : "انتقال هاپویی"
+
+- 👤 برای مشخص کردن کاربر هم چند راه داری :
+┘─ ریپلای کردن روی پیام اون کاربر
+┘─ نوشتن یوزرنیم (با @ یا بدون @)
+┘─ وارد کردن یوزر آیدی (آیدی عددی) کاربر
+
+❗️ اما چند قانون مهم هم وجود داره ⬇️
+┘─ حداقل مقدار انتقال: 50 هاپو پوینت
+┘─ حداکثر مقدار انتقال: 500,000 هاپو پوینت
+┘─ فقط میتونی به کاربرانی انتقال بدی که سطحشون بالاتر از 2 باشه
+┘─ ⌛️ بعد از هر انتقال باید 30 ثانیه صبر کنی تا دوباره بتونی انتقال انجام بدی
+
+🔺 پس اگر میخوای به دوستت کمک کنی ، بدهی‌ ات رو صاف کنی ، یا حتی جایزه‌ ای به کسی بدی… این بهترین راهشه !"""
 
 ACADEMY_HOP = """📚 آکادمی هاپویی ✨
 ┘─ 🐾 بخش : شروع ماجراجویی 🐾
@@ -508,9 +530,8 @@ ACADEMY_EXP = """📚 آکادمی هاپویی ✨
 💝 هربار که سطحت ارتقا پیدا کنه , جوایز خفن مانند 🪙 هاپو پوینت دریافت میکنی…
 ✨ و همچنین با رسیدن به سطح های بالاتر , قابلیت ها و امکانات تازه ای برات باز میشه
 
-🐾 میتونی با نوشتن هاپویی پروفایل هاپویی خودت رو مشاهده کنی و سطح کنونی خودت و همچنین تعداد باقی مونده هاپ هات تا رسیدن به سطح بعدی رو ببینی"""
+🐾 میتونی با نوشتن هاپوهام پروفایل هاپویی خودت رو مشاهده کنی و سطح کنونی خودت و همچنین تعداد باقی مونده هاپ هات تا رسیدن به سطح بعدی رو ببینی"""
 
-# ✅ متن جدید پروفایل (جایگزین شده)
 ACADEMY_PROFILE = """📚 آکادمی هاپویی ✨
 ┘─ 🐾 بخش : شروع ماجراجویی 🐾
 ┘─ 📚 مطلب : پروفایل هاپویی 🪪
@@ -525,7 +546,7 @@ ACADEMY_PROFILE = """📚 آکادمی هاپویی ✨
 """
 
 # ================================================================
-# توابع آکادمی (برای ایمپورت در bot.py)
+# توابع آکادمی
 # ================================================================
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
@@ -570,6 +591,9 @@ async def show_academy_features_menu(update: Update, query=None):
         ],
         [
             InlineKeyboardButton("🏦 بانک", callback_data="academy_bank"),
+            InlineKeyboardButton("🧲 انتقال هاپویی", callback_data="academy_transfer")
+        ],
+        [
             InlineKeyboardButton("◀️ برگشت", callback_data="academy_back_main")
         ]
     ]
@@ -596,3 +620,149 @@ async def show_academy_adventure_menu(update: Update, query=None):
         await query.edit_message_text(ACADEMY_SUB_ADVENTURE, reply_markup=InlineKeyboardMarkup(keyboard))
     else:
         await update.message.reply_text(ACADEMY_SUB_ADVENTURE, reply_markup=InlineKeyboardMarkup(keyboard))
+# ================================================================
+# ادامه توابع آکادمی برای Callback
+# ================================================================
+
+async def show_academy_system_pages(update: Update, query, page):
+    """نمایش صفحات سیستم هاپویی"""
+    pages = {
+        1: ACADEMY_SYSTEM_PAGE1,
+        2: ACADEMY_SYSTEM_PAGE2,
+        3: ACADEMY_SYSTEM_PAGE3,
+        4: ACADEMY_SYSTEM_PAGE4
+    }
+    
+    keyboard = []
+    if page > 1:
+        keyboard.append(InlineKeyboardButton("◀️ صفحه قبل", callback_data=f"academy_system_page{page-1}"))
+    if page < 4:
+        if keyboard:
+            keyboard.append(InlineKeyboardButton("▶️ صفحه بعد", callback_data=f"academy_system_page{page+1}"))
+        else:
+            keyboard = [InlineKeyboardButton("▶️ صفحه بعد", callback_data=f"academy_system_page{page+1}")]
+    
+    if page == 4 and page > 1:
+        keyboard = [InlineKeyboardButton("◀️ صفحه قبل", callback_data=f"academy_system_page{page-1}")]
+    elif page == 1 and page < 4:
+        keyboard = [InlineKeyboardButton("▶️ صفحه بعد", callback_data=f"academy_system_page{page+1}")]
+    elif 1 < page < 4:
+        keyboard = [
+            InlineKeyboardButton("◀️ صفحه قبل", callback_data=f"academy_system_page{page-1}"),
+            InlineKeyboardButton("▶️ صفحه بعد", callback_data=f"academy_system_page{page+1}")
+        ]
+    
+    keyboard.append(InlineKeyboardButton("◀️ برگشت", callback_data="academy_system_menu"))
+    
+    await query.edit_message_text(
+        pages.get(page, ACADEMY_SYSTEM_PAGE1),
+        reply_markup=InlineKeyboardMarkup([keyboard])
+    )
+
+async def show_academy_animals_pages(update: Update, query, page):
+    """نمایش صفحات حیوانات"""
+    pages = {
+        1: ACADEMY_ANIMALS_PAGE1,
+        2: ACADEMY_ANIMALS_PAGE2,
+        3: ACADEMY_ANIMALS_PAGE3
+    }
+    
+    keyboard = []
+    if page > 1:
+        keyboard.append(InlineKeyboardButton("◀️ صفحه قبل", callback_data=f"academy_animals_page{page-1}"))
+    if page < 3:
+        if keyboard:
+            keyboard.append(InlineKeyboardButton("▶️ صفحه بعد", callback_data=f"academy_animals_page{page+1}"))
+        else:
+            keyboard = [InlineKeyboardButton("▶️ صفحه بعد", callback_data=f"academy_animals_page{page+1}")]
+    
+    if page == 3 and page > 1:
+        keyboard = [InlineKeyboardButton("◀️ صفحه قبل", callback_data=f"academy_animals_page{page-1}")]
+    elif page == 1 and page < 3:
+        keyboard = [InlineKeyboardButton("▶️ صفحه بعد", callback_data=f"academy_animals_page{page+1}")]
+    elif 1 < page < 3:
+        keyboard = [
+            InlineKeyboardButton("◀️ صفحه قبل", callback_data=f"academy_animals_page{page-1}"),
+            InlineKeyboardButton("▶️ صفحه بعد", callback_data=f"academy_animals_page{page+1}")
+        ]
+    
+    keyboard.append(InlineKeyboardButton("◀️ برگشت", callback_data="academy_system_menu"))
+    
+    await query.edit_message_text(
+        pages.get(page, ACADEMY_ANIMALS_PAGE1),
+        reply_markup=InlineKeyboardMarkup([keyboard])
+    )
+
+async def show_academy_claw_pages(update: Update, query, page):
+    """نمایش صفحات سطح پنجه"""
+    pages = {
+        1: ACADEMY_CLAW_PAGE1,
+        2: ACADEMY_CLAW_PAGE2,
+        3: ACADEMY_CLAW_PAGE3
+    }
+    
+    keyboard = []
+    if page > 1:
+        keyboard.append(InlineKeyboardButton("◀️ صفحه قبل", callback_data=f"academy_claw_page{page-1}"))
+    if page < 3:
+        if keyboard:
+            keyboard.append(InlineKeyboardButton("▶️ صفحه بعد", callback_data=f"academy_claw_page{page+1}"))
+        else:
+            keyboard = [InlineKeyboardButton("▶️ صفحه بعد", callback_data=f"academy_claw_page{page+1}")]
+    
+    if page == 3 and page > 1:
+        keyboard = [InlineKeyboardButton("◀️ صفحه قبل", callback_data=f"academy_claw_page{page-1}")]
+    elif page == 1 and page < 3:
+        keyboard = [InlineKeyboardButton("▶️ صفحه بعد", callback_data=f"academy_claw_page{page+1}")]
+    elif 1 < page < 3:
+        keyboard = [
+            InlineKeyboardButton("◀️ صفحه قبل", callback_data=f"academy_claw_page{page-1}"),
+            InlineKeyboardButton("▶️ صفحه بعد", callback_data=f"academy_claw_page{page+1}")
+        ]
+    
+    keyboard.append(InlineKeyboardButton("◀️ برگشت", callback_data="academy_system_menu"))
+    
+    await query.edit_message_text(
+        pages.get(page, ACADEMY_CLAW_PAGE1),
+        reply_markup=InlineKeyboardMarkup([keyboard])
+    )
+
+# ================================================================
+# نمایش صفحات قابلیت ها
+# ================================================================
+
+async def show_feature_page(update: Update, query, feature):
+    """نمایش صفحات قابلیت‌ها"""
+    pages = {
+        "hapo": ACADEMY_HAPO,
+        "hunt": ACADEMY_HUNT,
+        "bank": ACADEMY_BANK,
+        "transfer": ACADEMY_TRANSFER
+    }
+    
+    keyboard = [[InlineKeyboardButton("◀️ برگشت", callback_data="academy_features_menu")]]
+    
+    await query.edit_message_text(
+        pages.get(feature, ACADEMY_HAPO),
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+
+# ================================================================
+# نمایش صفحات شروع ماجراجویی
+# ================================================================
+
+async def show_adventure_page(update: Update, query, page):
+    """نمایش صفحات شروع ماجراجویی"""
+    pages = {
+        "hop": ACADEMY_HOP,
+        "points": ACADEMY_POINTS,
+        "exp": ACADEMY_EXP,
+        "profile": ACADEMY_PROFILE
+    }
+    
+    keyboard = [[InlineKeyboardButton("◀️ برگشت", callback_data="academy_adventure_menu")]]
+    
+    await query.edit_message_text(
+        pages.get(page, ACADEMY_HOP),
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
