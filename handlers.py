@@ -1091,7 +1091,6 @@ async def handle_street_hapo_rescue(update: Update, context: ContextTypes.DEFAUL
             await query.message.edit_reply_markup(reply_markup=None)
         except:
             pass
-        
     elif result.get("died", False):
         # ======== هاپو مرد ========
         msg = f"💀 {result['message']}\n\n"
@@ -1102,14 +1101,13 @@ async def handle_street_hapo_rescue(update: Update, context: ContextTypes.DEFAUL
             await query.message.edit_reply_markup(reply_markup=None)
         except:
             pass
-        
-    elif not result.get("success", False):
-        # ======== خطا (مثلاً پوینت کافی نیست) ========
+
+    elif "پوینت کافی نیست" in str(result.get("reason", "")):
+        # ======== خطا (پوینت کافی نیست) ========
         await query.answer(result.get("reason", "خطا!"))
-        if "پوینت کافی نیست" in result.get("reason", "") or "کافی نیست" in result.get("reason", ""):
-            await query.message.reply_text(f"❌ {result['reason']}")
-        
-    else:
+        await query.message.reply_text(f"❌ {result['reason']}")
+
+    elif result.get("success") is False and result.get("died") is False:
         # ======== تلاش ناموفق (هاپو زنده‌ست) ========
         remaining = result.get("remaining_attempts", 0)
         cost = street_hapo.get_attempt_cost()
@@ -1131,13 +1129,18 @@ async def handle_street_hapo_rescue(update: Update, context: ContextTypes.DEFAUL
             msg,
             reply_markup=InlineKeyboardMarkup(keyboard) if keyboard else None
         )
+
+    else:
+        # ======== هر حالت دیگه ========
+        await query.answer(result.get("reason", "خطا!"))
+        if result.get("reason"):
+            await query.message.reply_text(f"❌ {result['reason']}")
     
     # ======== پیام اصلی رو دست نزن ========
     try:
         await query.answer()
     except:
         pass
-
 
 # ================================================================
 # دستور ادمین - ارسال هاپوی خیابونی به گروه خاص (/hapo) - فقط پیوی
