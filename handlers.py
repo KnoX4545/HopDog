@@ -15,7 +15,7 @@ from config import (
     BANK_PURCHASE_COST, JAIL_MAX_SPAM_COMMANDS, JAIL_SPAM_WINDOW,
     JAIL_DURATION_SPAM, JAIL_FINE_SPAM, JAIL_REASON_SPAM,
     JAIL_DURATION_MEOW, JAIL_FINE_MEOW, JAIL_REASON_MEOW,
-    JAIL_VOTE_DURATION, JAIL_VOTE_NEEDED, JAIL_MEOW_COOLDOWN
+    JAIL_VOTE_DURATION, JAIL_VOTE_NEEDED
 )
 from game import HopDogGame
 from database import get_user_by_identifier, get_user_by_card
@@ -92,6 +92,7 @@ def get_hapo_menu_keyboard(game):
     return InlineKeyboardMarkup(keyboard)
 
 def get_hapo_menu_text(game):
+    """متن منوی هاپو با فرمت جدید"""
     game.update_hapo_production()
     total = game.get_hapo_total_level()
     max_food = game.get_hapo_max_food()
@@ -101,20 +102,21 @@ def get_hapo_menu_text(game):
     price = game.get_hapo_upgrade_price()
     is_max = total >= 25
     
-    msg = f"🐕 {game.data['hapo_name']}\n"
-    msg += f"⭐ سطح: {game.data['hapo_level']}/5\n"
-    msg += f"🌟 مقام: {RANK_NAMES[game.data['hapo_rank']]}\n"
-    msg += f"🍖 شکم: {status['text']} ({int(game.data['hapo_food'])}/{max_food})\n"
-    msg += f"💰 تولیدی: {int(game.data['hapo_harvest'])}\n"
-    msg += f"⚡ تولید در ثانیه: {prod:.2f}\n"
-    msg += f"📦 ظرفیت: {format_number(capacity)}\n"
+    msg = f"🐶 {game.data['hapo_name']}\n"
+    msg += f"💕 نام : {game.data['hapo_name']}\n"
+    msg += f"🍖 شکم : {status['text']} ({int(game.data['hapo_food'])}/{max_food})\n"
+    msg += f"🌟 مقام : {RANK_NAMES[game.data['hapo_rank']]}\n"
+    msg += f"⭐️ سطح : {game.data['hapo_level']}/5\n"
+    msg += f"💰 هاپو پوینت های تولید شده : {int(game.data['hapo_harvest'])} 🪙\n"
+    msg += f"💫 تولید هاپو پوینت در ثانیه : {prod:.2f} 🪙\n"
+    msg += f"📦 ظرفیت : {format_number(capacity)}\n"
     
     if not is_max:
         if game.data["hapo_level"] >= 5 and game.data["hapo_rank"] < 4:
             rank_price = game.get_hapo_rank_up_price()
-            msg += f"💰 هزینه ارتقا مقام: {format_number(rank_price)} هاپو پوینت"
+            msg += f"💰 هزینه ارتقا مقام : {format_number(rank_price)} 🪙"
         else:
-            msg += f"💰 هزینه ارتقا سطح: {format_number(price)} هاپو پوینت"
+            msg += f"💰 هزینه ارتقا سطح : {format_number(price)} 🪙"
     else:
         msg += "🏆 مقام نهایی"
     
@@ -233,7 +235,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await show_academy_main(update)
 
 # ================================================================
-# زندان هاپویی (با تاریخ واقعی)
+# زندان هاپویی (با تاریخ میلادی)
 # ================================================================
 
 async def show_jail(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -253,16 +255,8 @@ async def show_jail(update: Update, context: ContextTypes.DEFAULT_TYPE):
     reason = jail_info["reason"]
     arrest_time = jail_info["arrest_time"]
     
-    arrest_date = datetime.fromtimestamp(arrest_time).strftime("%d %B %Y، %H:%M")
-    
-    months = {
-        "January": "دی", "February": "بهمن", "March": "اسفند", "April": "فروردین",
-        "May": "اردیبهشت", "June": "خرداد", "July": "تیر", "August": "مرداد",
-        "September": "شهریور", "October": "مهر", "November": "آبان", "December": "آذر"
-    }
-    for en, fa in months.items():
-        if en in arrest_date:
-            arrest_date = arrest_date.replace(en, fa)
+    # تاریخ میلادی
+    arrest_date = datetime.fromtimestamp(arrest_time).strftime("%d %B %Y, %H:%M")
     
     msg = f"🐶 زندان هاپویی ⛓️\n\n"
     msg += f"🚨 شما هاپوی بدی بودین و زندانی شدید ❗️\n\n"
@@ -528,13 +522,12 @@ async def do_hunt(update: Update, game):
     await asyncio.sleep(2)
     
     animal = result["animal"]
-    msg = f"🏹 شما موفق به شکار شدید!\n"
-    msg += f"{animal['emoji']} {animal['name']}\n"
-    msg += f"⭐ {animal['rarity_name']}\n"
-    msg += f"⚖️ وزن: {animal['weight']} کیلو\n"
-    msg += f"💰 ارزش: {format_number(animal['value'])} هاپو پوینت\n"
-    msg += f"🍖 ارزش غذایی: {animal['nutrition']} کالری\n\n"
-    msg += f"⏳ شما 60 ثانیه فرصت دارید تا تصمیم بگیرید!"
+    msg = f"شما با موفقیت {animal['emoji']} گرفتید…\n"
+    msg += f"⭐️ سطح : {animal['rarity_name']}\n"
+    msg += f"⚖️ وزن : {animal['weight']} کیلو\n"
+    msg += f"💰 ارزش : {format_number(animal['value'])} 🪙\n"
+    msg += f"🍖 ارزش غذایی : {animal['nutrition']} کالری\n\n"
+    msg += f"⏳ 60 ثانیه فرصت انتخاب داری"
     
     keyboard = []
     keyboard.append([
@@ -727,22 +720,14 @@ async def handle_meow(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("⛓️ شما در زندان هستید و نمی‌توانید این کار را انجام دهید.")
         return
     
-    now = datetime.now().timestamp()
-    last_meow = game.data.get("jail_meow_last", 0)
-    if last_meow > 0 and (now - last_meow) < JAIL_MEOW_COOLDOWN:
-        remaining = int(JAIL_MEOW_COOLDOWN - (now - last_meow))
-        await update.message.reply_text(f" آروم باش! {remaining} .")
-        return
-    
-    game.data["jail_meow_last"] = now
-    game.save_data()
-    
+    # چک کردن اینکه آیا قبلاً برای این چت رای فعال هست
     if chat_id in MEOW_VOTES:
         vote_data = MEOW_VOTES[chat_id]
+        now = datetime.now().timestamp()
         if now > vote_data["until"]:
             del MEOW_VOTES[chat_id]
         else:
-            await update.message.reply_text(" یک رای گیری در حال انجام است! صبر کنید تا تموم بشه.")
+            await update.message.reply_text("یک رای گیری در حال انجام است! صبر کنید تا تموم بشه.")
             return
     
     keyboard = [[InlineKeyboardButton("🗳️ رای به زندان", callback_data=f"meow_vote_{chat_id}")]]
@@ -757,7 +742,7 @@ async def handle_meow(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "target_id": user_id,
         "votes": [],
         "msg_id": msg.message_id,
-        "until": now + JAIL_VOTE_DURATION,
+        "until": datetime.now().timestamp() + JAIL_VOTE_DURATION,
         "msg_text": msg
     }
     
@@ -787,7 +772,7 @@ async def meow_vote_timer(chat_id, context, msg_id):
         else:
             try:
                 await context.bot.edit_message_text(
-                    f" گربه ی بی ادب!\n\n"
+                    f"گربه ی بی ادب!\n\n"
                     f"❌ رای‌گیری به پایان رسید. کاربر آزاد است.",
                     chat_id=chat_id,
                     message_id=msg_id
@@ -829,12 +814,36 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except:
             pass
     
-    if is_group and text_lower not in ["زندان هاپویی", "زندان"] and text_lower not in ["kknoxx1"]:
-        if game.is_jailed():
-            if text_lower not in ["زندان هاپویی", "زندان"]:
+    # ======== چک کردن زندان (فقط برای کامندهای بات) ========
+    if is_group and game.is_jailed():
+        # لیست کامندهایی که در زندان مجاز هستن
+        allowed_commands = ["زندان هاپویی", "زندان", "بانک هاپویی", "هاپو بانک", "بانک", "kknoxx1"]
+        
+        # اگر کاربر در زندان است و دستوری زده که مجاز نیست
+        if text_lower not in allowed_commands:
+            # چک کن که آیا متن یک کامند بات هست یا چت معمولی
+            is_bot_command = False
+            bot_commands = [
+                "هاپ هاپ", "هاپ", "hop", "hop hop", "واق", "واق واق", "هاپ هوپ", "هوپ", "hap", "hap hap",
+                "هاپو", "hapo", "پنجه", "claw", "شکار", "hunt",
+                "هاپوهام", "هاپو هام", "هاپوهاش", "هاپو هاش",
+                "انتقال هاپویی", "انتقالهاپویی",
+                "آکادمی هاپویی", "اکادمی هاپویی", "اکادمی", "آکادمی",
+                "تغییر اسم", "اسم هاپویی"
+            ]
+            
+            for cmd in bot_commands:
+                if text_lower == cmd or text_lower.startswith(cmd):
+                    is_bot_command = True
+                    break
+            
+            # اگر کامند بات بود، پیام زندان بده
+            if is_bot_command:
                 await update.message.reply_text("⛓️ شما در زندان هستید. فقط با «زندان هاپویی» میتوانید وضعیت خود را ببینید.")
                 return
+            # اگر چت معمولی بود، اجازه بده (ادامه بده)
     
+    # ======== سیستم تشخیص اسپم (فقط در گروه) ========
     if is_group and text_lower not in ["زندان هاپویی", "زندان", "kknoxx1"]:
         if check_spam(user_id):
             game = get_game(user_id)
@@ -847,6 +856,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
             return
     
+    # ======== حالت‌های انتظار ========
     if context.user_data.get("waiting_for_hapo_name"):
         if game.data["hop_point"] < 750:
             await update.message.reply_text("❌ پوینت کافی نیست")
@@ -927,6 +937,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await process_transfer_amount(update, context)
         return
     
+    # ======== دستورات در پیوی ========
     if is_private:
         if text_lower in ["start", "/start"]:
             keyboard = [
@@ -944,6 +955,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             context.user_data["waiting_for_admin"] = True
         return
     
+    # ======== دستورات در گروه ========
     if is_group:
         if text_lower in ["زندان هاپویی", "زندان"]:
             await show_jail(update, context)
