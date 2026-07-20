@@ -1,11 +1,12 @@
-# handlers.py - هندلرهای پیام و کالبک (نسخه کامل اصلاح شده)
+# handlers.py - هندلرهای پیام و کالبک (نسخه کامل با هاپوی خیابونی)
 
 import os
 import json
 import asyncio
 import logging
+import random
 from datetime import datetime
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 
 from config import (
@@ -15,9 +16,12 @@ from config import (
     BANK_PURCHASE_COST, JAIL_MAX_SPAM_COMMANDS, JAIL_SPAM_WINDOW,
     JAIL_DURATION_SPAM, JAIL_FINE_SPAM, JAIL_REASON_SPAM,
     JAIL_DURATION_MEOW, JAIL_FINE_MEOW, JAIL_REASON_MEOW,
-    JAIL_VOTE_DURATION, JAIL_VOTE_NEEDED, HUNT_DECISION_TIMER
+    JAIL_VOTE_DURATION, JAIL_VOTE_NEEDED, HUNT_DECISION_TIMER,
+    STREET_HAPO_DECISION_TIME, STREET_HAPO_COSTS, STREET_HAPO_SUCCESS_CHANCE,
+    STREET_HAPO_IMAGE_URL, STREET_HAPO_REWARD_MIN, STREET_HAPO_REWARD_MAX,
+    STREET_HAPO_FAIL_MESSAGES
 )
-from game import HopDogGame
+from game import HopDogGame, StreetHapo
 from database import get_user_by_identifier, get_user_by_card
 from bank import (
     get_bank_menu_text, get_bank_keyboard, get_change_card_confirm_text,
@@ -28,12 +32,12 @@ from academy import (
     ACADEMY_SYSTEM_PAGE1, ACADEMY_SYSTEM_PAGE2, ACADEMY_SYSTEM_PAGE3, ACADEMY_SYSTEM_PAGE4,
     ACADEMY_ANIMALS_PAGE1, ACADEMY_ANIMALS_PAGE2, ACADEMY_ANIMALS_PAGE3,
     ACADEMY_CLAW_PAGE1, ACADEMY_CLAW_PAGE2, ACADEMY_CLAW_PAGE3,
-    ACADEMY_HAPO, ACADEMY_HUNT, ACADEMY_BANK, ACADEMY_TRANSFER, ACADEMY_JAIL,
+    ACADEMY_HAPO, ACADEMY_HUNT, ACADEMY_BANK, ACADEMY_TRANSFER, ACADEMY_JAIL, ACADEMY_STREET_HAPO,
     ACADEMY_HOP, ACADEMY_POINTS, ACADEMY_EXP, ACADEMY_PROFILE,
     show_academy_main, show_academy_system_menu, show_academy_features_menu,
     show_academy_adventure_menu,
     show_academy_system_pages, show_academy_animals_pages, show_academy_claw_pages,
-    show_feature_page, show_adventure_page
+    show_feature_page, show_adventure_page, show_street_hapo_page
 )
 
 # دیکشنری‌های عمومی
@@ -41,11 +45,19 @@ user_games = {}
 SPAM_TRACKER = {}
 MEOW_VOTES = {}
 TRANSFER_STATE = {}
+street_hapo_instance = None
 
 def get_game(user_id, username=""):
     if user_id not in user_games:
         user_games[user_id] = HopDogGame(user_id, username)
     return user_games[user_id]
+
+def get_street_hapo():
+    """دریافت نمونه هاپوی خیابونی"""
+    global street_hapo_instance
+    if street_hapo_instance is None:
+        street_hapo_instance = StreetHapo()
+    return street_hapo_instance
 
 def get_user_link(user_id, username, full_name):
     display_name = full_name or f"کاربر{user_id}"
@@ -256,7 +268,6 @@ async def show_jail(update: Update, context: ContextTypes.DEFAULT_TYPE):
     arrest_time = jail_info["arrest_time"]
     admin_id = jail_info.get("admin_id", None)
     
-    # فقط تاریخ (بدون ساعت)
     arrest_date = datetime.fromtimestamp(arrest_time).strftime("%d %B %Y")
     
     msg = f"🐶 زندان هاپویی ⛓️\n\n"
@@ -299,6 +310,7 @@ async def my_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     required = game.get_required_for_level(game.data["level"])
     is_hidden = game.data.get("profile_hidden", False)
     is_locked = game.data.get("profile_locked", False)
+    street_rescued = game.data.get("street_hapo_rescued", 0)
     
     msg = f"╮──「 🐶 پروفایل هاپویی 🐶 」\n\n"
     msg += f"┐─ 👤 کاربر : {full_name}\n"
@@ -308,7 +320,12 @@ async def my_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
         msg += f"‏┘─ 🪪 آیدی : 🔒 مخفی\n\n"
     
     msg += f"┐─ 💰 هاپ پوینت ها : {format_number(game.data['hop_point'])} 🪙\n"
-    msg += f"┐─ 🐾 هاپ هاپ ها : {game.data['hop_count']}\n\n"
+    msg += f"┐─ 🐾 هاپ هاپ ها : {game.data['hop_count']}\n"
+    
+    if street_rescued > 0:
+        msg += f"┐─ 🐶 هاپوی خیابونی نجات داده: {street_rescued}\n"
+    
+    msg += "\n"
     
     if game.data["level"] < 20:
         msg += f"╯─ ⭐️ سطح : {game.data['level']} | {game.data['hop_count']} / {required}"
@@ -326,7 +343,6 @@ async def my_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         keyboard.append([InlineKeyboardButton("🔒 قفل کردن پروفایل", callback_data="profile_lock")])
     
-    # ❌ بدون عکس - فقط متن
     await update.message.reply_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
 
 async def show_user_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -358,19 +374,24 @@ async def show_user_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     
     required = target_game.get_required_for_level(target_data["level"])
+    street_rescued = target_data.get("street_hapo_rescued", 0)
     
     msg = f"╮──「 🐶 پروفایل هاپویی 🐶 」\n\n"
     msg += f"┐─ 👤 کاربر : {target_full_name}\n"
     msg += f"‏┘─ 🪪 آیدی : {target_user_id}\n\n"
     msg += f"┐─ 💰 هاپ پوینت ها : {format_number(target_data['hop_point'])} 🪙\n"
-    msg += f"┐─ 🐾 هاپ هاپ ها : {target_data['hop_count']}\n\n"
+    msg += f"┐─ 🐾 هاپ هاپ ها : {target_data['hop_count']}\n"
+    
+    if street_rescued > 0:
+        msg += f"┐─ 🐶 هاپوی خیابونی نجات داده: {street_rescued}\n"
+    
+    msg += "\n"
     
     if target_data["level"] < 20:
         msg += f"╯─ ⭐️ سطح : {target_data['level']} | {target_data['hop_count']} / {required}"
     else:
         msg += f"╯─ ⭐️ سطح : {target_data['level']} 🏆 نهایی"
     
-    # ✅ نمایش عکس پروفایل (فقط برای پروفایل دیگران)
     try:
         user_photos = await context.bot.get_user_profile_photos(target_user_id, limit=1)
         if user_photos.total_count > 0 and not target_data.get("profile_hidden", False):
@@ -557,7 +578,6 @@ async def show_bank_menu(update: Update, game):
         )
         return
     
-    # اعمال سود بانکی
     game.apply_bank_interest()
     msg = get_bank_menu_text(game, False)
     keyboard = get_bank_keyboard(False)
@@ -712,13 +732,11 @@ async def handle_meow(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("⛓️ شما در زندان هستید و نمی‌توانید این کار را انجام دهید.")
         return
     
-    # بررسی اینکه آیا خود این کاربر قبلاً نظرسنجی فعال داره
     for key, vote_data in MEOW_VOTES.items():
         if vote_data.get("target_id") == user_id:
             await update.message.reply_text("⚠️ شما یک نظرسنجی فعال دارید! صبر کنید تا تموم بشه.")
             return
     
-    # کلید منحصر به فرد
     vote_key = f"{chat_id}_{user_id}_{int(datetime.now().timestamp())}"
     
     keyboard = [[InlineKeyboardButton("🗳️ رای به زندان", callback_data=f"meow_vote_{vote_key}")]]
@@ -852,6 +870,163 @@ async def jail_user_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
     except:
         pass
+
+# ================================================================
+# هاپوی خیابونی
+# ================================================================
+
+async def send_street_hapo_notification(context: ContextTypes.DEFAULT_TYPE):
+    """ارسال پیام هاپوی خیابونی به همه گروه‌ها (هر ۶ ساعت)"""
+    try:
+        groups_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "groups.json")
+        if not os.path.exists(groups_file):
+            return
+        
+        with open(groups_file, "r", encoding="utf-8") as f:
+            groups_data = json.load(f)
+        
+        if not groups_data:
+            return
+        
+        street_hapo = get_street_hapo()
+        
+        if street_hapo.active:
+            return
+        
+        chat_ids = list(groups_data.keys())
+        chat_id = random.choice(chat_ids)
+        
+        success, msg = street_hapo.start_event(int(chat_id))
+        if not success:
+            return
+        
+        keyboard = [[InlineKeyboardButton("🐶 نجات هاپوی خیابونی", callback_data="street_hapo_rescue")]]
+        
+        try:
+            message = await context.bot.send_photo(
+                chat_id=chat_id,
+                photo=STREET_HAPO_IMAGE_URL,
+                caption=f"🐶 یک هاپوی خیابونی پیدا شده!\n\n"
+                       f"⏳ زمان برای نجات: {STREET_HAPO_DECISION_TIME} ثانیه\n"
+                       f"💰 هزینه تلاش اول: {STREET_HAPO_COSTS[0]} 🪙\n"
+                       f"🍀 شانس موفقیت: {int(STREET_HAPO_SUCCESS_CHANCE * 100)}%\n\n"
+                       f"برای نجاتش کلیک کن 👇",
+                reply_markup=InlineKeyboardMarkup(keyboard)
+            )
+            
+            street_hapo.data["message_id"] = message.message_id
+            street_hapo.save_status()
+            
+            asyncio.create_task(street_hapo_timer(street_hapo, context))
+            
+        except Exception as e:
+            logging.error(f"Error sending street hapo notification: {e}")
+            street_hapo.active = False
+            street_hapo.save_status()
+            
+    except Exception as e:
+        logging.error(f"Error in send_street_hapo_notification: {e}")
+
+async def street_hapo_timer(street_hapo, context):
+    """تایمر برای پایان زمان هاپوی خیابونی"""
+    await asyncio.sleep(STREET_HAPO_DECISION_TIME)
+    
+    if not street_hapo.active:
+        return
+    
+    if street_hapo.data.get("rescued", False):
+        return
+    
+    street_hapo.data["status"] = "expired"
+    street_hapo.active = False
+    street_hapo.save_status()
+    
+    chat_id = street_hapo.data.get("chat_id")
+    message_id = street_hapo.data.get("message_id")
+    
+    if chat_id and message_id:
+        try:
+            await context.bot.edit_message_caption(
+                chat_id=chat_id,
+                message_id=message_id,
+                caption="⏰ هاپوی خیابونی فرار کرد!\n\nمتاسفانه وقت تموم شد و هاپوی خیابونی رفت... 🐾"
+            )
+        except Exception as e:
+            logging.error(f"Error editing street hapo message: {e}")
+
+async def handle_street_hapo_rescue(update: Update, context: ContextTypes.DEFAULT_TYPE, query):
+    """هندلر دکمه نجات هاپوی خیابونی"""
+    user_id = update.effective_user.id
+    username = update.effective_user.username
+    full_name = update.effective_user.full_name or f"کاربر{user_id}"
+    game = get_game(user_id, username or full_name)
+    
+    if game.is_jailed():
+        await query.answer("⛓️ شما در زندان هستید!")
+        return
+    
+    street_hapo = get_street_hapo()
+    
+    if not street_hapo.active:
+        await query.edit_message_caption(
+            caption="🐶 هیچ هاپوی خیابونی در دسترس نیست!"
+        )
+        return
+    
+    if street_hapo.is_expired():
+        street_hapo.active = False
+        street_hapo.save_status()
+        await query.edit_message_caption(
+            caption="⏰ هاپوی خیابونی فرار کرد!"
+        )
+        return
+    
+    if street_hapo.data.get("rescued", False):
+        await query.answer("❌ این هاپوی خیابونی قبلاً نجات پیدا کرده!")
+        return
+    
+    result = street_hapo.attempt_rescue(user_id, full_name, game)
+    
+    if result.get("success", False) and result.get("rescued", False):
+        keyboard = [[InlineKeyboardButton("🎉 تبریک!", callback_data="street_hapo_ignore")]]
+        await query.edit_message_caption(
+            caption=result["message"],
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+        
+        try:
+            await context.bot.send_message(
+                user_id,
+                f"🎉 شما یک هاپوی خیابونی رو نجات دادید!\n"
+                f"💰 {result['reward']} 🪙 هاپو پوینت به حساب شما واریز شد!\n"
+                f"🐶 تعداد هاپوهای نجات داده شده: {game.data.get('street_hapo_rescued', 0)}"
+            )
+        except:
+            pass
+        
+    elif result.get("died", False):
+        await query.edit_message_caption(
+            caption=result["message"]
+        )
+        
+    elif not result.get("success", False):
+        await query.answer(result.get("reason", "خطا!"))
+        
+    else:
+        remaining = result.get("remaining_attempts", 0)
+        cost = street_hapo.get_attempt_cost()
+        
+        keyboard = []
+        if cost is not None and remaining > 0:
+            keyboard.append([InlineKeyboardButton(f"🐶 تلاش مجدد ({cost} 🪙)", callback_data="street_hapo_rescue")])
+        
+        await query.edit_message_caption(
+            caption=f"{result['message']}\n\n"
+                   f"🔄 تلاش‌های باقی‌مونده: {remaining}\n"
+                   f"💰 هزینه تلاش بعدی: {cost} 🪙\n"
+                   f"⏳ زمان باقی‌مونده: {street_hapo.get_remaining_time()} ثانیه",
+            reply_markup=InlineKeyboardMarkup(keyboard) if keyboard else None
+        )
 
 # ================================================================
 # هندلر اصلی پیام‌ها
@@ -1082,6 +1257,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     game = get_game(user_id, username or full_name)
     data = query.data
     
+    # ======== آکادمی ========
     if data == "academy_back_main":
         await show_academy_main(update, query)
         return
@@ -1133,6 +1309,10 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await show_feature_page(update, query, "jail")
         return
     
+    if data == "academy_street_hapo":
+        await show_street_hapo_page(update, query)
+        return
+    
     if data == "academy_hop":
         await show_adventure_page(update, query, "hop")
         return
@@ -1149,6 +1329,16 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await show_adventure_page(update, query, "profile")
         return
     
+    # ======== هاپوی خیابونی ========
+    if data == "street_hapo_rescue":
+        await handle_street_hapo_rescue(update, context, query)
+        return
+    
+    if data == "street_hapo_ignore":
+        await query.answer()
+        return
+    
+    # ======== هاپو ========
     if data == "confirm_hapo_name":
         new_name = context.user_data.get("new_hapo_name", "")
         if not new_name:
@@ -1177,36 +1367,6 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["new_hapo_name"] = None
         return
     
-    # ======== پروفایل ========
-    if data == "profile_hide":
-        game.data["profile_hidden"] = True
-        game.save_data()
-        await query.edit_message_text("✅ پروفایل شما مخفی شد.")
-        await my_profile_from_callback(query, game)
-        return
-
-    if data == "profile_show":
-        game.data["profile_hidden"] = False
-        game.save_data()
-        await query.edit_message_text("✅ پروفایل شما نمایش داده شد.")
-        await my_profile_from_callback(query, game)
-        return
-
-    if data == "profile_lock":
-        game.data["profile_locked"] = True
-        game.save_data()
-        await query.edit_message_text("✅ پروفایل شما قفل شد.")
-        await my_profile_from_callback(query, game)
-        return
-
-    if data == "profile_unlock":
-        game.data["profile_locked"] = False
-        game.save_data()
-        await query.edit_message_text("✅ پروفایل شما باز شد.")
-        await my_profile_from_callback(query, game)
-        return
-    
-    # ======== هاپو ========
     if data == "buy_hapo":
         result = game.buy_hapo()
         if result["success"]:
@@ -1355,9 +1515,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         error_msg = result["reason"]
         animal = game.data.get("current_hunt_animal")
         
-        # اگر هاپو سیر است
         if error_msg == "هاپو سیر است" and animal:
-            # چک کن که حیوان فرار نکرده باشه
             if game.data.get("hunt_time", 0) > 0:
                 now = datetime.now().timestamp()
                 if (now - game.data["hunt_time"]) > HUNT_DECISION_TIMER:
@@ -1367,7 +1525,6 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     await query.edit_message_text("🦌 حیوان فرار کرد! وقتت تموم شد.")
                     return
             
-            # پیام مناسب با گزینه فروش
             await query.edit_message_text(
                 f"❌ هاپو سیر است!\n"
                 f"می‌تونی حیوان رو بفروشی.\n\n"
@@ -1386,8 +1543,36 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
             return
         
-        # سایر خطاها
         await query.edit_message_text(f"❌ {error_msg}")
+        return
+    
+    # ======== پروفایل ========
+    if data == "profile_hide":
+        game.data["profile_hidden"] = True
+        game.save_data()
+        await query.edit_message_text("✅ پروفایل شما مخفی شد.")
+        await my_profile_from_callback(query, game)
+        return
+
+    if data == "profile_show":
+        game.data["profile_hidden"] = False
+        game.save_data()
+        await query.edit_message_text("✅ پروفایل شما نمایش داده شد.")
+        await my_profile_from_callback(query, game)
+        return
+
+    if data == "profile_lock":
+        game.data["profile_locked"] = True
+        game.save_data()
+        await query.edit_message_text("✅ پروفایل شما قفل شد.")
+        await my_profile_from_callback(query, game)
+        return
+
+    if data == "profile_unlock":
+        game.data["profile_locked"] = False
+        game.save_data()
+        await query.edit_message_text("✅ پروفایل شما باز شد.")
+        await my_profile_from_callback(query, game)
         return
     
     # ======== بانک ========
@@ -1589,6 +1774,7 @@ async def my_profile_from_callback(query, game):
     required = game.get_required_for_level(game.data["level"])
     is_hidden = game.data.get("profile_hidden", False)
     is_locked = game.data.get("profile_locked", False)
+    street_rescued = game.data.get("street_hapo_rescued", 0)
     
     msg = f"╮──「 🐶 پروفایل هاپویی 🐶 」\n\n"
     msg += f"┐─ 👤 کاربر : {full_name}\n"
@@ -1598,7 +1784,12 @@ async def my_profile_from_callback(query, game):
         msg += f"‏┘─ 🪪 آیدی : 🔒 مخفی\n\n"
     
     msg += f"┐─ 💰 هاپ پوینت ها : {format_number(game.data['hop_point'])} 🪙\n"
-    msg += f"┐─ 🐾 هاپ هاپ ها : {game.data['hop_count']}\n\n"
+    msg += f"┐─ 🐾 هاپ هاپ ها : {game.data['hop_count']}\n"
+    
+    if street_rescued > 0:
+        msg += f"┐─ 🐶 هاپوی خیابونی نجات داده: {street_rescued}\n"
+    
+    msg += "\n"
     
     if game.data["level"] < 20:
         msg += f"╯─ ⭐️ سطح : {game.data['level']} | {game.data['hop_count']} / {required}"
@@ -1616,7 +1807,6 @@ async def my_profile_from_callback(query, game):
     else:
         keyboard.append([InlineKeyboardButton("🔒 قفل کردن پروفایل", callback_data="profile_lock")])
     
-    # ❌ بدون عکس - فقط متن
     await query.edit_message_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
 
 # ================================================================
@@ -1673,7 +1863,11 @@ async def get_user_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
         msg += f"  💰 موجودی: {format_number(user_data['bank_balance'])}\n"
         msg += f"  💳 شماره کارت: {user_data.get('bank_card_number', 'نامشخص')}\n"
     
-    msg += f"\n📅 آخرین بروزرسانی: {user_data.get('last_updated', 'نامشخص')}"
+    street_rescued = user_data.get('street_hapo_rescued', 0)
+    if street_rescued > 0:
+        msg += f"\n🐶 هاپوی خیابونی نجات داده: {street_rescued}"
+    
+    msg += f"\n\n📅 آخرین بروزرسانی: {user_data.get('last_updated', 'نامشخص')}"
     
     await update.message.reply_text(msg, parse_mode="Markdown")
 
