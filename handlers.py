@@ -331,7 +331,11 @@ async def my_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     required = game.get_required_for_level(game.data["level"])
     is_hidden = game.data.get("profile_hidden", False)
     is_locked = game.data.get("profile_locked", False)
+    
+    # ✅ تبدیل به عدد
     street_rescued = game.data.get("street_hapo_rescued", 0)
+    if isinstance(street_rescued, str):
+        street_rescued = int(street_rescued) if street_rescued.isdigit() else 0
     
     msg = f"╮──「 🐶 پروفایل هاپویی 🐶 」\n\n"
     msg += f"┐─ 👤 کاربر : {full_name}\n"
@@ -404,7 +408,11 @@ async def show_user_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     
     required = target_game.get_required_for_level(target_data["level"])
+    
+    # ✅ تبدیل به عدد
     street_rescued = target_data.get("street_hapo_rescued", 0)
+    if isinstance(street_rescued, str):
+        street_rescued = int(street_rescued) if street_rescued.isdigit() else 0
     
     msg = f"╮──「 🐶 پروفایل هاپویی 🐶 」\n\n"
     msg += f"┐─ 👤 کاربر : {target_full_name}\n"
@@ -2174,7 +2182,11 @@ async def my_profile_from_callback(query, game):
     required = game.get_required_for_level(game.data["level"])
     is_hidden = game.data.get("profile_hidden", False)
     is_locked = game.data.get("profile_locked", False)
+    
+    # ✅ تبدیل به عدد
     street_rescued = game.data.get("street_hapo_rescued", 0)
+    if isinstance(street_rescued, str):
+        street_rescued = int(street_rescued) if street_rescued.isdigit() else 0
     
     msg = f"╮──「 🐶 پروفایل هاپویی 🐶 」\n\n"
     msg += f"┐─ 👤 کاربر : {full_name}\n"
@@ -2273,6 +2285,9 @@ async def get_user_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
         msg += f"  💳 شماره کارت: {user_data.get('bank_card_number', 'نامشخص')}\n"
     
     street_rescued = user_data.get('street_hapo_rescued', 0)
+    if isinstance(street_rescued, str):
+        street_rescued = int(street_rescued) if street_rescued.isdigit() else 0
+    
     if street_rescued > 0:
         msg += f"\n🐶 هاپوی خیابونی نجات داده: {street_rescued}"
     else:
