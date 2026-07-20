@@ -1,4 +1,4 @@
-# game.py - کلاس اصلی بازی (نسخه اصلاح شده)
+# game.py - کلاس اصلی بازی
 
 import random
 import json
@@ -31,6 +31,31 @@ class HopDogGame:
                 data["last_transfer_time"] = 0
             if "is_transferring" not in data:
                 data["is_transferring"] = False
+            # فیلدهای زندان
+            if "jailed" not in data:
+                data["jailed"] = False
+            if "jail_reason" not in data:
+                data["jail_reason"] = ""
+            if "jail_until" not in data:
+                data["jail_until"] = 0
+            if "jail_fine" not in data:
+                data["jail_fine"] = 0
+            if "jail_arrest_time" not in data:
+                data["jail_arrest_time"] = 0
+            if "jail_voted" not in data:
+                data["jail_voted"] = []
+            if "jail_meow_last" not in data:
+                data["jail_meow_last"] = 0
+            # چک کردن خودکار آزادی
+            if data.get("jailed", False):
+                now = datetime.now().timestamp()
+                if now >= data.get("jail_until", 0):
+                    data["jailed"] = False
+                    data["jail_reason"] = ""
+                    data["jail_until"] = 0
+                    data["jail_fine"] = 0
+                    data["jail_arrest_time"] = 0
+                    save_user_data(self.user_id, data)
             return data
         return None
 
@@ -68,12 +93,19 @@ class HopDogGame:
             "is_transferring": False,
             "bank_card_number": "",
             "bank_transactions": [],
+            "jailed": False,
+            "jail_reason": "",
+            "jail_until": 0,
+            "jail_fine": 0,
+            "jail_arrest_time": 0,
+            "jail_voted": [],
+            "jail_meow_last": 0,
             "last_updated": datetime.now().isoformat()
         }
         self.save_data()
 
     # ============================================================
-    # متدهای سطح و هاپ (همون قبلی)
+    # متدهای سطح و هاپ
     # ============================================================
 
     def get_level_data(self, level):
@@ -121,7 +153,7 @@ class HopDogGame:
         return {"success": True, "earned": earned, "level_up": False}
 
     # ============================================================
-    # متدهای هاپو (همون قبلی)
+    # متدهای هاپو
     # ============================================================
 
     def get_hapo_total_level(self):
@@ -228,7 +260,7 @@ class HopDogGame:
         }
 
     # ============================================================
-    # متدهای پنجه و شکار (همون قبلی)
+    # متدهای پنجه و شکار
     # ============================================================
 
     def get_claw_data(self, level):
@@ -400,15 +432,14 @@ class HopDogGame:
         return {"success": True, "fed": actual}
 
     # ============================================================
-    # متدهای بانک (با کارت و تراکنش - اصلاح شده)
+    # متدهای بانک
     # ============================================================
 
     def generate_card_number(self):
-        """تولید شماره کارت ۱۳ رقمی منحصر به فرد"""
         import random
         from database import is_card_unique
         
-        for _ in range(100):  # حداکثر 100 بار تلاش
+        for _ in range(100):
             first = str(random.randint(1000, 9999))
             second = str(random.randint(1000, 9999))
             third = str(random.randint(1000, 9999))
@@ -417,7 +448,6 @@ class HopDogGame:
             if is_card_unique(card):
                 return card
         
-        # اگر بعد از 100 بار نتونست، با timestamp بساز
         import time
         return str(int(time.time() * 1000))[:16].zfill(16)
 
@@ -525,35 +555,26 @@ class HopDogGame:
         }
 
     def card_to_card(self, amount, target_card):
-        """کارت به کارت هاپویی با اعتبارسنجی کامل"""
         if not self.data["bank_opened"]:
             return {"success": False, "reason": "بانک باز نشده است"}
         if self.data["bank_balance"] < amount:
             return {"success": False, "reason": "موجودی بانک کافی نیست"}
         if amount <= 0:
             return {"success": False, "reason": "مبلغ نامعتبر است"}
-        
-        # اعتبارسنجی شماره کارت: ۱۳ رقم و فقط عدد
         if len(target_card) != 16 or not target_card.isdigit():
             return {"success": False, "reason": "❌ شماره کارت باید ۱۳ رقم باشد"}
-        
         if target_card == self.data["bank_card_number"]:
             return {"success": False, "reason": "❌ نمی‌تونی به کارت خودت انتقال بدی"}
         
-        # بررسی وجود شماره کارت در دیتابیس
         from database import get_user_by_card
         target_user = get_user_by_card(target_card)
         if not target_user:
             return {"success": False, "reason": "❌ کارت مقصد در سیستم ثبت نشده است"}
-        
-        # بررسی اینکه کاربر مقصد خودش نباشه
         if str(target_user['user_id']) == self.user_id:
             return {"success": False, "reason": "❌ نمی‌تونی به کارت خودت انتقال بدی"}
         
-        # انتقال پول
         self.data["bank_balance"] -= amount
         
-        # اضافه کردن به حساب کاربر مقصد
         target_user_id = target_user['user_id']
         target_game = HopDogGame(int(target_user_id))
         target_game.data["bank_balance"] += amount
@@ -574,18 +595,14 @@ class HopDogGame:
         return self.data.get("bank_transactions", [])
 
     # ============================================================
-    # متدهای انتقال هاپویی (با جلوگیری از انتقال همزمان)
+    # متدهای انتقال هاپویی
     # ============================================================
 
     def can_transfer(self):
-        """بررسی امکان انتقال هاپویی"""
-        # بررسی در حال انتقال بودن
         if self.data.get("is_transferring", False):
             return {"success": False, "reason": "⏳ شما در حال حاضر در حال انتقال هستید. لطفاً صبر کنید."}
-        
         if self.data["level"] < TRANSFER_MIN_LEVEL_SENDER:
             return {"success": False, "reason": f"برای انتقال هاپو پوینت باید سطح {TRANSFER_MIN_LEVEL_SENDER} باشی"}
-        
         if self.data.get("profile_locked", False):
             return {"success": False, "reason": "پروفایل شما قفل است. ابتدا آن را باز کن"}
         
@@ -598,17 +615,14 @@ class HopDogGame:
         return {"success": True}
 
     def transfer_points(self, target_user_id, amount):
-        """انتقال هاپو پوینت به کاربر دیگر (با جلوگیری از انتقال همزمان)"""
         can = self.can_transfer()
         if not can["success"]:
             return can
         
         if amount < TRANSFER_MIN_AMOUNT:
             return {"success": False, "reason": f"حداقل مبلغ انتقال {TRANSFER_MIN_AMOUNT} هاپو پوینت است"}
-        
         if amount > TRANSFER_MAX_AMOUNT:
             return {"success": False, "reason": f"حداکثر مبلغ انتقال {TRANSFER_MAX_AMOUNT:,} هاپو پوینت است"}
-        
         if self.data["hop_point"] < amount:
             return {"success": False, "reason": f"موجودی کافی نیست. شما {int(self.data['hop_point']):,} هاپو پوینت داری"}
         
@@ -617,18 +631,15 @@ class HopDogGame:
         
         if target_data["level"] < TRANSFER_MIN_LEVEL_RECEIVER:
             return {"success": False, "reason": f"کاربر مقصد باید حداقل سطح {TRANSFER_MIN_LEVEL_RECEIVER} داشته باشد"}
-        
         if target_data.get("profile_locked", False):
             return {"success": False, "reason": "پروفایل کاربر مقصد قفل است"}
         
-        # علامت‌گذاری در حال انتقال (هم برای خودش هم برای مقصد)
         self.data["is_transferring"] = True
         target_game.data["is_transferring"] = True
         self.save_data()
         target_game.save_data()
         
         try:
-            # انجام انتقال
             self.data["hop_point"] -= amount
             target_game.data["hop_point"] += amount
             self.data["last_transfer_time"] = datetime.now().timestamp()
@@ -643,8 +654,88 @@ class HopDogGame:
                 "target_id": target_user_id
             }
         finally:
-            # رفع علامت در حال انتقال
             self.data["is_transferring"] = False
             target_game.data["is_transferring"] = False
             self.save_data()
             target_game.save_data()
+
+    # ============================================================
+    # متدهای زندان
+    # ============================================================
+
+    def is_jailed(self):
+        if not self.data.get("jailed", False):
+            return False
+        now = datetime.now().timestamp()
+        if now >= self.data.get("jail_until", 0):
+            self.data["jailed"] = False
+            self.data["jail_reason"] = ""
+            self.data["jail_until"] = 0
+            self.data["jail_fine"] = 0
+            self.data["jail_arrest_time"] = 0
+            self.save_data()
+            return False
+        return True
+
+    def get_jail_remaining(self):
+        if not self.data.get("jailed", False):
+            return 0
+        now = datetime.now().timestamp()
+        remaining = self.data.get("jail_until", 0) - now
+        return max(0, int(remaining))
+
+    def jail_user(self, reason, duration, fine):
+        now = datetime.now().timestamp()
+        self.data["jailed"] = True
+        self.data["jail_reason"] = reason
+        self.data["jail_until"] = now + duration
+        self.data["jail_fine"] = fine
+        self.data["jail_arrest_time"] = now
+        self.save_data()
+        return {"success": True}
+
+    def pay_jail_fine(self):
+        if not self.data.get("jailed", False):
+            return {"success": False, "reason": "شما در زندان نیستید"}
+        
+        fine = self.data.get("jail_fine", 0)
+        if self.data["hop_point"] < fine:
+            return {"success": False, "reason": f"پوینت کافی نیست. نیاز به {fine:,} هاپو پوینت"}
+        
+        self.data["hop_point"] -= fine
+        self.data["jailed"] = False
+        self.data["jail_reason"] = ""
+        self.data["jail_until"] = 0
+        self.data["jail_fine"] = 0
+        self.data["jail_arrest_time"] = 0
+        self.save_data()
+        return {"success": True}
+
+    def get_jail_info(self):
+        if not self.data.get("jailed", False):
+            return None
+        
+        remaining = self.get_jail_remaining()
+        if remaining <= 0:
+            self.data["jailed"] = False
+            self.save_data()
+            return None
+        
+        return {
+            "reason": self.data.get("jail_reason", "نامشخص"),
+            "remaining": remaining,
+            "fine": self.data.get("jail_fine", 0),
+            "arrest_time": self.data.get("jail_arrest_time", 0)
+        }
+
+    def add_meow_vote(self, voter_id):
+        votes = self.data.get("jail_voted", [])
+        if voter_id not in votes:
+            votes.append(voter_id)
+            self.data["jail_voted"] = votes
+            self.save_data()
+            return True
+        return False
+
+    def get_meow_votes(self):
+        return self.data.get("jail_voted", [])
