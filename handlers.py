@@ -280,7 +280,6 @@ async def show_jail(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     keyboard = [[InlineKeyboardButton("💰 پرداخت جریمه", callback_data="jail_pay_fine")]]
     await update.message.reply_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
-
 # ================================================================
 # پروفایل - نسخه ساده شده (بدون تیک/ضربدر)
 # ================================================================
@@ -382,10 +381,10 @@ async def show_user_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         msg += f"╯─ ⭐️ سطح : {target_data['level']} 🏆 نهایی"
     
-    # نمایش عکس پروفایل
+    # نمایش عکس پروفایل (اگه مخفی نباشه)
     try:
         user_photos = await context.bot.get_user_profile_photos(target_user_id, limit=1)
-        if user_photos.total_count > 0:
+        if user_photos.total_count > 0 and not target_data.get("profile_hidden", False):
             photo = user_photos.photos[0][-1]
             await update.message.reply_photo(
                 photo.file_id,
@@ -396,6 +395,80 @@ async def show_user_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
         pass
     
     await update.message.reply_text(msg)
+
+# ================================================================
+# پروفایل از کالبک - فقط متن (بدون عکس)
+# ================================================================
+
+async def my_profile_from_callback(query, game):
+    user_id = int(game.user_id)
+    full_name = game.data["player_name"]
+    
+    required = game.get_required_for_level(game.data["level"])
+    is_hidden = game.data.get("profile_hidden", False)
+    is_locked = game.data.get("profile_locked", False)
+    
+    msg = f"╮──「 🐶 پروفایل هاپویی 🐶 」\n\n"
+    msg += f"┐─ 👤 کاربر : {full_name}\n"
+    if not is_hidden:
+        msg += f"‏┘─ 🪪 آیدی : {user_id}\n\n"
+    else:
+        msg += f"‏┘─ 🪪 آیدی : 🔒 مخفی\n\n"
+    
+    msg += f"┐─ 💰 هاپ پوینت ها : {format_number(game.data['hop_point'])} 🪙\n"
+    msg += f"┐─ 🐾 هاپ هاپ ها : {game.data['hop_count']}\n\n"
+    
+    if game.data["level"] < 20:
+        msg += f"╯─ ⭐️ سطح : {game.data['level']} | {game.data['hop_count']} / {required}"
+    else:
+        msg += f"╯─ ⭐️ سطح : {game.data['level']} 🏆 نهایی"
+    
+    keyboard = []
+    if is_hidden:
+        keyboard.append([InlineKeyboardButton("👀 نمایش پروفایل", callback_data="profile_show")])
+    else:
+        keyboard.append([InlineKeyboardButton("👀 مخفی کردن پروفایل", callback_data="profile_hide")])
+    
+    if is_locked:
+        keyboard.append([InlineKeyboardButton("🔓 باز کردن پروفایل", callback_data="profile_unlock")])
+    else:
+        keyboard.append([InlineKeyboardButton("🔒 قفل کردن پروفایل", callback_data="profile_lock")])
+    
+    # ✅ فقط متن، بدون عکس
+    await query.edit_message_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
+
+# ================================================================
+# و در handle_callback - بخش پروفایل
+# ================================================================
+
+# ======== پروفایل - ساده (بدون تیک/ضربدر) ========
+if data == "profile_hide":
+    game.data["profile_hidden"] = True
+    game.save_data()
+    await query.edit_message_text("✅ پروفایل شما مخفی شد.")
+    await my_profile_from_callback(query, game)
+    return
+
+if data == "profile_show":
+    game.data["profile_hidden"] = False
+    game.save_data()
+    await query.edit_message_text("✅ پروفایل شما نمایش داده شد.")
+    await my_profile_from_callback(query, game)
+    return
+
+if data == "profile_lock":
+    game.data["profile_locked"] = True
+    game.save_data()
+    await query.edit_message_text("✅ پروفایل شما قفل شد.")
+    await my_profile_from_callback(query, game)
+    return
+
+if data == "profile_unlock":
+    game.data["profile_locked"] = False
+    game.save_data()
+    await query.edit_message_text("✅ پروفایل شما باز شد.")
+    await my_profile_from_callback(query, game)
+    return
 
 # ================================================================
 # دستورات هاپ، هاپو، پنجه، شکار (با چک زندان)
