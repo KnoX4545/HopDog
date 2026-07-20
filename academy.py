@@ -1,4 +1,4 @@
-# academy.py - متن‌های آکادمی (نسخه کامل با ACADEMY_JAIL)
+# academy.py - متن‌های آکادمی (نسخه کامل با ACADEMY_JAIL و ACADEMY_STREET_HAPO)
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import ContextTypes
@@ -519,6 +519,42 @@ ACADEMY_JAIL = """📚 آکادمی هاپویی ✨
 
 🐶 پس مراقب باش و قوانین رو رعایت کن!"""
 
+ACADEMY_STREET_HAPO = """📚 آکادمی هاپویی ✨
+┘─ 🐾 بخش : قابلیت های میویی ✨
+┘─ 📚 مطلب : هاپوی های خیابونی 🐕
+
+🌘 در گوشه و کنار این دنیا ، هاپوی های تنهایی هستند که خانه‌ای ندارند و در انتظارِ یک دست مهربان ، زیر نور چراغ‌ های خیابان نشسته‌ اند…
+
+🐾 گاهی اوقات ، وقتی هاپو های یک شهر با هم شروع به "هاپو پوینت"🪙 میکنن ، صدای اون‌ ها به گوشِ یک هاپوی خیابونی میرسه و اون ظاهر میشه و از شما کمک میخواد !
+
+اما نجات دادنِ یک هاپویِ ترسیده ، اصلا کار راحتی نیست
+┘─ 🍀 شما و دوستانتون کلا 3 بار فرصت دارید تا برای نجات اون پیشی تلاش کنید.
+┘─ 💰 هر تلاش مقداری "هاپو پوینت"🪙 هزینه داره.
+┘─ ➕ حواست باشه که هر بار که شکست بخورید ، تلاش بعدی گرون‌ تر میشه !
+┘─ 🛍 شانس موفقیت در هر بار تلاش فقط 30% هست. پس باید شانس داشته باشی !
+
+💰 هزینه هر تلاش:
+┘─ تلاش اول: ۵۰ 🪙
+┘─ تلاش دوم: ۷۵ 🪙
+┘─ تلاش سوم: ۱۰۰ 🪙
+
+🎁 جایزه موفقیت:
+┘─ بین ۵۰۰ تا ۹۹۹ 🪙 هاپو پوینت
+
+💀 اگر نتونید نجاتش بدید:
+┘─ پول‌هایی که خرج کردید میسوزه!
+┘─ هاپوی خیابونی میمیره... 😢
+
+⏳ زمان محدود:
+┘─ فقط ۶۰ ثانیه فرصت دارید تا هاپوی خیابونی رو نجات بدید!
+┘─ بعد از اون، هاپوی خیابونی فرار میکنه! 🏃‍♂️
+
+🏆 هاپوهای نجات داده شده:
+┘─ هر هاپوی خیابونی که نجات بدید، توی پروفایل شما ثبت میشه!
+┘─ میتونید تعداد نجات‌هاتون رو توی «هاپوهام» ببینید.
+
+🐶 پس منتظر چی هستی؟ شاید همون هاپوی خیابونی منتظر تو باشه... 🐾"""
+
 ACADEMY_HOP = """📚 آکادمی هاپویی ✨
 ┘─ 🐾 بخش : شروع ماجراجویی 🐾
 ┘─ 📚 مطلب : هاپ هاپ 🐾
@@ -629,6 +665,9 @@ async def show_academy_features_menu(update: Update, query=None):
         ],
         [
             InlineKeyboardButton("⛓️ زندان هاپویی", callback_data="academy_jail"),
+            InlineKeyboardButton("🐶 هاپوی خیابونی", callback_data="academy_street_hapo")
+        ],
+        [
             InlineKeyboardButton("◀️ برگشت", callback_data="academy_back_main")
         ]
     ]
@@ -766,7 +805,8 @@ async def show_feature_page(update: Update, query, feature):
         "hunt": ACADEMY_HUNT,
         "bank": ACADEMY_BANK,
         "transfer": ACADEMY_TRANSFER,
-        "jail": ACADEMY_JAIL
+        "jail": ACADEMY_JAIL,
+        "street_hapo": ACADEMY_STREET_HAPO
     }
     
     keyboard = [[InlineKeyboardButton("◀️ برگشت", callback_data="academy_features_menu")]]
@@ -788,5 +828,13 @@ async def show_adventure_page(update: Update, query, page):
     
     await query.edit_message_text(
         pages.get(page, ACADEMY_HOP),
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+
+async def show_street_hapo_page(update: Update, query):
+    """نمایش صفحه هاپوی خیابونی در آکادمی"""
+    keyboard = [[InlineKeyboardButton("◀️ برگشت", callback_data="academy_features_menu")]]
+    await query.edit_message_text(
+        ACADEMY_STREET_HAPO,
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
