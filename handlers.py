@@ -718,7 +718,7 @@ async def process_transfer_amount(update: Update, context: ContextTypes.DEFAULT_
         del TRANSFER_STATE[user_id]
 
 # ================================================================
-# سیستم میو (گربه بی ادب)
+# سیستم میو (گربه بی ادب) - نسخه همزمان
 # ================================================================
 
 async def handle_meow(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -730,16 +730,10 @@ async def handle_meow(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("⛓️ شما در زندان هستید و نمی‌توانید این کار را انجام دهید.")
         return
     
-    if chat_id in MEOW_VOTES:
-        vote_data = MEOW_VOTES[chat_id]
-        now = datetime.now().timestamp()
-        if now > vote_data["until"]:
-            del MEOW_VOTES[chat_id]
-        else:
-            await update.message.reply_text("یک رای گیری در حال انجام است! صبر کنید تا تموم بشه.")
-            return
+    # کلید منحصر به فرد برای هر رای‌گیری
+    vote_key = f"{chat_id}_{user_id}_{int(datetime.now().timestamp())}"
     
-    keyboard = [[InlineKeyboardButton("🗳️ رای به زندان", callback_data=f"meow_vote_{chat_id}")]]
+    keyboard = [[InlineKeyboardButton("🗳️ رای به زندان", callback_data=f"meow_vote_{vote_key}")]]
     msg = await update.message.reply_text(
         f"😱 یک گربه ی بی ادب!\n"
         f"رای بدید که بفرستیمش زندان\n"
@@ -747,23 +741,27 @@ async def handle_meow(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
     
-    MEOW_VOTES[chat_id] = {
+    MEOW_VOTES[vote_key] = {
         "target_id": user_id,
         "votes": [],
         "msg_id": msg.message_id,
         "until": datetime.now().timestamp() + JAIL_VOTE_DURATION,
+        "chat_id": chat_id,
         "msg_text": msg
     }
     
-    asyncio.create_task(meow_vote_timer(chat_id, context, msg.message_id))
+    asyncio.create_task(meow_vote_timer(vote_key, context))
 
-async def meow_vote_timer(chat_id, context, msg_id):
+async def meow_vote_timer(vote_key, context):
+    """تایمر رای‌گیری میو"""
     await asyncio.sleep(JAIL_VOTE_DURATION)
     
-    if chat_id in MEOW_VOTES:
-        vote_data = MEOW_VOTES[chat_id]
+    if vote_key in MEOW_VOTES:
+        vote_data = MEOW_VOTES[vote_key]
         votes_count = len(vote_data["votes"])
         target_id = vote_data["target_id"]
+        chat_id = vote_data["chat_id"]
+        msg_id = vote_data["msg_id"]
         
         if votes_count >= JAIL_VOTE_NEEDED:
             target_game = get_game(target_id)
@@ -789,7 +787,7 @@ async def meow_vote_timer(chat_id, context, msg_id):
             except:
                 pass
         
-        del MEOW_VOTES[chat_id]
+        del MEOW_VOTES[vote_key]
 
 # ================================================================
 # کامند ادمین - jail (زندانی کردن کاربر)
@@ -1566,14 +1564,15 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             del TRANSFER_STATE[user_id]
         return
     
+    # ======== میو (گربه بی ادب) - نسخه همزمان ========
     if data.startswith("meow_vote_"):
-        chat_id = int(data.replace("meow_vote_", ""))
+        vote_key = data.replace("meow_vote_", "")
         
-        if chat_id not in MEOW_VOTES:
+        if vote_key not in MEOW_VOTES:
             await query.edit_message_text("❌ رای‌گیری به پایان رسیده است.")
             return
         
-        vote_data = MEOW_VOTES[chat_id]
+        vote_data = MEOW_VOTES[vote_key]
         voter_id = user_id
         
         if voter_id == vote_data["target_id"]:
@@ -1587,7 +1586,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         vote_data["votes"].append(voter_id)
         votes_count = len(vote_data["votes"])
         
-        keyboard = [[InlineKeyboardButton("🗳️ رای به زندان", callback_data=f"meow_vote_{chat_id}")]]
+        keyboard = [[InlineKeyboardButton("🗳️ رای به زندان", callback_data=f"meow_vote_{vote_key}")]]
         await query.edit_message_text(
             f"😱 یک گربه ی بی ادب!\n"
             f"رای بدید که بفرستیمش زندان\n"
@@ -1606,7 +1605,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"😡 گربه ی بی ادب!\n\n"
                 f"✅ با {votes_count} رای، کاربر به زندان فرستاده شد!"
             )
-            del MEOW_VOTES[chat_id]
+            del MEOW_VOTES[vote_key]
         return
     
     if data == "jail_pay_fine":
