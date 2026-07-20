@@ -1,6 +1,7 @@
 # config.py - تنظیمات و ثابت‌های اصلی
 
 import os
+from datetime import timedelta
 
 # ================================================================
 # تنظیمات اولیه
@@ -113,14 +114,30 @@ BANK_INTEREST_HOUR = 6
 BANK_ACCOUNT_CHANGE_COST = 1250
 
 # ================================================================
-# تنظیمات انتقال هاپویی (کاملاً حفظ شده)
+# تنظیمات انتقال هاپویی
 # ================================================================
 
 TRANSFER_MIN_AMOUNT = 50
 TRANSFER_MAX_AMOUNT = 500000
-TRANSFER_COOLDOWN = 30  # ثانیه
+TRANSFER_COOLDOWN = 30
 TRANSFER_MIN_LEVEL_SENDER = 3
 TRANSFER_MIN_LEVEL_RECEIVER = 2
+
+# ================================================================
+# تنظیمات زندان
+# ================================================================
+
+JAIL_REASON_SPAM = "اسپم"
+JAIL_REASON_MEOW = "میو میو (گربه بی ادب)"
+JAIL_DURATION_SPAM = 15 * 60
+JAIL_DURATION_MEOW = 5 * 60
+JAIL_FINE_SPAM = 3750
+JAIL_FINE_MEOW = 1250
+JAIL_MAX_SPAM_COMMANDS = 5
+JAIL_SPAM_WINDOW = 10
+JAIL_VOTE_DURATION = 60
+JAIL_VOTE_NEEDED = 3
+JAIL_MEOW_COOLDOWN = 60
 
 # ================================================================
 # سایر تنظیمات
