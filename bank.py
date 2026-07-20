@@ -1,4 +1,4 @@
-# bank.py - منطق بانک (منوها، کارت، تراکنش‌ها)
+# bank.py - منطق بانک (منوها، کارت، تراکنش‌ها) - نسخه اصلاح شده
 
 from datetime import datetime, timedelta
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
@@ -16,12 +16,13 @@ def format_date(dt):
     """فرمت کردن تاریخ"""
     return dt.strftime("%H:%M %Y/%m/%d")
 
-def get_next_interest_time():
-    """دریافت زمان بعدی واریز سود"""
-    now = datetime.now()
-    next_time = now.replace(hour=BANK_INTEREST_HOUR, minute=0, second=0, microsecond=0)
-    if next_time <= now:
-        next_time = next_time + timedelta(days=1)
+def get_next_interest_time(game):
+    """دریافت زمان بعدی واریز سود (۲۴ ساعت بعد از آخرین سود)"""
+    last_time = game.data.get("bank_last_interest_at", 0)
+    if last_time == 0:
+        return datetime.now() + timedelta(seconds=1)
+    
+    next_time = datetime.fromtimestamp(last_time) + timedelta(days=1)
     return next_time
 
 def calculate_interest(balance):
@@ -44,7 +45,7 @@ def get_bank_menu_text(game, show_transactions=False):
     card_number = data.get("bank_card_number", "نامشخص")
     player_name = data.get("player_name", "کاربر")
     interest = calculate_interest(balance)
-    next_time = get_next_interest_time()
+    next_time = get_next_interest_time(game)
     
     msg = "🏦 بانک هاپویی 🏦\n\n"
     msg += f"💳 شماره حساب : {card_number}\n"
