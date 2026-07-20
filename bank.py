@@ -75,19 +75,16 @@ def get_bank_keyboard(show_transactions=False):
     """دریافت کیبورد منوی بانک"""
     keyboard = []
     
-    # ردیف اول: واریز و برداشت
     keyboard.append([
         InlineKeyboardButton("➕ واریز", callback_data="bank_deposit"),
         InlineKeyboardButton("➖ برداشت", callback_data="bank_withdraw")
     ])
     
-    # ردیف دوم: کارت به کارت و تراکنش‌ها
     keyboard.append([
         InlineKeyboardButton("💳 کارت به کارت", callback_data="bank_card_to_card"),
         InlineKeyboardButton("🧾 تراکنش‌ها", callback_data="bank_transactions")
     ])
     
-    # ردیف سوم: تغییر شماره حساب
     keyboard.append([
         InlineKeyboardButton("🔄 تغییر شماره حساب", callback_data="bank_change_card")
     ])
@@ -122,5 +119,4 @@ def get_card_to_card_text():
 🔺 لطفا مبلغ کارت به کارت و شماره حساب مقصد را در جواب همین پنل وارد کنید
 ┘─ مثال :
 500 1234567890123
-┘─ مثال : {مبلغ} {شماره حساب}
-"""
+┘─ مثال : {مبلغ} {شماره حساب}"""
