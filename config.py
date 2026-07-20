@@ -74,6 +74,20 @@ CLAW_DATA = {
 }
 MAX_CLAW_LEVEL = 7
 
+# ================================================================
+# عکس‌های پنجه (هر سطح)
+# ================================================================
+
+CLAW_IMAGES = {
+    1: "https://raw.githubusercontent.com/YOUR_USERNAME/YOUR_REPO/main/claw_1.jpg",
+    2: "https://raw.githubusercontent.com/YOUR_USERNAME/YOUR_REPO/main/claw_2.jpg",
+    3: "https://raw.githubusercontent.com/YOUR_USERNAME/YOUR_REPO/main/claw_3.jpg",
+    4: "https://raw.githubusercontent.com/YOUR_USERNAME/YOUR_REPO/main/claw_4.jpg",
+    5: "https://raw.githubusercontent.com/YOUR_USERNAME/YOUR_REPO/main/claw_5.jpg",
+    6: "https://raw.githubusercontent.com/YOUR_USERNAME/YOUR_REPO/main/claw_6.jpg",
+    7: "https://raw.githubusercontent.com/YOUR_USERNAME/YOUR_REPO/main/claw_7.jpg",
+}
+
 ANIMALS = {
     "common": [
         {"name": "خرگوش", "emoji": "🐇", "weightMin": 0.25, "weightMax": 0.50, "multiplier": 80, "nutrition": 1},
@@ -143,7 +157,7 @@ JAIL_MEOW_COOLDOWN = 60
 # تنظیمات هاپوی خیابونی
 # ================================================================
 
-STREET_HAPO_INTERVAL = 60  # هر ۶ ساعت یکبار (به ثانیه)
+STREET_HAPO_INTERVAL = 6 * 3600  # هر ۶ ساعت یکبار (به ثانیه)
 STREET_HAPO_DECISION_TIME = 60  # ۶۰ ثانیه فرصت برای نجات
 STREET_HAPO_MAX_ATTEMPTS = 3  # حداکثر ۳ تلاش
 STREET_HAPO_SUCCESS_CHANCE = 0.30  # ۳۰% شانس موفقیت
