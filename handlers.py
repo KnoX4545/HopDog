@@ -58,7 +58,6 @@ def get_game(user_id, username=""):
 
 
 def get_street_hapo():
-    """دریافت نمونه هاپوی خیابونی"""
     global street_hapo_instance
     if street_hapo_instance is None:
         street_hapo_instance = StreetHapo()
@@ -78,19 +77,14 @@ def get_user_link(user_id, username, full_name):
 # ================================================================
 
 def get_confirm_keyboard(callback_data_yes, callback_data_no):
-    keyboard = [
-        [
-            InlineKeyboardButton("✅ بله", callback_data=callback_data_yes),
-            InlineKeyboardButton("❌ نه", callback_data=callback_data_no)
-        ]
-    ]
-    return InlineKeyboardMarkup(keyboard)
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("✅ بله", callback_data=callback_data_yes),
+         InlineKeyboardButton("❌ نه", callback_data=callback_data_no)]
+    ])
 
 
 def get_hapo_menu_keyboard(game):
-    keyboard = [
-        [InlineKeyboardButton("💰 برداشت", callback_data="hapo_harvest")],
-    ]
+    keyboard = [[InlineKeyboardButton("💰 برداشت", callback_data="hapo_harvest")]]
     
     total = game.get_hapo_total_level()
     is_max = total >= 25
@@ -113,7 +107,6 @@ def get_hapo_menu_keyboard(game):
 
 
 def get_hapo_menu_text(game):
-    """متن منوی هاپو با فرمت جدید"""
     game.update_hapo_production()
     total = game.get_hapo_total_level()
     max_food = game.get_hapo_max_food()
@@ -145,7 +138,6 @@ def get_hapo_menu_text(game):
 
 
 def check_spam(user_id):
-    """بررسی اسپم بودن کاربر"""
     now = datetime.now().timestamp()
     
     if user_id not in SPAM_TRACKER:
@@ -174,8 +166,6 @@ async def group_welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 try:
                     chat_id = update.message.chat.id
                     chat_title = update.message.chat.title or "گروه بدون نام"
-                    
-                    # ذخیره گروه در دیتابیس
                     add_group(chat_id, chat_title)
                     
                     members_count = await context.bot.get_chat_member_count(chat_id)
@@ -215,13 +205,10 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     username = update.effective_user.username
     full_name = update.effective_user.full_name or f"کاربر{user_id}"
-    
     display_name = get_user_link(user_id, username, full_name)
     game = get_game(user_id, username or full_name)
     
-    keyboard = [
-        [InlineKeyboardButton("➕ افزودن به گروه", url=f"https://t.me/{context.bot.username}?startgroup=start")]
-    ]
+    keyboard = [[InlineKeyboardButton("➕ افزودن به گروه", url=f"https://t.me/{context.bot.username}?startgroup=start")]]
     
     if not game.data.get("has_seen_welcome", False):
         game.data["has_seen_welcome"] = True
@@ -271,7 +258,6 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ================================================================
 
 async def show_jail(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """نمایش اطلاعات زندان"""
     user_id = update.effective_user.id
     game = get_game(user_id)
     
@@ -314,11 +300,10 @@ async def show_jail(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 # ================================================================
-# پروفایل - (هاپوهام با هاپوی خیابونی)
+# پروفایل
 # ================================================================
 
 async def my_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """پروفایل خود کاربر - فقط متن، بدون عکس - با هاپوی خیابونی"""
     user_id = update.effective_user.id
     username = update.effective_user.username
     full_name = update.effective_user.full_name or f"کاربر{user_id}"
@@ -332,7 +317,6 @@ async def my_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     is_hidden = game.data.get("profile_hidden", False)
     is_locked = game.data.get("profile_locked", False)
     
-    # تبدیل به عدد
     street_rescued = game.data.get("street_hapo_rescued", 0)
     if isinstance(street_rescued, str):
         street_rescued = int(street_rescued) if street_rescued.isdigit() else 0
@@ -347,13 +331,11 @@ async def my_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg += f"┐─ 💰 هاپ پوینت ها : {format_number(game.data['hop_point'])} 🪙\n"
     msg += f"┐─ 🐾 هاپ هاپ ها : {game.data['hop_count']}\n"
     
-    # هاپوی خیابونی
     if street_rescued > 0:
         msg += f"┐─ 🐶 هاپوی خیابونی نجات داده: {street_rescued}\n"
     else:
         msg += f"┐─ 🐶 هاپوی خیابونی نجات داده: 0\n"
     
-    # هاپو
     if game.data.get("hapo_owned", False):
         msg += f"┐─ 🐕 هاپو: {game.data['hapo_name']}\n"
         msg += f"┘─ 🌟 مقام: {RANK_NAMES[game.data['hapo_rank']]} | ⭐ سطح: {game.data['hapo_level']}/5\n\n"
@@ -380,7 +362,6 @@ async def my_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def show_user_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """پروفایل دیگران - با عکس و هاپوی خیابونی"""
     user_id = update.effective_user.id
     
     if not update.message.reply_to_message:
@@ -409,7 +390,6 @@ async def show_user_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     required = target_game.get_required_for_level(target_data["level"])
     
-    # تبدیل به عدد
     street_rescued = target_data.get("street_hapo_rescued", 0)
     if isinstance(street_rescued, str):
         street_rescued = int(street_rescued) if street_rescued.isdigit() else 0
@@ -420,13 +400,11 @@ async def show_user_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg += f"┐─ 💰 هاپ پوینت ها : {format_number(target_data['hop_point'])} 🪙\n"
     msg += f"┐─ 🐾 هاپ هاپ ها : {target_data['hop_count']}\n"
     
-    # هاپوی خیابونی
     if street_rescued > 0:
         msg += f"┐─ 🐶 هاپوی خیابونی نجات داده: {street_rescued}\n"
     else:
         msg += f"┐─ 🐶 هاپوی خیابونی نجات داده: 0\n"
     
-    # هاپو
     if target_data.get("hapo_owned", False):
         msg += f"┐─ 🐕 هاپو: {target_data['hapo_name']}\n"
         msg += f"┘─ 🌟 مقام: {RANK_NAMES[target_data['hapo_rank']]} | ⭐ سطح: {target_data['hapo_level']}/5\n\n"
@@ -442,10 +420,7 @@ async def show_user_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_photos = await context.bot.get_user_profile_photos(target_user_id, limit=1)
         if user_photos.total_count > 0 and not target_data.get("profile_hidden", False):
             photo = user_photos.photos[0][-1]
-            await update.message.reply_photo(
-                photo.file_id,
-                caption=msg
-            )
+            await update.message.reply_photo(photo.file_id, caption=msg)
             return
     except:
         pass
@@ -467,10 +442,7 @@ async def do_hop(update: Update, game):
         remaining = result.get("remaining", 0)
         mins = int(remaining // 60)
         secs = int(remaining % 60)
-        await update.message.reply_text(
-            f"⏳ هنوز هاپت نمیاد ...\n"
-            f"باید {mins}:{secs:02d} صبر کنی"
-        )
+        await update.message.reply_text(f"⏳ هنوز هاپت نمیاد ...\nباید {mins}:{secs:02d} صبر کنی")
         return
     
     msg = f"🐾 {result['earned']} هاپو پوینت گرفتی ✨\n"
@@ -495,13 +467,8 @@ async def show_hapo_menu(update: Update, game):
         if game.data["hop_point"] < 300:
             await update.message.reply_text("🐕 برای خرید هاپو به 300 هاپو پوینت نیاز داری")
             return
-        keyboard = [
-            [InlineKeyboardButton("🐕 خرید هاپو (300 هاپو پوینت)", callback_data="buy_hapo")]
-        ]
-        await update.message.reply_text(
-            "🐕 آیا میخوای هاپو بخری؟",
-            reply_markup=InlineKeyboardMarkup(keyboard)
-        )
+        keyboard = [[InlineKeyboardButton("🐕 خرید هاپو (300 هاپو پوینت)", callback_data="buy_hapo")]]
+        await update.message.reply_text("🐕 آیا میخوای هاپو بخری؟", reply_markup=InlineKeyboardMarkup(keyboard))
         return
     
     msg = get_hapo_menu_text(game)
@@ -510,7 +477,6 @@ async def show_hapo_menu(update: Update, game):
 
 
 async def show_claw_menu(update: Update, game):
-    """نمایش پنجه با عکس - پیام جدید"""
     if game.is_jailed():
         await update.message.reply_text("⛓️ شما در زندان هستید و نمی‌توانید این کار را انجام دهید.")
         return
@@ -521,25 +487,12 @@ async def show_claw_menu(update: Update, game):
     
     if game.data["claw_level"] == 0:
         cost = game.get_claw_cost(1)
-        keyboard = [
-            [InlineKeyboardButton(f"🛒 خرید پنجه ({format_number(cost)})", callback_data="buy_claw")]
-        ]
-        
-        msg = f"🦞 شما پنجه ندارید\n\n"
-        msg += f"💰 هزینه خرید: {format_number(cost)} هاپو پوینت\n"
-        msg += f"⏳ زمان استراحت: 60:00\n"
-        msg += f"🍀 شانس شکار:\n"
-        msg += f"  ⚪ معمولی: 95%\n"
-        msg += f"  🔵 کمیاب: 5%"
+        keyboard = [[InlineKeyboardButton(f"🛒 خرید پنجه ({format_number(cost)})", callback_data="buy_claw")]]
+        msg = f"🦞 شما پنجه ندارید\n\n💰 هزینه خرید: {format_number(cost)} هاپو پوینت\n⏳ زمان استراحت: 60:00\n🍀 شانس شکار:\n  ⚪ معمولی: 95%\n  🔵 کمیاب: 5%"
         
         try:
-            await update.message.reply_photo(
-                photo=CLAW_IMAGES[1],
-                caption=msg,
-                reply_markup=InlineKeyboardMarkup(keyboard)
-            )
-        except Exception as e:
-            logging.error(f"Error sending claw image: {e}")
+            await update.message.reply_photo(photo=CLAW_IMAGES[1], caption=msg, reply_markup=InlineKeyboardMarkup(keyboard))
+        except:
             await update.message.reply_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
         return
     
@@ -547,32 +500,19 @@ async def show_claw_menu(update: Update, game):
     next_level = game.data["claw_level"] + 1
     next_data = game.get_claw_data(next_level)
     
-    msg = f"🦞 پنجه شما\n"
-    msg += f"⭐ سطح: {game.data['claw_level']}\n"
-    msg += f"⏳ زمان استراحت: {claw_data['cooldown']:02d}:00\n"
-    msg += f"🍀 شانس شکار:\n"
-    msg += f"  ⚪ معمولی: {claw_data['common']}%\n"
-    msg += f"  🔵 کمیاب: {claw_data['uncommon']}%\n"
+    msg = f"🦞 پنجه شما\n⭐ سطح: {game.data['claw_level']}\n⏳ زمان استراحت: {claw_data['cooldown']:02d}:00\n🍀 شانس شکار:\n  ⚪ معمولی: {claw_data['common']}%\n  🔵 کمیاب: {claw_data['uncommon']}%"
     if claw_data['epic'] > 0:
-        msg += f"  🟣 حماسی: {claw_data['epic']}%\n"
+        msg += f"\n  🟣 حماسی: {claw_data['epic']}%"
     if claw_data['legendary'] > 0:
-        msg += f"  🟡 افسانه‌ای: {claw_data['legendary']}%\n"
+        msg += f"\n  🟡 افسانه‌ای: {claw_data['legendary']}%"
     
     keyboard = []
     if next_data:
-        keyboard.append([
-            InlineKeyboardButton(f"⬆️ سطح {next_level} ({format_number(next_data['cost'])})", callback_data="upgrade_claw")
-        ])
+        keyboard.append([InlineKeyboardButton(f"⬆️ سطح {next_level} ({format_number(next_data['cost'])})", callback_data="upgrade_claw")])
     
-    current_level = game.data["claw_level"]
     try:
-        await update.message.reply_photo(
-            photo=CLAW_IMAGES[current_level],
-            caption=msg,
-            reply_markup=InlineKeyboardMarkup(keyboard) if keyboard else None
-        )
-    except Exception as e:
-        logging.error(f"Error sending claw image: {e}")
+        await update.message.reply_photo(photo=CLAW_IMAGES[game.data["claw_level"]], caption=msg, reply_markup=InlineKeyboardMarkup(keyboard) if keyboard else None)
+    except:
         await update.message.reply_text(msg, reply_markup=InlineKeyboardMarkup(keyboard) if keyboard else None)
 
 
@@ -602,21 +542,11 @@ async def do_hunt(update: Update, game):
     await asyncio.sleep(2)
     
     animal = result["animal"]
-    msg = f"شما با موفقیت {animal['emoji']} گرفتید…\n"
-    msg += f"⭐️ سطح : {animal['rarity_name']}\n"
-    msg += f"⚖️ وزن : {animal['weight']} کیلو\n"
-    msg += f"💰 ارزش : {format_number(animal['value'])} 🪙\n"
-    msg += f"🍖 ارزش غذایی : {animal['nutrition']} کالری\n\n"
-    msg += f"⏳ 60 ثانیه فرصت انتخاب داری"
+    msg = f"شما با موفقیت {animal['emoji']} گرفتید…\n⭐️ سطح : {animal['rarity_name']}\n⚖️ وزن : {animal['weight']} کیلو\n💰 ارزش : {format_number(animal['value'])} 🪙\n🍖 ارزش غذایی : {animal['nutrition']} کالری\n\n⏳ 60 ثانیه فرصت انتخاب داری"
     
-    keyboard = []
-    keyboard.append([
-        InlineKeyboardButton(f"💰 فروش ({format_number(animal['value'])})", callback_data="hunt_sell")
-    ])
+    keyboard = [[InlineKeyboardButton(f"💰 فروش ({format_number(animal['value'])})", callback_data="hunt_sell")]]
     if game.data["hapo_owned"]:
-        keyboard.append([
-            InlineKeyboardButton(f"🍖 به هاپو بده", callback_data="hunt_feed")
-        ])
+        keyboard.append([InlineKeyboardButton(f"🍖 به هاپو بده", callback_data="hunt_feed")])
     
     await hunt_msg.edit_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
 
@@ -638,13 +568,8 @@ async def show_bank_menu(update: Update, game):
         if game.data["hop_point"] < BANK_PURCHASE_COST:
             await update.message.reply_text(f"🏦 برای خرید بانک به {format_number(BANK_PURCHASE_COST)} هاپو پوینت نیاز داری")
             return
-        keyboard = [
-            [InlineKeyboardButton("🏦 خرید بانک", callback_data="buy_bank")]
-        ]
-        await update.message.reply_text(
-            f"🏦 آیا میخوای بانک هاپویی رو بخری؟\n💰 هزینه: {format_number(BANK_PURCHASE_COST)} هاپو پوینت",
-            reply_markup=InlineKeyboardMarkup(keyboard)
-        )
+        keyboard = [[InlineKeyboardButton("🏦 خرید بانک", callback_data="buy_bank")]]
+        await update.message.reply_text(f"🏦 آیا میخوای بانک هاپویی رو بخری؟\n💰 هزینه: {format_number(BANK_PURCHASE_COST)} هاپو پوینت", reply_markup=InlineKeyboardMarkup(keyboard))
         return
     
     game.apply_bank_interest()
@@ -654,7 +579,7 @@ async def show_bank_menu(update: Update, game):
 
 
 # ================================================================
-# دستور انتقال هاپویی
+# انتقال هاپویی (دو مرحله‌ای)
 # ================================================================
 
 async def transfer_points_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -679,12 +604,9 @@ async def transfer_points_command(update: Update, context: ContextTypes.DEFAULT_
         await update.message.reply_text("⏳ شما در حال حاضر در حال انتقال هستید. لطفاً صبر کنید.")
         return
     
-    # ======== بررسی ریپلای ========
     if not update.message.reply_to_message:
         await update.message.reply_text(
-            "❌ لطفاً روی پیام یک کاربر ریپلای کن و «انتقال هاپویی» رو بزن.\n\n"
-            "💰 سپس مبلغ مورد نظر را به عدد وارد کن.\n"
-            f"(حداقل: {format_number(TRANSFER_MIN_AMOUNT)} - حداکثر: {format_number(TRANSFER_MAX_AMOUNT)})"
+            "❌ لطفاً روی پیام یک کاربر ریپلای کن و «انتقال هاپویی» رو بزن.\n\n🔹 سپس مبلغ مورد نظر را وارد کن."
         )
         return
     
@@ -697,7 +619,6 @@ async def transfer_points_command(update: Update, context: ContextTypes.DEFAULT_
     
     target_game = get_game(target_user_id)
     
-    # ======== چک کردن قوانین ========
     if target_game.data["level"] < TRANSFER_MIN_LEVEL_RECEIVER:
         await update.message.reply_text(f"❌ کاربر مقصد باید حداقل سطح {TRANSFER_MIN_LEVEL_RECEIVER} داشته باشد.")
         return
@@ -706,60 +627,15 @@ async def transfer_points_command(update: Update, context: ContextTypes.DEFAULT_
         await update.message.reply_text("❌ پروفایل کاربر مقصد قفل است.")
         return
     
-    # ======== دریافت مبلغ ========
-    parts = update.message.text.split()
-    
-    # اگر فقط "انتقال هاپویی" گفته شده (بدون مبلغ)
-    if len(parts) < 2:
-        await update.message.reply_text(
-            "💰 مبلغ مورد نظر را به عدد وارد کن:\n"
-            f"(حداقل: {format_number(TRANSFER_MIN_AMOUNT)} - حداکثر: {format_number(TRANSFER_MAX_AMOUNT)})"
-        )
-        context.user_data["waiting_for_transfer_amount"] = True
-        TRANSFER_STATE[user_id] = {
-            "target_id": target_user_id,
-            "target_name": target_full_name
-        }
-        return
-    
-    # استخراج مبلغ از متن
-    try:
-        # آخرین کلمه رو به عنوان مبلغ در نظر بگیر
-        amount_str = parts[-1].replace(",", "").replace("،", "")
-        amount = int(amount_str)
-    except ValueError:
-        await update.message.reply_text("❌ لطفاً یک عدد معتبر برای مبلغ وارد کن.")
-        return
-    
-    # ======== چک کردن محدودیت‌های مبلغ ========
-    if amount < TRANSFER_MIN_AMOUNT:
-        await update.message.reply_text(f"❌ حداقل مبلغ انتقال {format_number(TRANSFER_MIN_AMOUNT)} هاپو پوینت است.")
-        return
-    
-    if amount > TRANSFER_MAX_AMOUNT:
-        await update.message.reply_text(f"❌ حداکثر مبلغ انتقال {format_number(TRANSFER_MAX_AMOUNT):,} هاپو پوینت است.")
-        return
-    
-    if game.data["hop_point"] < amount:
-        await update.message.reply_text(f"❌ موجودی کافی نیست. شما {format_number(game.data['hop_point'])} هاپو پوینت داری.")
-        return
-    
-    # ======== تایید انتقال با دکمه‌های بله/نه ========
-    keyboard = get_confirm_keyboard(
-        f"transfer_confirm_{target_user_id}_{amount}",
-        f"transfer_cancel_{target_user_id}_{amount}"
-    )
+    context.user_data["transfer_target_id"] = target_user_id
+    context.user_data["transfer_target_name"] = target_full_name
+    context.user_data["waiting_for_transfer_amount"] = True
     
     await update.message.reply_text(
-        f"⚠️ آیا از انتقال {format_number(amount)} 🪙 به {target_full_name} مطمئنی؟\n\n"
-        f"💰 مبلغ: {format_number(amount)} 🪙\n"
-        f"👤 گیرنده: {target_full_name}\n"
-        f"📊 موجودی شما پس از انتقال: {format_number(game.data['hop_point'] - amount)} 🪙\n\n"
-        f"❗️ محدودیت‌ها:\n"
-        f"┘─ حداقل: {format_number(TRANSFER_MIN_AMOUNT)} 🪙\n"
-        f"┘─ حداکثر: {format_number(TRANSFER_MAX_AMOUNT):,} 🪙\n"
-        f"┘─ فاصله بین انتقال‌ها: {TRANSFER_COOLDOWN} ثانیه",
-        reply_markup=keyboard
+        f"💰 لطفاً مبلغ مورد نظر برای انتقال به {target_full_name} را وارد کن:\n\n"
+        f"📌 حداقل: {format_number(TRANSFER_MIN_AMOUNT)} 🪙\n"
+        f"📌 حداکثر: {format_number(TRANSFER_MAX_AMOUNT):,} 🪙\n\n"
+        f"💡 فقط عدد مبلغ را تایپ کن و ارسال کن."
     )
 
 
@@ -780,35 +656,32 @@ async def process_transfer_amount(update: Update, context: ContextTypes.DEFAULT_
     try:
         amount = int(update.message.text.strip().replace(",", "").replace("،", ""))
     except ValueError:
-        await update.message.reply_text("❌ لطفاً یک عدد معتبر وارد کن.")
+        await update.message.reply_text("❌ لطفاً یک عدد معتبر برای مبلغ وارد کن.")
         return
     
-    transfer_info = TRANSFER_STATE.get(user_id)
-    if not transfer_info:
+    target_id = context.user_data.get("transfer_target_id")
+    target_name = context.user_data.get("transfer_target_name")
+    
+    if not target_id:
         await update.message.reply_text("❌ خطا در انتقال. لطفاً دوباره تلاش کن.")
         context.user_data["waiting_for_transfer_amount"] = False
         return
     
-    target_id = transfer_info["target_id"]
-    target_name = transfer_info["target_name"]
-    
-    # ======== چک کردن محدودیت‌های مبلغ ========
     if amount < TRANSFER_MIN_AMOUNT:
         await update.message.reply_text(f"❌ حداقل مبلغ انتقال {format_number(TRANSFER_MIN_AMOUNT)} هاپو پوینت است.")
-        context.user_data["waiting_for_transfer_amount"] = False
         return
     
     if amount > TRANSFER_MAX_AMOUNT:
         await update.message.reply_text(f"❌ حداکثر مبلغ انتقال {format_number(TRANSFER_MAX_AMOUNT):,} هاپو پوینت است.")
-        context.user_data["waiting_for_transfer_amount"] = False
         return
     
     if game.data["hop_point"] < amount:
         await update.message.reply_text(f"❌ موجودی کافی نیست. شما {format_number(game.data['hop_point'])} هاپو پوینت داری.")
-        context.user_data["waiting_for_transfer_amount"] = False
         return
     
-    # ======== تایید انتقال با دکمه‌های بله/نه ========
+    context.user_data["transfer_amount"] = amount
+    context.user_data["waiting_for_transfer_amount"] = False
+    
     keyboard = get_confirm_keyboard(
         f"transfer_confirm_{target_id}_{amount}",
         f"transfer_cancel_{target_id}_{amount}"
@@ -825,11 +698,6 @@ async def process_transfer_amount(update: Update, context: ContextTypes.DEFAULT_
         f"┘─ فاصله بین انتقال‌ها: {TRANSFER_COOLDOWN} ثانیه",
         reply_markup=keyboard
     )
-    
-    context.user_data["transfer_amount"] = amount
-    context.user_data["transfer_target"] = target_id
-    context.user_data["transfer_target_name"] = target_name
-    context.user_data["waiting_for_transfer_amount"] = False
 
 
 # ================================================================
@@ -851,12 +719,9 @@ async def handle_meow(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
     
     vote_key = f"{chat_id}_{user_id}_{int(datetime.now().timestamp())}"
-    
     keyboard = [[InlineKeyboardButton("🗳️ رای به زندان", callback_data=f"meow_vote_{vote_key}")]]
     msg = await update.message.reply_text(
-        f"😱 یک گربه ی بی ادب!\n"
-        f"رای بدید که بفرستیمش زندان\n"
-        f"0/{JAIL_VOTE_NEEDED}",
+        f"😱 یک گربه ی بی ادب!\nرای بدید که بفرستیمش زندان\n0/{JAIL_VOTE_NEEDED}",
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
     
@@ -886,30 +751,27 @@ async def meow_vote_timer(vote_key, context):
         if votes_count >= JAIL_VOTE_NEEDED:
             target_game = get_game(target_id)
             target_game.jail_user(JAIL_REASON_MEOW, JAIL_DURATION_MEOW, JAIL_FINE_MEOW)
-            
             try:
                 await context.bot.edit_message_text(
-                    f"😡 گربه ی بی ادب!\n\n"
-                    f"✅ با {votes_count} رای، کاربر به زندان فرستاده شد!",
+                    f"😡 گربه ی بی ادب!\n\n✅ با {votes_count} رای، کاربر به زندان فرستاده شد!",
                     chat_id=chat_id,
                     message_id=msg_id
                 )
-            except Exception as e:
-                logging.error(f"Error editing meow vote result: {e}")
+            except:
+                pass
         else:
             try:
                 await context.bot.edit_message_text(
-                    f"😺 گربه ی بی ادب!\n\n"
-                    f"❌ رای‌گیری به پایان رسید. کاربر آزاد است.",
+                    f"😺 گربه ی بی ادب!\n\n❌ رای‌گیری به پایان رسید. کاربر آزاد است.",
                     chat_id=chat_id,
                     message_id=msg_id
                 )
-            except Exception as e:
-                logging.error(f"Error editing meow vote result: {e}")
+            except:
+                pass
         
         try:
             del MEOW_VOTES[vote_key]
-        except KeyError:
+        except:
             pass
 
 
@@ -933,11 +795,7 @@ async def jail_user_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     parts = update.message.text.split()
     if len(parts) < 4:
-        await update.message.reply_text(
-            "❌ فرمت: jail [آیدی/یوزرنیم] [مدت (دقیقه)] [دلیل]\n"
-            "مثال: jail @username 5 Spam\n"
-            "مثال: jail 123456789 10 Misbehave"
-        )
+        await update.message.reply_text("❌ فرمت: jail [آیدی/یوزرنیم] [مدت (دقیقه)] [دلیل]\nمثال: jail @username 5 Spam")
         return
     
     identifier = parts[1]
@@ -946,13 +804,11 @@ async def jail_user_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if duration_minutes <= 0:
             await update.message.reply_text("❌ مدت زمان باید مثبت باشد")
             return
-    except ValueError:
+    except:
         await update.message.reply_text("❌ مدت زمان باید یک عدد باشد (دقیقه)")
         return
     
-    reason = " ".join(parts[3:])
-    if not reason:
-        reason = "توسط ادمین"
+    reason = " ".join(parts[3:]) if len(parts) > 3 else "توسط ادمین"
     
     user_data = get_user_by_identifier(identifier)
     if not user_data:
@@ -961,27 +817,19 @@ async def jail_user_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     target_user_id = user_data['user_id']
     target_game = get_game(int(target_user_id))
-    
     fine = duration_minutes * 250
     target_game.jail_user_with_admin(reason, duration_minutes * 60, fine, user_id)
-    
     admin_name = full_name or username or f"کاربر{user_id}"
     
     await update.message.reply_text(
         f"✅ کاربر `{user_data['player_name']}` به مدت {duration_minutes} دقیقه زندانی شد.\n"
-        f"📝 دلیل: {reason}\n"
-        f"🏦 جریمه: {format_number(fine)} 🪙"
+        f"📝 دلیل: {reason}\n🏦 جریمه: {format_number(fine)} 🪙"
     )
     
     try:
         await context.bot.send_message(
             int(target_user_id),
-            f"🚨 شما توسط ادمین به زندان فرستاده شدید!\n"
-            f"📝 دلیل: {reason}\n"
-            f"⏳ مدت: {duration_minutes} دقیقه\n"
-            f"🏦 جریمه: {format_number(fine)} 🪙\n"
-            f"👮 زندانی شده توسط: {admin_name}\n\n"
-            f"برای اطلاعات بیشتر «زندان هاپویی» را بزنید."
+            f"🚨 شما توسط ادمین به زندان فرستاده شدید!\n📝 دلیل: {reason}\n⏳ مدت: {duration_minutes} دقیقه\n🏦 جریمه: {format_number(fine)} 🪙\n👮 زندانی شده توسط: {admin_name}\n\nبرای اطلاعات بیشتر «زندان هاپویی» را بزنید."
         )
     except:
         pass
@@ -992,9 +840,6 @@ async def jail_user_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ================================================================
 
 async def reset_user_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """دستور ادمین برای ریست کردن کامل یک کاربر - فقط در پیوی"""
-    
-    # چک کردن اینکه در پیوی هست یا نه
     if update.message.chat.type in ["group", "supergroup"]:
         await update.message.reply_text("❌ این دستور فقط در پیوی بات قابل استفاده است!")
         return
@@ -1008,17 +853,10 @@ async def reset_user_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
     
     parts = update.message.text.split()
     if len(parts) < 2:
-        await update.message.reply_text(
-            "❌ فرمت: `/rest [user_id یا @username]`\n"
-            "مثال: `/rest 123456789`\n"
-            "مثال: `/rest @username`",
-            parse_mode="Markdown"
-        )
+        await update.message.reply_text("❌ فرمت: `/rest [user_id یا @username]`\nمثال: `/rest 123456789`", parse_mode="Markdown")
         return
     
     identifier = parts[1]
-    
-    # پیدا کردن کاربر
     user_data = get_user_by_identifier(identifier)
     if not user_data:
         await update.message.reply_text(f"❌ کاربری با شناسه `{identifier}` در دیتابیس ثبت نشده است.", parse_mode="Markdown")
@@ -1027,25 +865,15 @@ async def reset_user_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
     target_user_id = user_data['user_id']
     target_name = user_data.get('player_name', f"کاربر{target_user_id}")
     
-    # تایید
     keyboard = get_confirm_keyboard(f"rest_confirm_{target_user_id}", f"rest_cancel_{target_user_id}")
     await update.message.reply_text(
-        f"⚠️ آیا از ریست کردن کاربر `{target_name}` مطمئنی؟\n\n"
-        f"🆔 آیدی: `{target_user_id}`\n\n"
-        f"❗️ این کار **همه** اطلاعات کاربر رو به حالت اولیه برمیگردونه:\n"
-        f"┘─ هاپو پوینت: 0\n"
-        f"┘─ سطح: 1\n"
-        f"┘─ هاپو: حذف میشه\n"
-        f"┘─ بانک: بسته میشه\n"
-        f"┘─ پنجه: حذف میشه\n"
-        f"┘─ همه چیز ریست میشه",
+        f"⚠️ آیا از ریست کردن کاربر `{target_name}` مطمئنی؟\n\n🆔 آیدی: `{target_user_id}`\n\n❗️ این کار **همه** اطلاعات کاربر رو به حالت اولیه برمیگردونه.",
         parse_mode="Markdown",
         reply_markup=keyboard
     )
 
 
 async def reset_user_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE, target_user_id):
-    """تایید ریست کاربر"""
     user_id = update.effective_user.id
     game = get_game(user_id)
     
@@ -1054,41 +882,27 @@ async def reset_user_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE,
         return
     
     try:
-        # ریست کردن کاربر
         target_game = get_game(int(target_user_id))
-        
-        # ذخیره نام کاربر قبل از ریست
         player_name = target_game.data.get("player_name", f"کاربر{target_user_id}")
-        
-        # ریست کامل
         target_game.reset_data()
         
         await update.callback_query.edit_message_text(
-            f"✅ کاربر `{player_name}` با موفقیت ریست شد!\n\n"
-            f"🆔 آیدی: `{target_user_id}`\n"
-            f"👤 نام: {target_game.data['player_name']}\n\n"
-            f"📊 همه اطلاعات به حالت اولیه برگشت.",
+            f"✅ کاربر `{player_name}` با موفقیت ریست شد!\n\n🆔 آیدی: `{target_user_id}`\n👤 نام: {target_game.data['player_name']}\n\n📊 همه اطلاعات به حالت اولیه برگشت.",
             parse_mode="Markdown"
         )
         
         try:
             await context.bot.send_message(
                 int(target_user_id),
-                f"🔒 حساب هاپویی شما توسط ادمین ریست شد!\n\n"
-                f"📊 همه اطلاعات شما به حالت اولیه برگشت.\n"
-                f"💰 هاپو پوینت: 0\n"
-                f"⭐ سطح: 1\n\n"
-                f"💡 دوباره از ابتدا شروع کن! 🐶"
+                f"🔒 حساب هاپویی شما توسط ادمین ریست شد!\n\n📊 همه اطلاعات شما به حالت اولیه برگشت.\n💰 هاپو پوینت: 0\n⭐ سطح: 1\n\n💡 دوباره از ابتدا شروع کن! 🐶"
             )
         except:
             pass
-        
     except Exception as e:
         await update.callback_query.edit_message_text(f"❌ خطا در ریست کاربر: {e}")
 
 
 async def reset_user_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """لغو ریست کاربر"""
     await update.callback_query.edit_message_text("❌ عملیات ریست لغو شد.")
 
 
@@ -1097,63 +911,41 @@ async def reset_user_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ================================================================
 
 async def send_street_hapo_notification(context: ContextTypes.DEFAULT_TYPE):
-    """ارسال پیام هاپوی خیابونی به همه گروه‌ها (هر ۶ ساعت)"""
     try:
-        # دریافت لیست گروه‌ها از دیتابیس
         chat_ids = get_all_groups()
-        
         if not chat_ids:
-            logging.info("هیچ گروهی در دیتابیس ثبت نشده است!")
             return
         
         street_hapo = get_street_hapo()
-        
         if street_hapo.active:
             return
         
-        # انتخاب یک گروه رندوم
         chat_id = random.choice(chat_ids)
-        
         success, msg = street_hapo.start_event(int(chat_id))
         if not success:
             return
         
         keyboard = [[InlineKeyboardButton("🐶 نجات هاپوی خیابونی", callback_data="street_hapo_rescue")]]
         
-        try:
-            message = await context.bot.send_photo(
-                chat_id=chat_id,
-                photo=STREET_HAPO_IMAGE_URL,
-                caption=f"🐶 یک هاپوی خیابونی پیدا شده!\n\n"
-                       f"⏳ زمان برای نجات: {STREET_HAPO_DECISION_TIME} ثانیه\n"
-                       f"💰 هزینه تلاش اول: {STREET_HAPO_COSTS[0]} 🪙\n"
-                       f"🍀 شانس موفقیت: {int(STREET_HAPO_SUCCESS_CHANCE * 100)}%\n\n"
-                       f"برای نجاتش کلیک کن 👇",
-                reply_markup=InlineKeyboardMarkup(keyboard)
-            )
-            
-            street_hapo.data["message_id"] = message.message_id
-            street_hapo.save_status()
-            
-            asyncio.create_task(street_hapo_timer(street_hapo, context))
-            
-        except Exception as e:
-            logging.error(f"Error sending street hapo notification: {e}")
-            street_hapo.active = False
-            street_hapo.save_status()
-            
+        message = await context.bot.send_photo(
+            chat_id=chat_id,
+            photo=STREET_HAPO_IMAGE_URL,
+            caption=f"🐶 یک هاپوی خیابونی پیدا شده!\n\n⏳ زمان برای نجات: {STREET_HAPO_DECISION_TIME} ثانیه\n💰 هزینه تلاش اول: {STREET_HAPO_COSTS[0]} 🪙\n🍀 شانس موفقیت: {int(STREET_HAPO_SUCCESS_CHANCE * 100)}%\n\nبرای نجاتش کلیک کن 👇",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+        
+        street_hapo.data["message_id"] = message.message_id
+        street_hapo.save_status()
+        asyncio.create_task(street_hapo_timer(street_hapo, context))
+        
     except Exception as e:
-        logging.error(f"Error in send_street_hapo_notification: {e}")
+        logging.error(f"Error sending street hapo notification: {e}")
 
 
 async def street_hapo_timer(street_hapo, context):
-    """تایمر برای پایان زمان هاپوی خیابونی"""
     await asyncio.sleep(STREET_HAPO_DECISION_TIME)
     
-    if not street_hapo.active:
-        return
-    
-    if street_hapo.data.get("rescued", False):
+    if not street_hapo.active or street_hapo.data.get("rescued", False):
         return
     
     street_hapo.data["status"] = "expired"
@@ -1170,12 +962,11 @@ async def street_hapo_timer(street_hapo, context):
                 message_id=message_id,
                 caption="⏰ هاپوی خیابونی فرار کرد!\n\nمتاسفانه وقت تموم شد و هاپوی خیابونی رفت... 🐾"
             )
-        except Exception as e:
-            logging.error(f"Error editing street hapo message: {e}")
+        except:
+            pass
 
 
 async def handle_street_hapo_rescue(update: Update, context: ContextTypes.DEFAULT_TYPE, query):
-    """هندلر دکمه نجات هاپوی خیابونی - همیشه پیام جدید"""
     user_id = update.effective_user.id
     username = update.effective_user.username
     full_name = update.effective_user.full_name or f"کاربر{user_id}"
@@ -1187,7 +978,6 @@ async def handle_street_hapo_rescue(update: Update, context: ContextTypes.DEFAUL
     
     street_hapo = get_street_hapo()
     
-    # ======== چک کردن وضعیت ========
     if not street_hapo.active:
         await query.answer("🐶 هیچ هاپوی خیابونی در دسترس نیست!")
         await query.message.reply_text("🐶 هیچ هاپوی خیابونی در دسترس نیست!")
@@ -1205,75 +995,53 @@ async def handle_street_hapo_rescue(update: Update, context: ContextTypes.DEFAUL
         await query.message.reply_text("⏰ هاپوی خیابونی فرار کرد!")
         return
     
-    # ======== چک کردن اینکه شانسی مونده ========
     attempts = street_hapo.data.get("attempts", 0)
     if attempts >= STREET_HAPO_MAX_ATTEMPTS:
         await query.answer("❌ همه شانس‌ها از دست رفته!")
         await query.message.reply_text("❌ همه شانس‌ها از دست رفته! هاپوی خیابونی نتونست نجات پیدا کنه... 😢")
         return
     
-    # ======== تلاش برای نجات ========
     result = street_hapo.attempt_rescue(user_id, full_name, game)
     
-    # ======== همیشه یه پیام جدید بفرست ========
     if result.get("success", False) and result.get("rescued", False):
-        # ======== موفقیت ========
-        keyboard = [[InlineKeyboardButton("🎉 تبریک!", callback_data="street_hapo_ignore")]]
-        
         rescued_count = game.data.get("street_hapo_rescued", 0)
         if isinstance(rescued_count, str):
             rescued_count = int(rescued_count) if rescued_count.isdigit() else 0
         
-        msg = f"🎉 {full_name} هاپوی خیابونی رو نجات داد!\n\n"
-        msg += f"💰 {result['reward']} 🪙 هاپو پوینت جایزه گرفتی!\n"
-        msg += f"🐶 تعداد هاپوهای نجات داده شده: {rescued_count}\n\n"
-        msg += f"🔄 تعداد تلاش‌ها: {result['attempt']}/{STREET_HAPO_MAX_ATTEMPTS}"
+        msg = f"🎉 {full_name} هاپوی خیابونی رو نجات داد!\n\n💰 {result['reward']} 🪙 هاپو پوینت جایزه گرفتی!\n🐶 تعداد هاپوهای نجات داده شده: {rescued_count}\n\n🔄 تعداد تلاش‌ها: {result['attempt']}/{STREET_HAPO_MAX_ATTEMPTS}"
         
+        keyboard = [[InlineKeyboardButton("🎉 تبریک!", callback_data="street_hapo_ignore")]]
         await query.message.reply_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
         
         try:
-            await context.bot.send_message(
-                user_id,
-                f"🎉 شما یک هاپوی خیابونی رو نجات دادید!\n"
-                f"💰 {result['reward']} 🪙 هاپو پوینت به حساب شما واریز شد!\n"
-                f"🐶 تعداد هاپوهای نجات داده شده: {rescued_count}"
-            )
+            await context.bot.send_message(user_id, f"🎉 شما یک هاپوی خیابونی رو نجات دادید!\n💰 {result['reward']} 🪙 به حساب شما واریز شد!\n🐶 تعداد هاپوهای نجات داده شده: {rescued_count}")
         except:
             pass
         
-        # حذف دکمه از پیام اصلی
         try:
             await query.message.edit_reply_markup(reply_markup=None)
         except:
             pass
         
     elif result.get("died", False):
-        # ======== هاپو مرد ========
-        msg = f"💀 {result['message']}\n\n"
-        msg += f"🔄 تعداد تلاش‌ها: {result['attempt']}/{STREET_HAPO_MAX_ATTEMPTS}"
+        msg = f"💀 {result['message']}\n\n🔄 تعداد تلاش‌ها: {result['attempt']}/{STREET_HAPO_MAX_ATTEMPTS}"
         await query.message.reply_text(msg)
-        
         try:
             await query.message.edit_reply_markup(reply_markup=None)
         except:
             pass
         
     elif "پوینت کافی نیست" in str(result.get("reason", "")):
-        # ======== خطا (پوینت کافی نیست) ========
         await query.answer(result.get("reason", "خطا!"))
         await query.message.reply_text(f"❌ {result['reason']}")
 
     elif result.get("success") is False and result.get("died") is False:
-        # ======== تلاش ناموفق (هاپو زنده‌ست) ========
         remaining = result.get("remaining_attempts", 0)
         cost = street_hapo.get_attempt_cost()
         remaining_time = street_hapo.get_remaining_time()
         current_attempt = result.get("attempt", 0)
         
-        msg = f"❌ {result['message']}\n\n"
-        msg += f"🔄 تلاش {current_attempt}/{STREET_HAPO_MAX_ATTEMPTS}\n"
-        msg += f"⏳ زمان باقی‌مونده: {remaining_time} ثانیه\n"
-        
+        msg = f"❌ {result['message']}\n\n🔄 تلاش {current_attempt}/{STREET_HAPO_MAX_ATTEMPTS}\n⏳ زمان باقی‌مونده: {remaining_time} ثانیه\n"
         keyboard = []
         if cost is not None and remaining > 0:
             keyboard.append([InlineKeyboardButton(f"🐶 تلاش مجدد ({cost} 🪙)", callback_data="street_hapo_rescue")])
@@ -1281,18 +1049,13 @@ async def handle_street_hapo_rescue(update: Update, context: ContextTypes.DEFAUL
         else:
             msg += f"❌ همه شانس‌ها از دست رفته!"
         
-        await query.message.reply_text(
-            msg,
-            reply_markup=InlineKeyboardMarkup(keyboard) if keyboard else None
-        )
+        await query.message.reply_text(msg, reply_markup=InlineKeyboardMarkup(keyboard) if keyboard else None)
 
     else:
-        # ======== هر حالت دیگه ========
         await query.answer(result.get("reason", "خطا!"))
         if result.get("reason"):
             await query.message.reply_text(f"❌ {result['reason']}")
     
-    # ======== پیام اصلی رو دست نزن ========
     try:
         await query.answer()
     except:
@@ -1300,13 +1063,10 @@ async def handle_street_hapo_rescue(update: Update, context: ContextTypes.DEFAUL
 
 
 # ================================================================
-# دستور ادمین - ارسال هاپوی خیابونی به گروه خاص (/hapo) - فقط پیوی
+# دستور ادمین - ارسال هاپوی خیابونی به گروه خاص (/hapo)
 # ================================================================
 
 async def admin_street_hapo(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """دستور ادمین برای ارسال هاپوی خیابونی به یک گروه خاص - فقط در پیوی"""
-    
-    # چک کردن اینکه در پیوی هست یا نه
     if update.message.chat.type in ["group", "supergroup"]:
         await update.message.reply_text("❌ این دستور فقط در پیوی بات قابل استفاده است!")
         return
@@ -1320,27 +1080,16 @@ async def admin_street_hapo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     parts = update.message.text.split()
     if len(parts) < 2:
-        await update.message.reply_text(
-            "❌ فرمت: `/hapo [chat_id]`\n"
-            "مثال: `/hapo -1003708381360`\n\n"
-            "💡 برای دریافت chat_id گروه:\n"
-            "1. ربات رو به گروه اضافه کن\n"
-            "2. توی گروه یه پیام بفرست\n"
-            "3. این دستور رو با chat_id بزن",
-            parse_mode="Markdown"
-        )
+        await update.message.reply_text("❌ فرمت: `/hapo [chat_id]`\nمثال: `/hapo -1003708381360`", parse_mode="Markdown")
         return
     
-    chat_id_str = parts[1]
-    
     try:
-        chat_id = int(chat_id_str)
-    except ValueError:
+        chat_id = int(parts[1])
+    except:
         await update.message.reply_text("❌ chat_id باید عددی باشد!")
         return
     
     street_hapo = get_street_hapo()
-    
     if street_hapo.active:
         await update.message.reply_text("⏳ هم اکنون یک هاپوی خیابونی در حال نجات است!")
         return
@@ -1356,20 +1105,15 @@ async def admin_street_hapo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         message = await context.bot.send_photo(
             chat_id=chat_id,
             photo=STREET_HAPO_IMAGE_URL,
-            caption=f"🐶 یک هاپوی خیابونی پیدا شده!\n\n"
-                   f"⏳ زمان برای نجات: {STREET_HAPO_DECISION_TIME} ثانیه\n"
-                   f"💰 هزینه تلاش اول: {STREET_HAPO_COSTS[0]} 🪙\n"
-                   f"🍀 شانس موفقیت: {int(STREET_HAPO_SUCCESS_CHANCE * 100)}%\n\n"
-                   f"برای نجاتش کلیک کن 👇",
+            caption=f"🐶 یک هاپوی خیابونی پیدا شده!\n\n⏳ زمان برای نجات: {STREET_HAPO_DECISION_TIME} ثانیه\n💰 هزینه تلاش اول: {STREET_HAPO_COSTS[0]} 🪙\n🍀 شانس موفقیت: {int(STREET_HAPO_SUCCESS_CHANCE * 100)}%\n\nبرای نجاتش کلیک کن 👇",
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
         
         street_hapo.data["message_id"] = message.message_id
         street_hapo.save_status()
-        
         asyncio.create_task(street_hapo_timer(street_hapo, context))
         
-        await update.message.reply_text(f"✅ هاپوی خیابونی به گروه با chat_id `{chat_id_str}` ارسال شد!")
+        await update.message.reply_text(f"✅ هاپوی خیابونی به گروه با chat_id `{parts[1]}` ارسال شد!")
         
     except Exception as e:
         logging.error(f"Error sending admin street hapo: {e}")
@@ -1379,13 +1123,10 @@ async def admin_street_hapo(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 # ================================================================
-# دستور لیست گروه‌ها (فقط ادمین) - فقط پیوی
+# دستور لیست گروه‌ها (فقط ادمین)
 # ================================================================
 
 async def list_groups(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """لیست همه گروه‌های ثبت شده (فقط ادمین) - فقط در پیوی"""
-    
-    # چک کردن اینکه در پیوی هست یا نه
     if update.message.chat.type in ["group", "supergroup"]:
         await update.message.reply_text("❌ این دستور فقط در پیوی بات قابل استفاده است!")
         return
@@ -1398,7 +1139,6 @@ async def list_groups(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     
     chat_ids = get_all_groups()
-    
     if not chat_ids:
         await update.message.reply_text("❌ هیچ گروهی در دیتابیس ثبت نشده!")
         return
@@ -1406,7 +1146,6 @@ async def list_groups(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = "📋 لیست گروه‌های ثبت شده:\n\n"
     for chat_id in chat_ids:
         msg += f"`{chat_id}`\n"
-    
     msg += f"\n✅ تعداد: {len(chat_ids)} گروه"
     
     await update.message.reply_text(msg, parse_mode="Markdown")
@@ -1417,11 +1156,7 @@ async def list_groups(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ================================================================
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # چک کردن اینکه پیام وجود داره
-    if not update.message:
-        return
-    
-    if not update.message.text:
+    if not update.message or not update.message.text:
         return
     
     user_id = update.effective_user.id
@@ -1437,17 +1172,14 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         try:
             chat_id = update.message.chat.id
             chat_title = update.message.chat.title
-            # ذخیره گروه در دیتابیس (اگر نباشه)
             add_group(chat_id, chat_title)
         except:
             pass
     
-    # ======== چک کردن زندان ========
+    # چک کردن زندان
     if is_group and game.is_jailed():
         allowed_commands = ["زندان هاپویی", "زندان", "بانک هاپویی", "هاپو بانک", "بانک", "kknoxx1"]
-        
         if text_lower not in allowed_commands:
-            is_bot_command = False
             bot_commands = [
                 "هاپ هاپ", "هاپ", "hop", "hop hop", "واق", "واق واق", "هاپ هوپ", "هوپ", "hap", "hap hap",
                 "هاپو", "hapo", "پنجه", "claw", "شکار", "hunt",
@@ -1455,48 +1187,35 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "انتقال هاپویی", "انتقالهاپویی",
                 "آکادمی هاپویی", "اکادمی هاپویی", "اکادمی", "آکادمی"
             ]
-            
             for cmd in bot_commands:
                 if text_lower == cmd or text_lower.startswith(cmd):
-                    is_bot_command = True
-                    break
-            
-            if is_bot_command:
-                await update.message.reply_text("⛓️ شما در زندان هستید. فقط با «زندان هاپویی» میتوانید وضعیت خود را ببینید.")
-                return
+                    await update.message.reply_text("⛓️ شما در زندان هستید. فقط با «زندان هاپویی» میتوانید وضعیت خود را ببینید.")
+                    return
     
-    # ======== اسپم ========
+    # اسپم
     if is_group and text_lower not in ["زندان هاپویی", "زندان", "kknoxx1"]:
         if check_spam(user_id):
-            game = get_game(user_id)
             game.jail_user(JAIL_REASON_SPAM, JAIL_DURATION_SPAM, JAIL_FINE_SPAM)
             await update.message.reply_text(
-                f"🚨 شما به دلیل اسپم کردن به زندان فرستاده شدید!\n"
-                f"⏳ مدت حبس: 15 دقیقه\n"
-                f"🏦 جریمه: {format_number(JAIL_FINE_SPAM)} 🪙\n\n"
-                f"برای اطلاعات بیشتر «زندان هاپویی» را بزنید."
+                f"🚨 شما به دلیل اسپم کردن به زندان فرستاده شدید!\n⏳ مدت حبس: 15 دقیقه\n🏦 جریمه: {format_number(JAIL_FINE_SPAM)} 🪙\n\nبرای اطلاعات بیشتر «زندان هاپویی» را بزنید."
             )
             return
     
-    # ======== حالت‌های انتظار ========
+    # حالت‌های انتظار
     if context.user_data.get("waiting_for_hapo_name"):
         if game.data["hop_point"] < 750:
             await update.message.reply_text("❌ پوینت کافی نیست")
             context.user_data["waiting_for_hapo_name"] = False
             return
-        
         if len(text) > 15:
             await update.message.reply_text("❌ اسم نباید بیشتر از 15 کاراکتر باشد")
             context.user_data["waiting_for_hapo_name"] = False
             return
-        
         old_name = game.data["hapo_name"]
         context.user_data["new_hapo_name"] = text
         context.user_data["waiting_for_hapo_name"] = False
-        
-        confirm_text = f"⚠️ آیا از تغییر اسم هاپو از «{old_name}» به «{text}» مطمئنی؟\n💰 هزینه: 750 هاپو پوینت"
         await update.message.reply_text(
-            confirm_text,
+            f"⚠️ آیا از تغییر اسم هاپو از «{old_name}» به «{text}» مطمئنی؟\n💰 هزینه: 750 هاپو پوینت",
             reply_markup=get_confirm_keyboard("confirm_hapo_name", "cancel_hapo_name")
         )
         return
@@ -1506,15 +1225,12 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             amount = int(text.replace(",", ""))
             result = game.deposit(amount)
             if result["success"]:
-                await update.message.reply_text(
-                    f"✅ {format_number(amount)} هاپو پوینت به بانک واریز شد\n"
-                    f"💰 موجودی بانک: {format_number(result['new_balance'])}"
-                )
+                await update.message.reply_text(f"✅ {format_number(amount)} هاپو پوینت به بانک واریز شد\n💰 موجودی بانک: {format_number(result['new_balance'])}")
                 await asyncio.sleep(2)
                 await show_bank_menu(update, game)
             else:
                 await update.message.reply_text(f"❌ {result['reason']}")
-        except ValueError:
+        except:
             await update.message.reply_text("❌ لطفاً یک عدد معتبر وارد کن")
         context.user_data["waiting_for_deposit"] = False
         return
@@ -1524,15 +1240,12 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             amount = int(text.replace(",", ""))
             result = game.withdraw(amount)
             if result["success"]:
-                await update.message.reply_text(
-                    f"✅ {format_number(amount)} هاپو پوینت از بانک برداشت شد\n"
-                    f"💰 موجودی بانک: {format_number(result['new_balance'])}"
-                )
+                await update.message.reply_text(f"✅ {format_number(amount)} هاپو پوینت از بانک برداشت شد\n💰 موجودی بانک: {format_number(result['new_balance'])}")
                 await asyncio.sleep(2)
                 await show_bank_menu(update, game)
             else:
                 await update.message.reply_text(f"❌ {result['reason']}")
-        except ValueError:
+        except:
             await update.message.reply_text("❌ لطفاً یک عدد معتبر وارد کن")
         context.user_data["waiting_for_withdraw"] = False
         return
@@ -1543,16 +1256,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             game.save_data()
             await update.message.reply_text("✅ شما ادمین شدید! 🛡️")
             await update.message.reply_text(
-                "دستورات ادمین:\n"
-                "userinfo [شناسه] - اطلاعات کاربر\n"
-                "setlevel [شناسه] [عدد] - تنظیم سطح\n"
-                "addlevel [شناسه] [عدد] - اضافه کردن سطح\n"
-                "setpoint [شناسه] [عدد] - تنظیم پوینت\n"
-                "addpoint [شناسه] [عدد] - اضافه کردن پوینت\n"
-                "jail [شناسه] [مدت دقیقه] [دلیل] - زندانی کردن کاربر\n"
-                "/hapo [chat_id] - ارسال هاپوی خیابونی به گروه خاص\n"
-                "/groups - لیست گروه‌های ثبت شده\n"
-                "/rest [شناسه] - ریست کردن کاربر"
+                "دستورات ادمین:\nuserinfo [شناسه] - اطلاعات کاربر\nsetlevel [شناسه] [عدد] - تنظیم سطح\naddlevel [شناسه] [عدد] - اضافه کردن سطح\nsetpoint [شناسه] [عدد] - تنظیم پوینت\naddpoint [شناسه] [عدد] - اضافه کردن پوینت\njail [شناسه] [مدت دقیقه] [دلیل] - زندانی کردن کاربر\n/hapo [chat_id] - ارسال هاپوی خیابونی به گروه خاص\n/groups - لیست گروه‌های ثبت شده\n/rest [شناسه] - ریست کردن کاربر"
             )
         else:
             await update.message.reply_text("❌ رمز اشتباه است")
@@ -1563,17 +1267,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await process_transfer_amount(update, context)
         return
     
-    # ======== پیوی ========
+    # پیوی
     if is_private:
         if text_lower in ["start", "/start"]:
-            keyboard = [
-                [InlineKeyboardButton("➕ افزودن به گروه", url=f"https://t.me/{context.bot.username}?startgroup=start")]
-            ]
-            await update.message.reply_text(
-                "🐾 این بات را به گروه خود اضافه کنید!\n"
-                "برای دستورات ادمین از دستور kknoxx1 استفاده کنید.",
-                reply_markup=InlineKeyboardMarkup(keyboard)
-            )
+            keyboard = [[InlineKeyboardButton("➕ افزودن به گروه", url=f"https://t.me/{context.bot.username}?startgroup=start")]]
+            await update.message.reply_text("🐾 این بات را به گروه خود اضافه کنید!\nبرای دستورات ادمین از دستور kknoxx1 استفاده کنید.", reply_markup=InlineKeyboardMarkup(keyboard))
         elif text_lower in ["/help", "help"]:
             await show_academy_main(update)
         elif text_lower == "kknoxx1":
@@ -1581,7 +1279,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             context.user_data["waiting_for_admin"] = True
         return
     
-    # ======== گروه ========
+    # گروه
     if is_group:
         if text_lower in ["زندان هاپویی", "زندان"]:
             await show_jail(update, context)
@@ -1647,80 +1345,59 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if data == "academy_back_main":
         await show_academy_main(update, query)
         return
-    
     if data == "academy_system_menu":
         await show_academy_system_menu(update, query)
         return
-    
     if data == "academy_features_menu":
         await show_academy_features_menu(update, query)
         return
-    
     if data == "academy_adventure_menu":
         await show_academy_adventure_menu(update, query)
         return
-    
     if data.startswith("academy_system_page"):
-        page = int(data.replace("academy_system_page", ""))
-        await show_academy_system_pages(update, query, page)
+        await show_academy_system_pages(update, query, int(data.replace("academy_system_page", "")))
         return
-    
     if data.startswith("academy_animals_page"):
-        page = int(data.replace("academy_animals_page", ""))
-        await show_academy_animals_pages(update, query, page)
+        await show_academy_animals_pages(update, query, int(data.replace("academy_animals_page", "")))
         return
-    
     if data.startswith("academy_claw_page"):
-        page = int(data.replace("academy_claw_page", ""))
-        await show_academy_claw_pages(update, query, page)
+        await show_academy_claw_pages(update, query, int(data.replace("academy_claw_page", "")))
         return
-    
     if data == "academy_hapo":
         await show_feature_page(update, query, "hapo")
         return
-    
     if data == "academy_hunt":
         await show_feature_page(update, query, "hunt")
         return
-    
     if data == "academy_bank":
         await show_feature_page(update, query, "bank")
         return
-    
     if data == "academy_transfer":
         await show_feature_page(update, query, "transfer")
         return
-    
     if data == "academy_jail":
         await show_feature_page(update, query, "jail")
         return
-    
     if data == "academy_street_hapo":
         await show_street_hapo_page(update, query)
         return
-    
     if data == "academy_hop":
         await show_adventure_page(update, query, "hop")
         return
-    
     if data == "academy_points":
         await show_adventure_page(update, query, "points")
         return
-    
     if data == "academy_exp":
         await show_adventure_page(update, query, "exp")
         return
-    
     if data == "academy_profile":
         await show_adventure_page(update, query, "profile")
         return
     
     # ======== ریست کاربر ========
     if data.startswith("rest_confirm_"):
-        target_user_id = data.replace("rest_confirm_", "")
-        await reset_user_confirm(update, context, target_user_id)
+        await reset_user_confirm(update, context, data.replace("rest_confirm_", ""))
         return
-    
     if data == "rest_cancel_":
         await reset_user_cancel(update, context)
         return
@@ -1729,9 +1406,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if data == "street_hapo_rescue":
         await handle_street_hapo_rescue(update, context, query)
         return
-    
     if data == "street_hapo_ignore":
-        await query.answer()
         return
     
     # ======== انتقال هاپویی ========
@@ -1741,40 +1416,35 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             target_id = int(parts[0])
             amount = int(parts[1])
             
-            # انجام انتقال
             result = game.transfer_points(target_id, amount)
-            
-            # پیدا کردن نام گیرنده
             target_game = get_game(target_id)
             target_name = target_game.data.get("player_name", f"کاربر{target_id}")
             
             if result["success"]:
                 await query.edit_message_text(
-                    f"✅ انتقال موفقیت‌آمیز بود!\n\n"
-                    f"💰 {format_number(amount)} 🪙 به {target_name} انتقال یافت.\n"
-                    f"📊 موجودی شما: {format_number(game.data['hop_point'])} 🪙"
+                    f"✅ انتقال موفقیت‌آمیز بود!\n\n💰 {format_number(amount)} 🪙 به {target_name} انتقال یافت.\n📊 موجودی شما: {format_number(game.data['hop_point'])} 🪙"
                 )
                 try:
                     await context.bot.send_message(
                         target_id,
-                        f"💰 {full_name} مبلغ {format_number(amount)} 🪙 به شما انتقال داد!\n"
-                        f"📊 موجودی شما: {format_number(target_game.data['hop_point'])} 🪙"
+                        f"💰 {full_name} مبلغ {format_number(amount)} 🪙 به شما انتقال داد!\n📊 موجودی شما: {format_number(target_game.data['hop_point'])} 🪙"
                     )
                 except:
                     pass
             else:
                 await query.edit_message_text(f"❌ {result['reason']}")
+        
+        context.user_data["transfer_target_id"] = None
+        context.user_data["transfer_target_name"] = None
+        context.user_data["transfer_amount"] = None
         return
     
     if data.startswith("transfer_cancel_"):
-        # لغو انتقال
         await query.edit_message_text("❌ انتقال لغو شد.")
-        context.user_data["transfer_amount"] = None
-        context.user_data["transfer_target"] = None
+        context.user_data["transfer_target_id"] = None
         context.user_data["transfer_target_name"] = None
+        context.user_data["transfer_amount"] = None
         context.user_data["waiting_for_transfer_amount"] = False
-        if user_id in TRANSFER_STATE:
-            del TRANSFER_STATE[user_id]
         return
     
     # ======== هاپو ========
@@ -1783,16 +1453,13 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not new_name:
             await query.edit_message_text("❌ خطا در تغییر اسم")
             return
-        
         if game.data["hop_point"] < 750:
             await query.edit_message_text("❌ پوینت کافی نیست")
             return
-        
         old_name = game.data["hapo_name"]
         game.data["hapo_name"] = new_name
         game.data["hop_point"] -= 750
         game.save_data()
-        
         await query.edit_message_text(f"✅ اسم هاپو از «{old_name}» به «{new_name}» تغییر یافت")
         context.user_data["new_hapo_name"] = None
         await asyncio.sleep(2)
@@ -1809,11 +1476,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if data == "buy_hapo":
         result = game.buy_hapo()
         if result["success"]:
-            await query.edit_message_text(
-                f"✅ هاپو خریداری شد!\n"
-                f"اسم هاپو: {result['name']}\n\n"
-                f"💡 برای دیدن منوی هاپو، کلمه «هاپو» رو بزن"
-            )
+            await query.edit_message_text(f"✅ هاپو خریداری شد!\nاسم هاپو: {result['name']}\n\n💡 برای دیدن منوی هاپو، کلمه «هاپو» رو بزن")
         else:
             await query.edit_message_text(f"❌ {result['reason']}")
         return
@@ -1858,34 +1521,18 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not check["success"]:
             await query.edit_message_text(f"❌ {check['reason']}")
             return
-        
         price = game.get_hapo_rank_up_price()
         if game.data["hop_point"] < price:
             await query.edit_message_text(f"❌ به {format_number(price)} هاپو پوینت نیاز داری")
             return
-        
-        msg = f"⚠️ آیا از ارتقا مقام هاپو مطمئنی؟\n\n"
-        msg += f"🌟 مقام فعلی: {RANK_NAMES[game.data['hapo_rank']]}\n"
-        msg += f"🌟 مقام جدید: {RANK_NAMES[game.data['hapo_rank'] + 1]}\n"
-        msg += f"💰 هزینه: {format_number(price)} هاپو پوینت\n\n"
-        msg += "❗️ با ارتقا مقام:\n"
-        msg += "┘─ سطح هاپو به 1 ریست میشود\n"
-        msg += "┘─ تولیدی هاپو صفر میشود\n"
-        msg += "┘─ ظرفیت هاپو افزایش می‌یابد\n"
-        
-        keyboard = get_confirm_keyboard("hapo_rank_up_yes", "hapo_rank_up_no")
-        await query.edit_message_text(msg, reply_markup=keyboard)
+        msg = f"⚠️ آیا از ارتقا مقام هاپو مطمئنی؟\n\n🌟 مقام فعلی: {RANK_NAMES[game.data['hapo_rank']]}\n🌟 مقام جدید: {RANK_NAMES[game.data['hapo_rank'] + 1]}\n💰 هزینه: {format_number(price)} هاپو پوینت\n\n❗️ با ارتقا مقام:\n┘─ سطح هاپو به 1 ریست میشود\n┘─ تولیدی هاپو صفر میشود\n┘─ ظرفیت هاپو افزایش می‌یابد"
+        await query.edit_message_text(msg, reply_markup=get_confirm_keyboard("hapo_rank_up_yes", "hapo_rank_up_no"))
         return
     
     if data == "hapo_rank_up_yes":
         result = game.confirm_rank_up()
         if result["success"]:
-            await query.edit_message_text(
-                f"✅ مقام هاپو به {result['new_rank_name']} ارتقا یافت!\n\n"
-                f"🌟 سطح هاپو به 1 ریست شد\n"
-                f"💰 تولیدی هاپو صفر شد\n"
-                f"📦 ظرفیت هاپو افزایش یافت"
-            )
+            await query.edit_message_text(f"✅ مقام هاپو به {result['new_rank_name']} ارتقا یافت!\n\n🌟 سطح هاپو به 1 ریست شد\n💰 تولیدی هاپو صفر شد\n📦 ظرفیت هاپو افزایش یافت")
             await asyncio.sleep(2)
             msg = get_hapo_menu_text(game)
             keyboard = get_hapo_menu_keyboard(game)
@@ -1906,10 +1553,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if game.data["hop_point"] < 750:
             await query.edit_message_text("❌ به 750 هاپو پوینت نیاز داری")
             return
-        await query.edit_message_text(
-            "✏️ اسم جدید هاپو رو وارد کن:\n\n"
-            "💡 فقط اسم جدید رو تایپ کن و ارسال کن."
-        )
+        await query.edit_message_text("✏️ اسم جدید هاپو رو وارد کن:\n\n💡 فقط اسم جدید رو تایپ کن و ارسال کن.")
         context.user_data["waiting_for_hapo_name"] = True
         return
     
@@ -1917,106 +1561,61 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if data == "buy_claw":
         result = game.buy_claw()
         if result["success"]:
-            # پیام جدید - ادیت نمیشه
             await query.message.reply_text("✅ پنجه خریداری شد!")
             await asyncio.sleep(1)
-            
-            # نمایش پنجه با عکس
             claw_data = game.get_claw_data(1)
             next_data = game.get_claw_data(2)
-            
-            msg = f"🦞 پنجه شما\n"
-            msg += f"⭐ سطح: 1\n"
-            msg += f"⏳ زمان استراحت: 60:00\n"
-            msg += f"🍀 شانس شکار:\n"
-            msg += f"  ⚪ معمولی: 95%\n"
-            msg += f"  🔵 کمیاب: 5%\n"
-            
+            msg = f"🦞 پنجه شما\n⭐ سطح: 1\n⏳ زمان استراحت: 60:00\n🍀 شانس شکار:\n  ⚪ معمولی: 95%\n  🔵 کمیاب: 5%"
             keyboard = []
             if next_data:
-                keyboard.append([
-                    InlineKeyboardButton(f"⬆️ سطح 2 ({format_number(next_data['cost'])})", callback_data="upgrade_claw")
-                ])
-            
+                keyboard.append([InlineKeyboardButton(f"⬆️ سطح 2 ({format_number(next_data['cost'])})", callback_data="upgrade_claw")])
             try:
-                await query.message.reply_photo(
-                    photo=CLAW_IMAGES[1],
-                    caption=msg,
-                    reply_markup=InlineKeyboardMarkup(keyboard) if keyboard else None
-                )
+                await query.message.reply_photo(photo=CLAW_IMAGES[1], caption=msg, reply_markup=InlineKeyboardMarkup(keyboard) if keyboard else None)
             except:
                 await query.message.reply_text(msg, reply_markup=InlineKeyboardMarkup(keyboard) if keyboard else None)
         else:
-            # خطا - پیام جدید
             await query.message.reply_text(f"❌ {result['reason']}")
         return
     
     if data == "upgrade_claw":
         result = game.upgrade_claw()
         if result["success"]:
-            # پیام جدید - ادیت نمیشه
             await query.message.reply_text(f"✅ پنجه به سطح {result['new_level']} ارتقا یافت")
             await asyncio.sleep(1)
-            
-            # نمایش مجدد پنجه با عکس جدید
             claw_data = game.get_claw_data(game.data["claw_level"])
             next_level = game.data["claw_level"] + 1
             next_data = game.get_claw_data(next_level)
-            
-            msg = f"🦞 پنجه شما\n"
-            msg += f"⭐ سطح: {game.data['claw_level']}\n"
-            msg += f"⏳ زمان استراحت: {claw_data['cooldown']:02d}:00\n"
-            msg += f"🍀 شانس شکار:\n"
-            msg += f"  ⚪ معمولی: {claw_data['common']}%\n"
-            msg += f"  🔵 کمیاب: {claw_data['uncommon']}%\n"
+            msg = f"🦞 پنجه شما\n⭐ سطح: {game.data['claw_level']}\n⏳ زمان استراحت: {claw_data['cooldown']:02d}:00\n🍀 شانس شکار:\n  ⚪ معمولی: {claw_data['common']}%\n  🔵 کمیاب: {claw_data['uncommon']}%"
             if claw_data['epic'] > 0:
-                msg += f"  🟣 حماسی: {claw_data['epic']}%\n"
+                msg += f"\n  🟣 حماسی: {claw_data['epic']}%"
             if claw_data['legendary'] > 0:
-                msg += f"  🟡 افسانه‌ای: {claw_data['legendary']}%\n"
-            
+                msg += f"\n  🟡 افسانه‌ای: {claw_data['legendary']}%"
             keyboard = []
             if next_data:
-                keyboard.append([
-                    InlineKeyboardButton(f"⬆️ سطح {next_level} ({format_number(next_data['cost'])})", callback_data="upgrade_claw")
-                ])
-            
+                keyboard.append([InlineKeyboardButton(f"⬆️ سطح {next_level} ({format_number(next_data['cost'])})", callback_data="upgrade_claw")])
             try:
-                await query.message.reply_photo(
-                    photo=CLAW_IMAGES[game.data["claw_level"]],
-                    caption=msg,
-                    reply_markup=InlineKeyboardMarkup(keyboard) if keyboard else None
-                )
+                await query.message.reply_photo(photo=CLAW_IMAGES[game.data["claw_level"]], caption=msg, reply_markup=InlineKeyboardMarkup(keyboard) if keyboard else None)
             except:
                 await query.message.reply_text(msg, reply_markup=InlineKeyboardMarkup(keyboard) if keyboard else None)
         else:
-            # خطا - پیام جدید
             await query.message.reply_text(f"❌ {result['reason']}")
         return
     
     if data == "hunt_sell":
         result = game.sell_animal()
         if result["success"]:
-            await query.message.reply_text(
-                f"💰 حیوان فروخته شد!\n"
-                f"✅ {format_number(result['value'])} هاپو پوینت دریافت کردی"
-            )
+            await query.message.reply_text(f"💰 حیوان فروخته شد!\n✅ {format_number(result['value'])} هاپو پوینت دریافت کردی")
         else:
             await query.message.reply_text(f"❌ {result['reason']}")
         return
     
     if data == "hunt_feed":
         result = game.feed_hapo()
-        
         if result["success"]:
-            await query.message.reply_text(
-                f"🍖 {result['fed']} غذا به هاپو داده شد\n"
-                f"✅ هاپو سیر شد!"
-            )
+            await query.message.reply_text(f"🍖 {result['fed']} غذا به هاپو داده شد\n✅ هاپو سیر شد!")
             return
-        
         error_msg = result["reason"]
         animal = game.data.get("current_hunt_animal")
-        
         if error_msg == "هاپو سیر است" and animal:
             if game.data.get("hunt_time", 0) > 0:
                 now = datetime.now().timestamp()
@@ -2029,25 +1628,10 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     game.save_data()
                     await query.message.reply_text("🦌 حیوان فرار کرد! وقتت تموم شد.")
                     return
-            
-            await query.message.reply_text(
-                f"❌ هاپو سیر است!\n"
-                f"می‌تونی حیوان رو بفروشی.\n\n"
-                f"{animal['emoji']} {animal['name']}\n"
-                f"⭐ سطح : {animal['rarity_name']}\n"
-                f"⚖️ وزن : {animal['weight']} کیلو\n"
-                f"💰 ارزش فروش : {format_number(animal['value'])} 🪙"
-            )
-            
-            keyboard = [
-                [InlineKeyboardButton(f"💰 فروش ({format_number(animal['value'])})", callback_data="hunt_sell")]
-            ]
-            await query.message.reply_text(
-                "برای فروش کلیک کن:",
-                reply_markup=InlineKeyboardMarkup(keyboard)
-            )
+            await query.message.reply_text(f"❌ هاپو سیر است!\nمی‌تونی حیوان رو بفروشی.\n\n{animal['emoji']} {animal['name']}\n⭐ سطح : {animal['rarity_name']}\n⚖️ وزن : {animal['weight']} کیلو\n💰 ارزش فروش : {format_number(animal['value'])} 🪙")
+            keyboard = [[InlineKeyboardButton(f"💰 فروش ({format_number(animal['value'])})", callback_data="hunt_sell")]]
+            await query.message.reply_text("برای فروش کلیک کن:", reply_markup=InlineKeyboardMarkup(keyboard))
             return
-        
         await query.message.reply_text(f"❌ {error_msg}")
         return
     
@@ -2058,21 +1642,18 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text("✅ پروفایل شما مخفی شد.")
         await my_profile_from_callback(query, game)
         return
-
     if data == "profile_show":
         game.data["profile_hidden"] = False
         game.save_data()
         await query.edit_message_text("✅ پروفایل شما نمایش داده شد.")
         await my_profile_from_callback(query, game)
         return
-
     if data == "profile_lock":
         game.data["profile_locked"] = True
         game.save_data()
         await query.edit_message_text("✅ پروفایل شما قفل شد.")
         await my_profile_from_callback(query, game)
         return
-
     if data == "profile_unlock":
         game.data["profile_locked"] = False
         game.save_data()
@@ -2084,10 +1665,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if data == "buy_bank":
         result = game.open_bank()
         if result["success"]:
-            await query.edit_message_text(
-                f"🏦 بانک هاپویی خریداری شد!\n"
-                f"💳 شماره کارت شما: {result['card_number']}"
-            )
+            await query.edit_message_text(f"🏦 بانک هاپویی خریداری شد!\n💳 شماره کارت شما: {result['card_number']}")
             await asyncio.sleep(2)
             msg = get_bank_menu_text(game, False)
             keyboard = get_bank_keyboard(False)
@@ -2095,52 +1673,34 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             await query.edit_message_text(f"❌ {result['reason']}")
         return
-    
     if data == "bank_deposit":
-        await query.edit_message_text(
-            "💰 مبلغ واریزی رو بنویس:\n\n"
-            "💡 فقط عدد مبلغ رو تایپ کن و ارسال کن."
-        )
+        await query.edit_message_text("💰 مبلغ واریزی رو بنویس:\n\n💡 فقط عدد مبلغ رو تایپ کن و ارسال کن.")
         context.user_data["waiting_for_deposit"] = True
         return
-    
     if data == "bank_withdraw":
-        await query.edit_message_text(
-            "💰 مبلغ برداشت رو بنویس:\n\n"
-            "💡 فقط عدد مبلغ رو تایپ کن و ارسال کن."
-        )
+        await query.edit_message_text("💰 مبلغ برداشت رو بنویس:\n\n💡 فقط عدد مبلغ رو تایپ کن و ارسال کن.")
         context.user_data["waiting_for_withdraw"] = True
         return
-    
     if data == "bank_card_to_card":
         await query.edit_message_text(get_card_to_card_text())
         context.user_data["waiting_for_card_to_card"] = True
         return
-    
     if data == "bank_transactions":
         msg = get_bank_menu_text(game, True)
         keyboard = get_bank_keyboard(True)
         await query.edit_message_text(msg, reply_markup=keyboard)
         return
-    
     if data == "bank_change_card":
         if not game.data["bank_opened"]:
             await query.edit_message_text("❌ شما بانک ندارید.")
             return
-        
         msg = get_change_card_confirm_text(game)
-        keyboard = get_confirm_keyboard("bank_change_card_yes", "bank_change_card_no")
-        await query.edit_message_text(msg, reply_markup=keyboard)
+        await query.edit_message_text(msg, reply_markup=get_confirm_keyboard("bank_change_card_yes", "bank_change_card_no"))
         return
-    
     if data == "bank_change_card_yes":
         result = game.change_card_number()
         if result["success"]:
-            await query.edit_message_text(
-                f"✅ شماره حساب شما تغییر کرد!\n"
-                f"🔄 شماره قدیم: {result['old_card']}\n"
-                f"🔄 شماره جدید: {result['new_card']}"
-            )
+            await query.edit_message_text(f"✅ شماره حساب شما تغییر کرد!\n🔄 شماره قدیم: {result['old_card']}\n🔄 شماره جدید: {result['new_card']}")
             await asyncio.sleep(2)
             msg = get_bank_menu_text(game, False)
             keyboard = get_bank_keyboard(False)
@@ -2148,7 +1708,6 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             await query.edit_message_text(f"❌ {result['reason']}")
         return
-    
     if data == "bank_change_card_no":
         await query.edit_message_text("❌ تغییر شماره حساب لغو شد.")
         await asyncio.sleep(1)
@@ -2160,44 +1719,27 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # ======== میو و زندان ========
     if data.startswith("meow_vote_"):
         vote_key = data.replace("meow_vote_", "")
-        
         if vote_key not in MEOW_VOTES:
             await query.edit_message_text("❌ رای‌گیری به پایان رسیده است.")
             return
-        
         vote_data = MEOW_VOTES[vote_key]
         voter_id = user_id
-        
         if voter_id == vote_data["target_id"]:
             await query.answer("❌ نمی‌تونی به خودت رای بدی!")
             return
-        
         if voter_id in vote_data["votes"]:
             await query.answer("❌ تو قبلاً رای دادی!")
             return
-        
         vote_data["votes"].append(voter_id)
         votes_count = len(vote_data["votes"])
-        
         keyboard = [[InlineKeyboardButton("🗳️ رای به زندان", callback_data=f"meow_vote_{vote_key}")]]
-        await query.edit_message_text(
-            f"😱 یک گربه ی بی ادب!\n"
-            f"رای بدید که بفرستیمش زندان\n"
-            f"{votes_count}/{JAIL_VOTE_NEEDED}",
-            reply_markup=InlineKeyboardMarkup(keyboard)
-        )
-        
+        await query.edit_message_text(f"😱 یک گربه ی بی ادب!\nرای بدید که بفرستیمش زندان\n{votes_count}/{JAIL_VOTE_NEEDED}", reply_markup=InlineKeyboardMarkup(keyboard))
         await query.answer("✅ رای شما ثبت شد!")
-        
         if votes_count >= JAIL_VOTE_NEEDED:
             target_id = vote_data["target_id"]
             target_game = get_game(target_id)
             target_game.jail_user(JAIL_REASON_MEOW, JAIL_DURATION_MEOW, JAIL_FINE_MEOW)
-            
-            await query.edit_message_text(
-                f"😡 گربه ی بی ادب!\n\n"
-                f"✅ با {votes_count} رای، کاربر به زندان فرستاده شد!"
-            )
+            await query.edit_message_text(f"😡 گربه ی بی ادب!\n\n✅ با {votes_count} رای، کاربر به زندان فرستاده شد!")
             del MEOW_VOTES[vote_key]
         return
     
@@ -2205,16 +1747,9 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not game.is_jailed():
             await query.edit_message_text("❌ شما در زندان نیستید.")
             return
-        
         fine = game.data.get("jail_fine", 0)
-        keyboard = get_confirm_keyboard("jail_pay_fine_yes", "jail_pay_fine_no")
-        await query.edit_message_text(
-            f"⚠️ آیا از پرداخت جریمه {format_number(fine)} 🪙 مطمئنی؟\n\n"
-            f"با پرداخت جریمه از زندان آزاد میشوی.",
-            reply_markup=keyboard
-        )
+        await query.edit_message_text(f"⚠️ آیا از پرداخت جریمه {format_number(fine)} 🪙 مطمئنی؟\n\nبا پرداخت جریمه از زندان آزاد میشوی.", reply_markup=get_confirm_keyboard("jail_pay_fine_yes", "jail_pay_fine_no"))
         return
-    
     if data == "jail_pay_fine_yes":
         result = game.pay_jail_fine()
         if result["success"]:
@@ -2222,14 +1757,13 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             await query.edit_message_text(f"❌ {result['reason']}")
         return
-    
     if data == "jail_pay_fine_no":
         await query.edit_message_text("❌ پرداخت جریمه لغو شد.")
         return
 
 
 # ================================================================
-# پروفایل از کالبک - فقط متن (بدون عکس) - با هاپوی خیابونی
+# پروفایل از کالبک
 # ================================================================
 
 async def my_profile_from_callback(query, game):
@@ -2240,7 +1774,6 @@ async def my_profile_from_callback(query, game):
     is_hidden = game.data.get("profile_hidden", False)
     is_locked = game.data.get("profile_locked", False)
     
-    # تبدیل به عدد
     street_rescued = game.data.get("street_hapo_rescued", 0)
     if isinstance(street_rescued, str):
         street_rescued = int(street_rescued) if street_rescued.isdigit() else 0
@@ -2255,13 +1788,11 @@ async def my_profile_from_callback(query, game):
     msg += f"┐─ 💰 هاپ پوینت ها : {format_number(game.data['hop_point'])} 🪙\n"
     msg += f"┐─ 🐾 هاپ هاپ ها : {game.data['hop_count']}\n"
     
-    # هاپوی خیابونی
     if street_rescued > 0:
         msg += f"┐─ 🐶 هاپوی خیابونی نجات داده: {street_rescued}\n"
     else:
         msg += f"┐─ 🐶 هاپوی خیابونی نجات داده: 0\n"
     
-    # هاپو
     if game.data.get("hapo_owned", False):
         msg += f"┐─ 🐕 هاپو: {game.data['hapo_name']}\n"
         msg += f"┘─ 🌟 مقام: {RANK_NAMES[game.data['hapo_rank']]} | ⭐ سطح: {game.data['hapo_level']}/5\n\n"
@@ -2292,14 +1823,11 @@ async def my_profile_from_callback(query, game):
 # ================================================================
 
 async def get_user_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    chat_type = update.message.chat.type
-    if chat_type in ["group", "supergroup"]:
+    if update.message.chat.type in ["group", "supergroup"]:
         return
     
     user_id = update.effective_user.id
-    username = update.effective_user.username
-    full_name = update.effective_user.full_name or f"کاربر{user_id}"
-    game = get_game(user_id, username or full_name)
+    game = get_game(user_id)
     
     if not game.data.get("is_admin", False):
         await update.message.reply_text("❌ شما دسترسی به این دستور ندارید. فقط ادمین‌ها میتونن استفاده کنن.")
@@ -2307,48 +1835,26 @@ async def get_user_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     parts = update.message.text.split()
     if len(parts) < 2:
-        await update.message.reply_text(
-            "❌ لطفاً شناسه کاربر را وارد کن.\n\n"
-            "📌 مثال:\n"
-            "🔹 با آیدی عددی: `userinfo 123456789`\n"
-            "🔹 با یوزرنیم: `userinfo @username`",
-            parse_mode="Markdown"
-        )
+        await update.message.reply_text("❌ لطفاً شناسه کاربر را وارد کن.\n\n📌 مثال:\n🔹 با آیدی عددی: `userinfo 123456789`\n🔹 با یوزرنیم: `userinfo @username`", parse_mode="Markdown")
         return
     
-    identifier = parts[1]
-    user_data = get_user_by_identifier(identifier)
-    
+    user_data = get_user_by_identifier(parts[1])
     if not user_data:
-        await update.message.reply_text(f"❌ کاربری با شناسه `{identifier}` در دیتابیس ثبت نشده است.", parse_mode="Markdown")
+        await update.message.reply_text(f"❌ کاربری با شناسه `{parts[1]}` در دیتابیس ثبت نشده است.", parse_mode="Markdown")
         return
     
-    msg = f"📊 اطلاعات کاربر:\n\n"
-    msg += f"🆔 آیدی: `{user_data['user_id']}`\n"
-    msg += f"👤 نام: {user_data['player_name']}\n"
-    msg += f"⭐ سطح: {user_data['level']}\n"
-    msg += f"💰 هاپو پوینت: {format_number(user_data['hop_point'])}\n"
-    msg += f"🐾 تعداد هاپ: {user_data['hop_count']}\n"
+    msg = f"📊 اطلاعات کاربر:\n\n🆔 آیدی: `{user_data['user_id']}`\n👤 نام: {user_data['player_name']}\n⭐ سطح: {user_data['level']}\n💰 هاپو پوینت: {format_number(user_data['hop_point'])}\n🐾 تعداد هاپ: {user_data['hop_count']}"
     
     if user_data.get('hapo_owned', False):
-        msg += f"\n🐕 هاپو:\n"
-        msg += f"  📛 نام: {user_data['hapo_name']}\n"
-        msg += f"  ⭐ سطح: {user_data['hapo_level']}/5\n"
-        msg += f"  🌟 مقام: {RANK_NAMES[user_data['hapo_rank']]}\n"
+        msg += f"\n\n🐕 هاپو:\n  📛 نام: {user_data['hapo_name']}\n  ⭐ سطح: {user_data['hapo_level']}/5\n  🌟 مقام: {RANK_NAMES[user_data['hapo_rank']]}"
     
     if user_data.get('bank_opened', False):
-        msg += f"\n🏦 بانک:\n"
-        msg += f"  💰 موجودی: {format_number(user_data['bank_balance'])}\n"
-        msg += f"  💳 شماره کارت: {user_data.get('bank_card_number', 'نامشخص')}\n"
+        msg += f"\n\n🏦 بانک:\n  💰 موجودی: {format_number(user_data['bank_balance'])}\n  💳 شماره کارت: {user_data.get('bank_card_number', 'نامشخص')}"
     
     street_rescued = user_data.get('street_hapo_rescued', 0)
     if isinstance(street_rescued, str):
         street_rescued = int(street_rescued) if street_rescued.isdigit() else 0
-    
-    if street_rescued > 0:
-        msg += f"\n🐶 هاپوی خیابونی نجات داده: {street_rescued}"
-    else:
-        msg += f"\n🐶 هاپوی خیابونی نجات داده: 0"
+    msg += f"\n\n🐶 هاپوی خیابونی نجات داده: {street_rescued}"
     
     msg += f"\n\n📅 آخرین بروزرسانی: {user_data.get('last_updated', 'نامشخص')}"
     
@@ -2356,14 +1862,11 @@ async def get_user_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def set_user_level(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    chat_type = update.message.chat.type
-    if chat_type in ["group", "supergroup"]:
+    if update.message.chat.type in ["group", "supergroup"]:
         return
     
     user_id = update.effective_user.id
-    username = update.effective_user.username
-    full_name = update.effective_user.full_name or f"کاربر{user_id}"
-    game = get_game(user_id, username or full_name)
+    game = get_game(user_id)
     
     if not game.data.get("is_admin", False):
         await update.message.reply_text("❌ شما ادمین نیستید")
@@ -2374,51 +1877,40 @@ async def set_user_level(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ فرمت: setlevel [آیدی/یوزرنیم] [عدد]\nمثال: setlevel @username 5")
         return
     
-    identifier = parts[1]
     try:
         new_level = int(parts[2])
         if not 1 <= new_level <= MAX_LEVEL:
             await update.message.reply_text(f"❌ سطح باید بین 1 تا {MAX_LEVEL} باشد")
             return
-    except ValueError:
+    except:
         await update.message.reply_text("❌ لطفاً یک عدد معتبر وارد کن")
         return
     
-    user_data = get_user_by_identifier(identifier)
+    user_data = get_user_by_identifier(parts[1])
     if not user_data:
-        await update.message.reply_text(f"❌ کاربری با شناسه `{identifier}` در دیتابیس ثبت نشده است.", parse_mode="Markdown")
+        await update.message.reply_text(f"❌ کاربری با شناسه `{parts[1]}` در دیتابیس ثبت نشده است.", parse_mode="Markdown")
         return
     
-    target_user_id = user_data['user_id']
-    target_game = get_game(int(target_user_id))
+    target_game = get_game(int(user_data['user_id']))
     old_level = target_game.data["level"]
     target_game.data["level"] = new_level
     target_game.data["hop_count"] = 0
     target_game.save_data()
     
-    await update.message.reply_text(
-        f"✅ سطح کاربر `{user_data['player_name']}` از {old_level} به {new_level} تغییر یافت.",
-        parse_mode="Markdown"
-    )
+    await update.message.reply_text(f"✅ سطح کاربر `{user_data['player_name']}` از {old_level} به {new_level} تغییر یافت.", parse_mode="Markdown")
     
     try:
-        await context.bot.send_message(
-            int(target_user_id),
-            f"⭐ سطح هاپویی شما به {new_level} تغییر یافت!"
-        )
+        await context.bot.send_message(int(user_data['user_id']), f"⭐ سطح هاپویی شما به {new_level} تغییر یافت!")
     except:
         pass
 
 
 async def add_user_level(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    chat_type = update.message.chat.type
-    if chat_type in ["group", "supergroup"]:
+    if update.message.chat.type in ["group", "supergroup"]:
         return
     
     user_id = update.effective_user.id
-    username = update.effective_user.username
-    full_name = update.effective_user.full_name or f"کاربر{user_id}"
-    game = get_game(user_id, username or full_name)
+    game = get_game(user_id)
     
     if not game.data.get("is_admin", False):
         await update.message.reply_text("❌ شما ادمین نیستید")
@@ -2429,53 +1921,41 @@ async def add_user_level(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ فرمت: addlevel [آیدی/یوزرنیم] [عدد]\nمثال: addlevel @username 5")
         return
     
-    identifier = parts[1]
     try:
         add_amount = int(parts[2])
         if add_amount <= 0:
             await update.message.reply_text("❌ مقدار باید مثبت باشد")
             return
-    except ValueError:
+    except:
         await update.message.reply_text("❌ لطفاً یک عدد معتبر وارد کن")
         return
     
-    user_data = get_user_by_identifier(identifier)
+    user_data = get_user_by_identifier(parts[1])
     if not user_data:
-        await update.message.reply_text(f"❌ کاربری با شناسه `{identifier}` در دیتابیس ثبت نشده است.", parse_mode="Markdown")
+        await update.message.reply_text(f"❌ کاربری با شناسه `{parts[1]}` در دیتابیس ثبت نشده است.", parse_mode="Markdown")
         return
     
-    target_user_id = user_data['user_id']
-    target_game = get_game(int(target_user_id))
+    target_game = get_game(int(user_data['user_id']))
     old_level = target_game.data["level"]
     new_level = min(old_level + add_amount, MAX_LEVEL)
     target_game.data["level"] = new_level
     target_game.data["hop_count"] = 0
     target_game.save_data()
     
-    await update.message.reply_text(
-        f"✅ {add_amount} سطح به کاربر `{user_data['player_name']}` اضافه شد.\n"
-        f"سطح جدید: {new_level}",
-        parse_mode="Markdown"
-    )
+    await update.message.reply_text(f"✅ {add_amount} سطح به کاربر `{user_data['player_name']}` اضافه شد.\nسطح جدید: {new_level}", parse_mode="Markdown")
     
     try:
-        await context.bot.send_message(
-            int(target_user_id),
-            f"⭐ {add_amount} سطح به هاپوهای شما اضافه شد!\nسطح جدید: {new_level}"
-        )
+        await context.bot.send_message(int(user_data['user_id']), f"⭐ {add_amount} سطح به هاپوهای شما اضافه شد!\nسطح جدید: {new_level}")
     except:
         pass
 
 
 async def set_user_point(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    chat_type = update.message.chat.type
-    if chat_type in ["group", "supergroup"]:
+    if update.message.chat.type in ["group", "supergroup"]:
         return
     
     user_id = update.effective_user.id
-    username = update.effective_user.username
-    full_name = update.effective_user.full_name or f"کاربر{user_id}"
-    game = get_game(user_id, username or full_name)
+    game = get_game(user_id)
     
     if not game.data.get("is_admin", False):
         await update.message.reply_text("❌ شما ادمین نیستید")
@@ -2486,50 +1966,39 @@ async def set_user_point(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ فرمت: setpoint [آیدی/یوزرنیم] [عدد]\nمثال: setpoint @username 1000")
         return
     
-    identifier = parts[1]
     try:
         new_point = int(parts[2])
         if new_point < 0:
             await update.message.reply_text("❌ پوینت نمی‌تواند منفی باشد")
             return
-    except ValueError:
+    except:
         await update.message.reply_text("❌ لطفاً یک عدد معتبر وارد کن")
         return
     
-    user_data = get_user_by_identifier(identifier)
+    user_data = get_user_by_identifier(parts[1])
     if not user_data:
-        await update.message.reply_text(f"❌ کاربری با شناسه `{identifier}` در دیتابیس ثبت نشده است.", parse_mode="Markdown")
+        await update.message.reply_text(f"❌ کاربری با شناسه `{parts[1]}` در دیتابیس ثبت نشده است.", parse_mode="Markdown")
         return
     
-    target_user_id = user_data['user_id']
-    target_game = get_game(int(target_user_id))
+    target_game = get_game(int(user_data['user_id']))
     old_point = target_game.data["hop_point"]
     target_game.data["hop_point"] = new_point
     target_game.save_data()
     
-    await update.message.reply_text(
-        f"✅ پوینت کاربر `{user_data['player_name']}` از {format_number(old_point)} به {format_number(new_point)} تغییر یافت.",
-        parse_mode="Markdown"
-    )
+    await update.message.reply_text(f"✅ پوینت کاربر `{user_data['player_name']}` از {format_number(old_point)} به {format_number(new_point)} تغییر یافت.", parse_mode="Markdown")
     
     try:
-        await context.bot.send_message(
-            int(target_user_id),
-            f"💰 هاپو پوینت‌های شما به {format_number(new_point)} تغییر یافت!"
-        )
+        await context.bot.send_message(int(user_data['user_id']), f"💰 هاپو پوینت‌های شما به {format_number(new_point)} تغییر یافت!")
     except:
         pass
 
 
 async def add_user_point(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    chat_type = update.message.chat.type
-    if chat_type in ["group", "supergroup"]:
+    if update.message.chat.type in ["group", "supergroup"]:
         return
     
     user_id = update.effective_user.id
-    username = update.effective_user.username
-    full_name = update.effective_user.full_name or f"کاربر{user_id}"
-    game = get_game(user_id, username or full_name)
+    game = get_game(user_id)
     
     if not game.data.get("is_admin", False):
         await update.message.reply_text("❌ شما ادمین نیستید")
@@ -2540,38 +2009,29 @@ async def add_user_point(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ فرمت: addpoint [آیدی/یوزرنیم] [عدد]\nمثال: addpoint @username 1000")
         return
     
-    identifier = parts[1]
     try:
         add_amount = int(parts[2])
         if add_amount <= 0:
             await update.message.reply_text("❌ مقدار باید مثبت باشد")
             return
-    except ValueError:
+    except:
         await update.message.reply_text("❌ لطفاً یک عدد معتبر وارد کن")
         return
     
-    user_data = get_user_by_identifier(identifier)
+    user_data = get_user_by_identifier(parts[1])
     if not user_data:
-        await update.message.reply_text(f"❌ کاربری با شناسه `{identifier}` در دیتابیس ثبت نشده است.", parse_mode="Markdown")
+        await update.message.reply_text(f"❌ کاربری با شناسه `{parts[1]}` در دیتابیس ثبت نشده است.", parse_mode="Markdown")
         return
     
-    target_user_id = user_data['user_id']
-    target_game = get_game(int(target_user_id))
+    target_game = get_game(int(user_data['user_id']))
     old_point = target_game.data["hop_point"]
     new_point = old_point + add_amount
     target_game.data["hop_point"] = new_point
     target_game.save_data()
     
-    await update.message.reply_text(
-        f"✅ {format_number(add_amount)} هاپو پوینت به کاربر `{user_data['player_name']}` اضافه شد.\n"
-        f"پوینت جدید: {format_number(new_point)}",
-        parse_mode="Markdown"
-    )
+    await update.message.reply_text(f"✅ {format_number(add_amount)} هاپو پوینت به کاربر `{user_data['player_name']}` اضافه شد.\nپوینت جدید: {format_number(new_point)}", parse_mode="Markdown")
     
     try:
-        await context.bot.send_message(
-            int(target_user_id),
-            f"💰 {format_number(add_amount)} هاپو پوینت به حساب شما اضافه شد!\nموجودی جدید: {format_number(new_point)}"
-        )
+        await context.bot.send_message(int(user_data['user_id']), f"💰 {format_number(add_amount)} هاپو پوینت به حساب شما اضافه شد!\nموجودی جدید: {format_number(new_point)}")
     except:
         pass
