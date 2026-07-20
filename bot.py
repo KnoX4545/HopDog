@@ -1,6 +1,7 @@
 # bot.py - فایل اصلی (ورودی برنامه)
 
 import logging
+from telegram import Update  # ✅ این خط رو اضافه کن
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, filters
 from config import TOKEN
 from handlers import (
