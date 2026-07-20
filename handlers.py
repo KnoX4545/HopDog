@@ -1062,9 +1062,15 @@ async def handle_street_hapo_rescue(update: Update, context: ContextTypes.DEFAUL
     if result.get("success", False) and result.get("rescued", False):
         # ======== موفقیت ========
         keyboard = [[InlineKeyboardButton("🎉 تبریک!", callback_data="street_hapo_ignore")]]
+        
+        # ✅ اصلاح: تبدیل به عدد قبل از نمایش
+        rescued_count = game.data.get("street_hapo_rescued", 0)
+        if isinstance(rescued_count, str):
+            rescued_count = int(rescued_count) if rescued_count.isdigit() else 0
+        
         msg = f"🎉 {full_name} هاپوی خیابونی رو نجات داد!\n\n"
         msg += f"💰 {result['reward']} 🪙 هاپو پوینت جایزه گرفتی!\n"
-        msg += f"🐶 تعداد هاپوهای نجات داده شده: {game.data.get('street_hapo_rescued', 0)}\n\n"
+        msg += f"🐶 تعداد هاپوهای نجات داده شده: {rescued_count}\n\n"
         msg += f"🔄 تعداد تلاش‌ها: {result['attempt']}/{STREET_HAPO_MAX_ATTEMPTS}"
         
         await query.message.reply_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
@@ -1074,7 +1080,7 @@ async def handle_street_hapo_rescue(update: Update, context: ContextTypes.DEFAUL
                 user_id,
                 f"🎉 شما یک هاپوی خیابونی رو نجات دادید!\n"
                 f"💰 {result['reward']} 🪙 هاپو پوینت به حساب شما واریز شد!\n"
-                f"🐶 تعداد هاپوهای نجات داده شده: {game.data.get('street_hapo_rescued', 0)}"
+                f"🐶 تعداد هاپوهای نجات داده شده: {rescued_count}"
             )
         except:
             pass
