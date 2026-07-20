@@ -1,4 +1,4 @@
-# bot.py - نسخه کامل نهایی با تمام قابلیت‌ها
+# bot.py - نسخه نهایی کامل با تمام اصلاحات
 
 import os
 import logging
@@ -27,7 +27,7 @@ if not SUPABASE_URL or not SUPABASE_KEY:
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # ================================================================
-# داده‌های ثابت
+# داده‌های ثابت - از کد اصلی
 # ================================================================
 
 LEVEL_DATA = {
@@ -63,6 +63,7 @@ HAPO_CAPACITY.update({5: 20000, 10: 50000, 15: 150000, 20: 400000, 25: 650000})
 HAPO_PRODUCTION = {i: 0.1 + (i-1) * 0.5 for i in range(1, 26)}
 HAPO_PRODUCTION.update({5: 2.0, 10: 4.5, 15: 7.0, 20: 9.5, 25: 12.0})
 
+# قیمت‌های اصلی هاپو - از کد اصلی
 HAPO_LEVEL_PRICES = {
     1: 250, 2: 500, 3: 5000, 4: 7500, 5: 15000,
     6: 25000, 7: 50000, 8: 75000, 9: 150000, 10: 300000,
@@ -70,6 +71,9 @@ HAPO_LEVEL_PRICES = {
     16: 5000000, 17: 7500000, 18: 10000000, 19: 15000000, 20: 20000000,
     21: 25000000, 22: 30000000, 23: 35000000, 24: 40000000, 25: 50000000
 }
+
+# قیمت‌های ارتقا مقام
+RANK_UP_PRICES = [15000, 150000, 1500000, 15000000]  # رنک 0→1, 1→2, 2→3, 3→4
 
 CLAW_DATA = {
     1: {"cost": 500, "cooldown": 60, "common": 95, "uncommon": 5, "epic": 0, "legendary": 0},
@@ -119,9 +123,12 @@ ADMIN_PASSWORD = "9061"
 # محدودیت‌های انتقال
 TRANSFER_MIN_AMOUNT = 50
 TRANSFER_MAX_AMOUNT = 500000
-TRANSFER_COOLDOWN = 30  # ثانیه
+TRANSFER_COOLDOWN = 30
 TRANSFER_MIN_LEVEL_SENDER = 3
 TRANSFER_MIN_LEVEL_RECEIVER = 2
+
+# تایمر شکار
+HUNT_DECISION_TIMER = 60
 
 # ================================================================
 # ایمپورت از academy.py
@@ -168,6 +175,8 @@ class HopDogGame:
                     data["profile_locked"] = False
                 if "last_transfer_time" not in data:
                     data["last_transfer_time"] = 0
+                if "hunt_time" not in data:
+                    data["hunt_time"] = 0
                 return data
             return None
         except Exception as e:
@@ -216,6 +225,7 @@ class HopDogGame:
             "profile_hidden": False,
             "profile_locked": False,
             "last_transfer_time": 0,
+            "hunt_time": 0,
             "last_updated": datetime.now().isoformat()
         }
         self.save_data()
@@ -285,6 +295,10 @@ class HopDogGame:
         self.save_data()
         return {"success": True, "earned": earned, "level_up": False}
 
+    # ============================================================
+    # متدهای هاپو - اصلاح شده
+    # ============================================================
+
     def get_hapo_total_level(self):
         return self.data["hapo_rank"] * 5 + self.data["hapo_level"]
 
@@ -304,6 +318,12 @@ class HopDogGame:
         if total >= 25:
             return float('inf')
         return HAPO_LEVEL_PRICES.get(total + 1, 10000000)
+
+    def get_hapo_rank_up_price(self):
+        current_rank = self.data["hapo_rank"]
+        if current_rank >= 4:
+            return float('inf')
+        return RANK_UP_PRICES[current_rank] if current_rank < len(RANK_UP_PRICES) else float('inf')
 
     def get_hapo_food_status(self):
         max_food = self.get_hapo_max_food()
@@ -352,6 +372,39 @@ class HopDogGame:
         self.data["hapo_last_update"] = datetime.now().timestamp()
         self.save_data()
         return {"success": True, "name": self.data["hapo_name"]}
+
+    def can_rank_up(self):
+        if self.data["hapo_level"] < 5:
+            return {"success": False, "reason": "هاپو باید سطح 5 باشد تا بتواند مقام خود را ارتقا دهد"}
+        if self.data["hapo_rank"] >= 4:
+            return {"success": False, "reason": "هاپو در بالاترین مقام قرار دارد"}
+        return {"success": True}
+
+    def confirm_rank_up(self):
+        if self.data["hapo_rank"] >= 4:
+            return {"success": False, "reason": "هاپو در بالاترین مقام قرار دارد"}
+        
+        price = self.get_hapo_rank_up_price()
+        if self.data["hop_point"] < price:
+            return {"success": False, "reason": f"به {price:,} هاپو پوینت نیاز داری"}
+        
+        self.data["hop_point"] -= price
+        self.data["hapo_rank"] += 1
+        self.data["hapo_level"] = 1
+        self.data["hapo_food"] = self.get_hapo_max_food()
+        self.data["hapo_harvest"] = 0
+        self.data["hapo_last_update"] = datetime.now().timestamp()
+        self.save_data()
+        
+        return {
+            "success": True, 
+            "new_rank": self.data["hapo_rank"],
+            "new_rank_name": RANK_NAMES[self.data["hapo_rank"]]
+        }
+
+    # ============================================================
+    # متدهای پنجه و شکار
+    # ============================================================
 
     def get_claw_data(self, level):
         return CLAW_DATA.get(level)
@@ -431,6 +484,25 @@ class HopDogGame:
         if self.data.get("hunt_active", False):
             return {"success": False, "reason": "در حال شکار هستید"}
         
+        # بررسی تایمر 60 ثانیه برای حیوان قبلی
+        if self.data.get("current_hunt_animal") and self.data.get("hunt_time", 0) > 0:
+            now = datetime.now().timestamp()
+            elapsed = now - self.data["hunt_time"]
+            if elapsed < HUNT_DECISION_TIMER:
+                remaining = HUNT_DECISION_TIMER - elapsed
+                return {
+                    "success": False, 
+                    "reason": f"⏳ هنوز حیوان قبلی رو تصمیم نگرفتی! {int(remaining)} ثانیه مونده",
+                    "hunt_active": True,
+                    "remaining": remaining
+                }
+            else:
+                animal_name = self.data["current_hunt_animal"].get("name", "حیوان")
+                self.data["current_hunt_animal"] = None
+                self.data["hunt_time"] = 0
+                self.save_data()
+                return {"success": False, "reason": f"🦌 {animal_name} فرار کرد! وقتت تموم شد."}
+        
         cooldown = self.get_claw_cooldown(self.data["claw_level"]) * 60
         now = datetime.now().timestamp()
         if self.data["last_hunt_time"] > 0 and (now - self.data["last_hunt_time"]) < cooldown:
@@ -449,6 +521,7 @@ class HopDogGame:
         
         self.data["hunt_active"] = False
         self.data["current_hunt_animal"] = animal
+        self.data["hunt_time"] = datetime.now().timestamp()
         self.save_data()
         return {"success": True, "animal": animal}
 
@@ -456,9 +529,20 @@ class HopDogGame:
         animal = self.data.get("current_hunt_animal")
         if not animal:
             return {"success": False, "reason": "هیچ حیوانی برای فروش وجود ندارد"}
+        
+        if self.data.get("hunt_time", 0) > 0:
+            now = datetime.now().timestamp()
+            if (now - self.data["hunt_time"]) > HUNT_DECISION_TIMER:
+                animal_name = animal.get("name", "حیوان")
+                self.data["current_hunt_animal"] = None
+                self.data["hunt_time"] = 0
+                self.save_data()
+                return {"success": False, "reason": f"🦌 {animal_name} فرار کرد! وقتت تموم شد."}
+        
         value = animal["value"]
         self.data["hop_point"] += value
         self.data["current_hunt_animal"] = None
+        self.data["hunt_time"] = 0
         self.save_data()
         return {"success": True, "value": value}
 
@@ -469,6 +553,15 @@ class HopDogGame:
         if not self.data["hapo_owned"]:
             return {"success": False, "reason": "شما هاپو ندارید"}
         
+        if self.data.get("hunt_time", 0) > 0:
+            now = datetime.now().timestamp()
+            if (now - self.data["hunt_time"]) > HUNT_DECISION_TIMER:
+                animal_name = animal.get("name", "حیوان")
+                self.data["current_hunt_animal"] = None
+                self.data["hunt_time"] = 0
+                self.save_data()
+                return {"success": False, "reason": f"🦌 {animal_name} فرار کرد! وقتت تموم شد."}
+        
         max_food = self.get_hapo_max_food()
         if self.data["hapo_food"] >= max_food:
             return {"success": False, "reason": "هاپو سیر است"}
@@ -478,8 +571,13 @@ class HopDogGame:
         actual = new_food - int(self.data["hapo_food"])
         self.data["hapo_food"] = new_food
         self.data["current_hunt_animal"] = None
+        self.data["hunt_time"] = 0
         self.save_data()
         return {"success": True, "fed": actual}
+
+    # ============================================================
+    # متدهای بانک
+    # ============================================================
 
     def open_bank(self):
         if self.data["level"] < BANK_REQUIRED_LEVEL:
@@ -538,8 +636,11 @@ class HopDogGame:
         self.save_data()
         return {"success": True, "new_balance": self.data["bank_balance"]}
 
+    # ============================================================
+    # متدهای انتقال
+    # ============================================================
+
     def can_transfer(self):
-        """بررسی امکان انتقال"""
         if self.data["level"] < TRANSFER_MIN_LEVEL_SENDER:
             return {"success": False, "reason": f"برای انتقال هاپو پوینت باید سطح {TRANSFER_MIN_LEVEL_SENDER} باشی"}
         
@@ -555,8 +656,6 @@ class HopDogGame:
         return {"success": True}
 
     def transfer_points(self, target_user_id, amount):
-        """انتقال هاپو پوینت به کاربر دیگر"""
-        # بررسی محدودیت‌ها
         can = self.can_transfer()
         if not can["success"]:
             return can
@@ -570,18 +669,15 @@ class HopDogGame:
         if self.data["hop_point"] < amount:
             return {"success": False, "reason": f"موجودی کافی نیست. شما {int(self.data['hop_point']):,} هاپو پوینت داری"}
         
-        # دریافت اطلاعات کاربر مقصد
         target_game = get_game(int(target_user_id))
         target_data = target_game.data
         
-        # بررسی سطح کاربر مقصد
         if target_data["level"] < TRANSFER_MIN_LEVEL_RECEIVER:
             return {"success": False, "reason": f"کاربر مقصد باید حداقل سطح {TRANSFER_MIN_LEVEL_RECEIVER} داشته باشد"}
         
         if target_data.get("profile_locked", False):
             return {"success": False, "reason": "پروفایل کاربر مقصد قفل است"}
         
-        # انجام انتقال
         self.data["hop_point"] -= amount
         target_game.data["hop_point"] += amount
         self.data["last_transfer_time"] = datetime.now().timestamp()
@@ -638,12 +734,16 @@ def get_hapo_menu_keyboard(game):
     if is_max:
         keyboard[0].append(InlineKeyboardButton("🏆 نهایی", callback_data="hapo_max"))
     elif game.data["hapo_level"] >= 5 and game.data["hapo_rank"] < 4:
-        keyboard.append([InlineKeyboardButton("🌟 ارتقا مقام", callback_data="hapo_rank_up")])
+        price = game.get_hapo_rank_up_price()
+        if price != float('inf'):
+            keyboard.append([InlineKeyboardButton(f"🌟 ارتقا مقام ({price:,})", callback_data="hapo_rank_up_confirm")])
     else:
-        keyboard.append([InlineKeyboardButton("⬆️ ارتقا سطح", callback_data="hapo_level_up")])
+        price = game.get_hapo_upgrade_price()
+        if price != float('inf'):
+            keyboard.append([InlineKeyboardButton(f"⬆️ ارتقا سطح ({price:,})", callback_data="hapo_level_up")])
     
     if game.data["hop_point"] >= 750:
-        keyboard.append([InlineKeyboardButton("✏️ تغییر اسم", callback_data="hapo_rename")])
+        keyboard.append([InlineKeyboardButton("✏️ تغییر اسم هاپو", callback_data="hapo_rename")])
     
     return InlineKeyboardMarkup(keyboard)
 
@@ -666,12 +766,17 @@ def get_hapo_menu_text(game):
     msg += f"📦 ظرفیت: {capacity:,}\n"
     
     if not is_max:
-        msg += f"💰 هزینه ارتقا: {price:,} هاپو پوینت"
+        if game.data["hapo_level"] >= 5 and game.data["hapo_rank"] < 4:
+            rank_price = game.get_hapo_rank_up_price()
+            msg += f"💰 هزینه ارتقا مقام: {rank_price:,} هاپو پوینت"
+        else:
+            msg += f"💰 هزینه ارتقا سطح: {price:,} هاپو پوینت"
     else:
         msg += "🏆 مقام نهایی"
     
     return msg
 
+# ================================================================
 # ================================================================
 # دستورات جدید (فارسی)
 # ================================================================
@@ -715,7 +820,6 @@ async def my_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         keyboard.append([InlineKeyboardButton("🔒 قفل کردن پروفایل", callback_data="profile_lock_confirm")])
     
-    # نمایش عکس پروفایل
     try:
         user_photos = await context.bot.get_user_profile_photos(user_id, limit=1)
         if user_photos.total_count > 0:
@@ -767,7 +871,6 @@ async def show_user_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         msg += f"╯─ ⭐️ سطح : {target_data['level']} 🏆 نهایی"
     
-    # نمایش عکس پروفایل
     try:
         user_photos = await context.bot.get_user_profile_photos(target_user_id, limit=1)
         if user_photos.total_count > 0:
@@ -789,17 +892,14 @@ async def transfer_points_command(update: Update, context: ContextTypes.DEFAULT_
     full_name = update.effective_user.full_name or f"کاربر{user_id}"
     game = get_game(user_id, username or full_name)
     
-    # بررسی سطح کاربر
     if game.data["level"] < TRANSFER_MIN_LEVEL_SENDER:
         await update.message.reply_text(f"❌ برای انتقال هاپو پوینت باید سطح {TRANSFER_MIN_LEVEL_SENDER} باشی.")
         return
     
-    # بررسی قفل بودن پروفایل
     if game.data.get("profile_locked", False):
         await update.message.reply_text("❌ پروفایل شما قفل است. ابتدا آن را باز کن.")
         return
     
-    # بررسی ریپلای
     if not update.message.reply_to_message:
         await update.message.reply_text(
             "❌ لطفاً روی پیام یک کاربر ریپلای کن و «انتقال هاپویی» رو بزن.\n\n"
@@ -817,7 +917,6 @@ async def transfer_points_command(update: Update, context: ContextTypes.DEFAULT_
         await update.message.reply_text("❌ نمی‌تونی به خودت هاپو پوینت انتقال بدی!")
         return
     
-    # بررسی سطح کاربر مقصد
     target_game = get_game(target_user_id)
     if target_game.data["level"] < TRANSFER_MIN_LEVEL_RECEIVER:
         await update.message.reply_text(f"❌ کاربر مقصد باید حداقل سطح {TRANSFER_MIN_LEVEL_RECEIVER} داشته باشد.")
@@ -827,7 +926,6 @@ async def transfer_points_command(update: Update, context: ContextTypes.DEFAULT_
         await update.message.reply_text("❌ پروفایل کاربر مقصد قفل است.")
         return
     
-    # دریافت مبلغ از متن پیام
     parts = update.message.text.split()
     if len(parts) < 2:
         await update.message.reply_text(
@@ -847,14 +945,12 @@ async def transfer_points_command(update: Update, context: ContextTypes.DEFAULT_
         await update.message.reply_text("❌ لطفاً یک عدد معتبر برای مبلغ وارد کن.")
         return
     
-    # انجام انتقال
     result = game.transfer_points(target_user_id, amount)
     if result["success"]:
         await update.message.reply_text(
             f"✅ انتقال موفقیت‌آمیز بود!\n\n"
             f"💰 {amount:,} هاپو پوینت به {target_full_name} انتقال یافت."
         )
-        # اطلاع به کاربر مقصد
         try:
             await context.bot.send_message(
                 target_user_id,
@@ -890,14 +986,12 @@ async def process_transfer_amount(update: Update, context: ContextTypes.DEFAULT_
     target_id = transfer_info["target_id"]
     target_name = transfer_info["target_name"]
     
-    # انجام انتقال
     result = game.transfer_points(target_id, amount)
     if result["success"]:
         await update.message.reply_text(
             f"✅ انتقال موفقیت‌آمیز بود!\n\n"
             f"💰 {amount:,} هاپو پوینت به {target_name} انتقال یافت."
         )
-        # اطلاع به کاربر مقصد
         try:
             await context.bot.send_message(
                 target_id,
@@ -1007,7 +1101,6 @@ async def set_user_level(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parse_mode="Markdown"
     )
     
-    # ارسال پیام به کاربر
     try:
         await context.bot.send_message(
             int(target_user_id),
@@ -1061,7 +1154,6 @@ async def add_user_level(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parse_mode="Markdown"
     )
     
-    # ارسال پیام به کاربر
     try:
         await context.bot.send_message(
             int(target_user_id),
@@ -1111,7 +1203,6 @@ async def set_user_point(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parse_mode="Markdown"
     )
     
-    # ارسال پیام به کاربر
     try:
         await context.bot.send_message(
             int(target_user_id),
@@ -1164,7 +1255,6 @@ async def add_user_point(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parse_mode="Markdown"
     )
     
-    # ارسال پیام به کاربر
     try:
         await context.bot.send_message(
             int(target_user_id),
@@ -1174,8 +1264,7 @@ async def add_user_point(update: Update, context: ContextTypes.DEFAULT_TYPE):
         pass
 
 # ================================================================
-# ================================================================
-# توابع اصلی (start, help, hapo, claw, hunt, bank)
+# توابع اصلی
 # ================================================================
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1306,11 +1395,16 @@ async def do_hunt(update: Update, game):
     
     if not result["success"]:
         reason = result.get("reason", "")
-        if reason == "خسته‌ام":
+        if "فرار کرد" in reason:
+            await update.message.reply_text(f"❌ {reason}")
+        elif reason == "خسته‌ام":
             remaining = result.get("remaining", 0)
             mins = int(remaining // 60)
             secs = int(remaining % 60)
             await update.message.reply_text(f"⏳ تا شکار بعدی {mins}:{secs:02d} مونده")
+        elif "ثانیه مونده" in reason:
+            remaining = result.get("remaining", 0)
+            await update.message.reply_text(f"⏳ {reason}")
         else:
             await update.message.reply_text(f"❌ {reason}")
         return
@@ -1321,7 +1415,8 @@ async def do_hunt(update: Update, game):
     msg += f"⭐ {animal['rarity_name']}\n"
     msg += f"⚖️ وزن: {animal['weight']} کیلو\n"
     msg += f"💰 ارزش: {animal['value']} هاپو پوینت\n"
-    msg += f"🍖 ارزش غذایی: {animal['nutrition']} کالری"
+    msg += f"🍖 ارزش غذایی: {animal['nutrition']} کالری\n\n"
+    msg += f"⏳ شما {HUNT_DECISION_TIMER} ثانیه فرصت دارید تا تصمیم بگیرید!"
     
     keyboard = []
     keyboard.append([
@@ -1407,7 +1502,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     is_private = update.message.chat.type == "private"
     is_group = update.message.chat.type in ["group", "supergroup"]
     
-    # ======== ذخیره اطلاعات گروه ========
     if is_group:
         try:
             chat_id = update.message.chat.id
@@ -1427,27 +1521,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             pass
     
     # ======== بررسی حالت‌های انتظار ========
-    if context.user_data.get("waiting_for_name"):
-        if game.data["hop_point"] < 750:
-            await update.message.reply_text("❌ پوینت کافی نیست")
-            context.user_data["waiting_for_name"] = False
-            return
-        
-        if len(text) > 20:
-            await update.message.reply_text("❌ اسم نباید بیشتر از 20 کاراکتر باشد")
-            return
-        
-        old_name = game.data["player_name"]
-        context.user_data["new_name"] = text
-        context.user_data["waiting_for_name"] = False
-        
-        confirm_text = f"⚠️ آیا از تغییر اسم خود از «{old_name}» به «{text}» مطمئنی؟\n💰 هزینه: 750 هاپو پوینت"
-        await update.message.reply_text(
-            confirm_text,
-            reply_markup=get_confirm_keyboard("confirm_name_change", "cancel_name_change")
-        )
-        return
-    
     if context.user_data.get("waiting_for_hapo_name"):
         if game.data["hop_point"] < 750:
             await update.message.reply_text("❌ پوینت کافی نیست")
@@ -1530,7 +1603,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await process_transfer_amount(update, context)
         return
     
-    # ======== دستورات در پیوی ========
     if is_private:
         if text_lower in ["start", "/start"]:
             keyboard = [
@@ -1548,7 +1620,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             context.user_data["waiting_for_admin"] = True
         return
     
-    # ======== دستورات در گروه ========
     if is_group:
         # ======== دستورات جدید فارسی ========
         if text_lower in ["هاپوهام", "هاپو هام"]:
@@ -1611,18 +1682,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if text_lower in ["بانک هاپویی", "هاپو بانک"]:
             await show_bank_menu(update, game)
             return
-        
-        # ======== تغییر اسم ========
-        if text_lower in ["تغییر اسم", "اسم هاپویی"]:
-            if game.data["hop_point"] < 750:
-                await update.message.reply_text("❌ برای تغییر اسم به 750 هاپو پوینت نیاز داری")
-                return
-            await update.message.reply_text(
-                "✏️ اسم جدید خود را وارد کن:\n\n"
-                "💡 فقط اسم جدید رو تایپ کن و ارسال کن."
-            )
-            context.user_data["waiting_for_name"] = True
-            return
 
 # ================================================================
 # هندلر Callback
@@ -1655,25 +1714,21 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await show_academy_adventure_menu(update, query)
         return
     
-    # ======== صفحات سیستم هاپویی ========
     if data.startswith("academy_system_page"):
         page = int(data.replace("academy_system_page", ""))
         await show_academy_system_pages(update, query, page)
         return
     
-    # ======== صفحات حیوانات ========
     if data.startswith("academy_animals_page"):
         page = int(data.replace("academy_animals_page", ""))
         await show_academy_animals_pages(update, query, page)
         return
     
-    # ======== صفحات سطح پنجه ========
     if data.startswith("academy_claw_page"):
         page = int(data.replace("academy_claw_page", ""))
         await show_academy_claw_pages(update, query, page)
         return
     
-    # ======== صفحات قابلیت ها ========
     if data == "academy_hapo":
         await show_feature_page(update, query, "hapo")
         return
@@ -1690,7 +1745,6 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await show_feature_page(update, query, "transfer")
         return
     
-    # ======== صفحات شروع ماجراجویی ========
     if data == "academy_hop":
         await show_adventure_page(update, query, "hop")
         return
@@ -1707,31 +1761,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await show_adventure_page(update, query, "profile")
         return
     
-    # ======== تایید تغییر اسم ========
-    if data == "confirm_name_change":
-        new_name = context.user_data.get("new_name", "")
-        if not new_name:
-            await query.edit_message_text("❌ خطا در تغییر اسم")
-            return
-        
-        if game.data["hop_point"] < 750:
-            await query.edit_message_text("❌ پوینت کافی نیست")
-            return
-        
-        old_name = game.data["player_name"]
-        game.data["player_name"] = new_name
-        game.data["hop_point"] -= 750
-        game.save_data()
-        
-        await query.edit_message_text(f"✅ اسم شما از «{old_name}» به «{new_name}» تغییر یافت")
-        context.user_data["new_name"] = None
-        return
-    
-    if data == "cancel_name_change":
-        await query.edit_message_text("❌ تغییر اسم لغو شد")
-        context.user_data["new_name"] = None
-        return
-    
+    # ======== تایید تغییر اسم هاپو ========
     if data == "confirm_hapo_name":
         new_name = context.user_data.get("new_hapo_name", "")
         if not new_name:
@@ -1853,45 +1883,50 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await my_profile_from_callback(query, game)
         return
     
-    # ======== انتقال ========
-    if data == "transfer_confirm":
-        amount = context.user_data.get("transfer_amount")
-        target_id = context.user_data.get("transfer_target")
-        target_name = context.user_data.get("transfer_target_name")
-        
-        if not amount or not target_id:
-            await query.edit_message_text("❌ خطا در انتقال. لطفاً دوباره تلاش کن.")
+    # ======== ارتقا مقام هاپو ========
+    if data == "hapo_rank_up_confirm":
+        check = game.can_rank_up()
+        if not check["success"]:
+            await query.edit_message_text(f"❌ {check['reason']}")
             return
         
-        result = game.transfer_points(target_id, amount)
-        if result["success"]:
-            await query.edit_message_text(
-                f"✅ انتقال موفقیت‌آمیز بود!\n\n"
-                f"💰 {amount:,} هاپو پوینت به {target_name} انتقال یافت."
-            )
-            try:
-                await context.bot.send_message(
-                    target_id,
-                    f"💰 {game.data['player_name']} مبلغ {amount:,} هاپو پوینت به شما انتقال داد!"
-                )
-            except:
-                pass
-        else:
-            await query.edit_message_text(f"❌ {result['reason']}")
+        price = game.get_hapo_rank_up_price()
+        if game.data["hop_point"] < price:
+            await query.edit_message_text(f"❌ به {price:,} هاپو پوینت نیاز داری")
+            return
         
-        context.user_data["transfer_amount"] = None
-        context.user_data["transfer_target"] = None
-        context.user_data["transfer_target_name"] = None
+        msg = f"⚠️ آیا از ارتقا مقام هاپو مطمئنی؟\n\n"
+        msg += f"🌟 مقام فعلی: {RANK_NAMES[game.data['hapo_rank']]}\n"
+        msg += f"🌟 مقام جدید: {RANK_NAMES[game.data['hapo_rank'] + 1]}\n"
+        msg += f"💰 هزینه: {price:,} هاپو پوینت\n\n"
+        msg += "❗️ با ارتقا مقام:\n"
+        msg += "┘─ سطح هاپو به 1 ریست میشود\n"
+        msg += "┘─ تولیدی هاپو صفر میشود\n"
+        msg += "┘─ ظرفیت هاپو افزایش می‌یابد\n"
+        
+        keyboard = get_confirm_keyboard("hapo_rank_up_yes", "hapo_rank_up_no")
+        await query.edit_message_text(msg, reply_markup=keyboard)
         return
     
-    if data == "transfer_cancel":
-        await query.edit_message_text("❌ انتقال لغو شد.")
-        context.user_data["transfer_amount"] = None
-        context.user_data["transfer_target"] = None
-        context.user_data["transfer_target_name"] = None
-        context.user_data["waiting_for_transfer_amount"] = False
-        if user_id in TRANSFER_STATE:
-            del TRANSFER_STATE[user_id]
+    if data == "hapo_rank_up_yes":
+        result = game.confirm_rank_up()
+        if result["success"]:
+            await query.edit_message_text(
+                f"✅ مقام هاپو به {result['new_rank_name']} ارتقا یافت!\n\n"
+                f"🌟 سطح هاپو به 1 ریست شد\n"
+                f"💰 تولیدی هاپو صفر شد\n"
+                f"📦 ظرفیت هاپو افزایش یافت"
+            )
+            await asyncio.sleep(2)
+            await edit_to_hapo_menu(query, game)
+        else:
+            await query.edit_message_text(f"❌ {result['reason']}")
+        return
+    
+    if data == "hapo_rank_up_no":
+        await query.edit_message_text("❌ ارتقا مقام لغو شد.")
+        await asyncio.sleep(1)
+        await edit_to_hapo_menu(query, game)
         return
     
     # ======== هاپو ========
@@ -1932,22 +1967,6 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         game.data["hapo_food"] = min(game.get_hapo_max_food(), int(game.data["hapo_food"] + 2))
         game.save_data()
         await query.edit_message_text(f"✅ سطح هاپو به {game.data['hapo_level']} ارتقا یافت")
-        await asyncio.sleep(2)
-        await edit_to_hapo_menu(query, game)
-        return
-    
-    if data == "hapo_rank_up":
-        price = game.get_hapo_upgrade_price()
-        if game.data["hop_point"] < price:
-            await query.edit_message_text(f"❌ به {price:,} هاپو پوینت نیاز داری")
-            return
-        game.data["hop_point"] -= price
-        game.data["hapo_rank"] += 1
-        game.data["hapo_level"] = 1
-        game.data["hapo_food"] = game.get_hapo_max_food()
-        game.data["hapo_harvest"] = 0
-        game.save_data()
-        await query.edit_message_text(f"✅ مقام هاپو به {RANK_NAMES[game.data['hapo_rank']]} ارتقا یافت")
         await asyncio.sleep(2)
         await edit_to_hapo_menu(query, game)
         return
@@ -2002,7 +2021,9 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             error_msg = result["reason"]
             animal = game.data.get("current_hunt_animal")
-            if animal and error_msg == "هاپو سیر است":
+            if animal and "فرار کرد" in error_msg:
+                await query.edit_message_text(f"❌ {error_msg}")
+            elif animal and error_msg == "هاپو سیر است":
                 await query.edit_message_text(
                     f"❌ هاپو سیر است!\n"
                     f"می‌تونی حیوان رو بفروشی یا بعداً به هاپو بدی.\n\n"
@@ -2046,9 +2067,49 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         context.user_data["waiting_for_withdraw"] = True
         return
+    
+    # ======== انتقال ========
+    if data == "transfer_confirm":
+        amount = context.user_data.get("transfer_amount")
+        target_id = context.user_data.get("transfer_target")
+        target_name = context.user_data.get("transfer_target_name")
+        
+        if not amount or not target_id:
+            await query.edit_message_text("❌ خطا در انتقال. لطفاً دوباره تلاش کن.")
+            return
+        
+        result = game.transfer_points(target_id, amount)
+        if result["success"]:
+            await query.edit_message_text(
+                f"✅ انتقال موفقیت‌آمیز بود!\n\n"
+                f"💰 {amount:,} هاپو پوینت به {target_name} انتقال یافت."
+            )
+            try:
+                await context.bot.send_message(
+                    target_id,
+                    f"💰 {game.data['player_name']} مبلغ {amount:,} هاپو پوینت به شما انتقال داد!"
+                )
+            except:
+                pass
+        else:
+            await query.edit_message_text(f"❌ {result['reason']}")
+        
+        context.user_data["transfer_amount"] = None
+        context.user_data["transfer_target"] = None
+        context.user_data["transfer_target_name"] = None
+        return
+    
+    if data == "transfer_cancel":
+        await query.edit_message_text("❌ انتقال لغو شد.")
+        context.user_data["transfer_amount"] = None
+        context.user_data["transfer_target"] = None
+        context.user_data["transfer_target_name"] = None
+        context.user_data["waiting_for_transfer_amount"] = False
+        if user_id in TRANSFER_STATE:
+            del TRANSFER_STATE[user_id]
+        return
 
 async def my_profile_from_callback(query, game):
-    """نمایش پروفایل از داخل کالبک"""
     user_id = int(game.user_id)
     full_name = game.data["player_name"]
     
@@ -2082,7 +2143,6 @@ async def my_profile_from_callback(query, game):
     else:
         keyboard.append([InlineKeyboardButton("🔒 قفل کردن پروفایل", callback_data="profile_lock_confirm")])
     
-    # نمایش عکس پروفایل
     try:
         user_photos = await query.message.bot.get_user_profile_photos(user_id, limit=1)
         if user_photos.total_count > 0 and not is_hidden:
@@ -2123,18 +2183,15 @@ async def group_welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
 def main():
     app = Application.builder().token(TOKEN).build()
     
-    # دستورات انگلیسی (با اسلش)
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("help", help_command))
     
-    # دستورات ادمین (با اسلش)
     app.add_handler(CommandHandler("setlevel", set_user_level))
     app.add_handler(CommandHandler("addlevel", add_user_level))
     app.add_handler(CommandHandler("setpoint", set_user_point))
     app.add_handler(CommandHandler("addpoint", add_user_point))
     app.add_handler(CommandHandler("userinfo", get_user_info))
     
-    # هندلر اصلی برای همه پیام‌ها (شامل دستورات فارسی)
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     app.add_handler(CallbackQueryHandler(handle_callback))
     app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, group_welcome))
@@ -2144,6 +2201,7 @@ def main():
     print(f"💰 حداقل انتقال: {TRANSFER_MIN_AMOUNT}")
     print(f"💰 حداکثر انتقال: {TRANSFER_MAX_AMOUNT:,}")
     print(f"⏳ کولداون انتقال: {TRANSFER_COOLDOWN} ثانیه")
+    print(f"⏳ تایمر تصمیم‌گیری شکار: {HUNT_DECISION_TIMER} ثانیه")
     app.run_polling(allowed_updates=Update.ALL_TYPES)
 
 if __name__ == "__main__":
