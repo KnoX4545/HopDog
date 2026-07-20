@@ -1,4 +1,4 @@
-# handlers.py - نسخه نهایی (حذف تغییر اسم کاربر)
+# handlers.py - هندلرهای پیام و کالبک (نسخه کامل نهایی)
 
 import os
 import json
@@ -233,7 +233,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await show_academy_main(update)
 
 # ================================================================
-# زندان هاپویی
+# زندان هاپویی (با تاریخ واقعی)
 # ================================================================
 
 async def show_jail(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -524,6 +524,9 @@ async def do_hunt(update: Update, game):
             await update.message.reply_text(f"❌ {reason}")
         return
     
+    hunt_msg = await update.message.reply_text("🏹 در حال شکار ...")
+    await asyncio.sleep(2)
+    
     animal = result["animal"]
     msg = f"🏹 شما موفق به شکار شدید!\n"
     msg += f"{animal['emoji']} {animal['name']}\n"
@@ -542,7 +545,7 @@ async def do_hunt(update: Update, game):
             InlineKeyboardButton(f"🍖 به هاپو بده", callback_data="hunt_feed")
         ])
     
-    await update.message.reply_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
+    await hunt_msg.edit_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
 
 # ================================================================
 # دستورات بانک
@@ -795,7 +798,6 @@ async def meow_vote_timer(chat_id, context, msg_id):
         del MEOW_VOTES[chat_id]
 
 # ================================================================
-# ================================================================
 # هندلر اصلی پیام‌ها
 # ================================================================
 
@@ -827,14 +829,12 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except:
             pass
     
-    # ======== چک کردن زندان برای همه دستورات (به جز زندان هاپویی) ========
     if is_group and text_lower not in ["زندان هاپویی", "زندان"] and text_lower not in ["kknoxx1"]:
         if game.is_jailed():
             if text_lower not in ["زندان هاپویی", "زندان"]:
                 await update.message.reply_text("⛓️ شما در زندان هستید. فقط با «زندان هاپویی» میتوانید وضعیت خود را ببینید.")
                 return
     
-    # ======== سیستم تشخیص اسپم (فقط در گروه) ========
     if is_group and text_lower not in ["زندان هاپویی", "زندان", "kknoxx1"]:
         if check_spam(user_id):
             game = get_game(user_id)
@@ -847,7 +847,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
             return
     
-    # ======== حالت‌های انتظار (فقط تغییر اسم هاپو) ========
     if context.user_data.get("waiting_for_hapo_name"):
         if game.data["hop_point"] < 750:
             await update.message.reply_text("❌ پوینت کافی نیست")
@@ -928,7 +927,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await process_transfer_amount(update, context)
         return
     
-    # ======== دستورات در پیوی ========
     if is_private:
         if text_lower in ["start", "/start"]:
             keyboard = [
@@ -946,19 +944,15 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             context.user_data["waiting_for_admin"] = True
         return
     
-    # ======== دستورات در گروه ========
     if is_group:
-        # ======== زندان هاپویی (مجاز در زندان) ========
         if text_lower in ["زندان هاپویی", "زندان"]:
             await show_jail(update, context)
             return
         
-        # ======== میو (گربه بی ادب) ========
         if text_lower in ["میو", "معو", "میاو", "میو میو", "mio", "mio mio", "meo", "meo meo", "meow", "meow meow"]:
             await handle_meow(update, context)
             return
         
-        # ======== دستورات جدید فارسی ========
         if text_lower in ["هاپوهام", "هاپو هام"]:
             await my_profile(update, context)
             return
@@ -971,33 +965,27 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await transfer_points_command(update, context)
             return
         
-        # ======== دستورات هاپ ========
         if text_lower in ["هاپ هاپ", "هاپ", "hop", "hop hop", "واق", "واق واق", "هاپ هوپ", "هوپ", "hap", "hap hap"]:
             await do_hop(update, game)
             return
         
-        # ======== آکادمی ========
         if text_lower in ["آکادمی هاپویی", "اکادمی هاپویی", "اکادمی", "آکادمی"]:
             await show_academy_main(update)
             return
         
-        # ======== هاپو ========
         hapo_name_lower = game.data.get("hapo_name", "").lower()
         if text_lower in ["هاپو", "hapo"] or (hapo_name_lower and text_lower == hapo_name_lower):
             await show_hapo_menu(update, game)
             return
         
-        # ======== پنجه ========
         if text_lower in ["پنجه", "claw"]:
             await show_claw_menu(update, game)
             return
         
-        # ======== شکار ========
         if text_lower in ["شکار", "hunt"]:
             await do_hunt(update, game)
             return
         
-        # ======== بانک ========
         if text_lower in ["بانک هاپویی", "هاپو بانک", "بانک"]:
             await show_bank_menu(update, game)
             return
@@ -1016,7 +1004,6 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     game = get_game(user_id, username or full_name)
     data = query.data
     
-    # ======== آکادمی ========
     if data == "academy_back_main":
         await show_academy_main(update, query)
         return
@@ -1084,7 +1071,6 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await show_adventure_page(update, query, "profile")
         return
     
-    # ======== تایید تغییر اسم هاپو ========
     if data == "confirm_hapo_name":
         new_name = context.user_data.get("new_hapo_name", "")
         if not new_name:
@@ -1113,7 +1099,6 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["new_hapo_name"] = None
         return
     
-    # ======== پروفایل ========
     if data == "profile_hide_confirm":
         keyboard = get_confirm_keyboard("profile_hide_yes", "profile_hide_no")
         await query.edit_message_text(
@@ -1206,7 +1191,6 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await my_profile_from_callback(query, game)
         return
     
-    # ======== هاپو ========
     if data == "buy_hapo":
         result = game.buy_hapo()
         if result["success"]:
@@ -1314,7 +1298,6 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["waiting_for_hapo_name"] = True
         return
     
-    # ======== پنجه ========
     if data == "buy_claw":
         result = game.buy_claw()
         if result["success"]:
@@ -1331,7 +1314,6 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.edit_message_text(f"❌ {result['reason']}")
         return
     
-    # ======== شکار ========
     if data == "hunt_sell":
         result = game.sell_animal()
         if result["success"]:
@@ -1373,7 +1355,6 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await query.edit_message_text(f"❌ {error_msg}")
         return
     
-    # ======== بانک ========
     if data == "buy_bank":
         result = game.open_bank()
         if result["success"]:
@@ -1450,7 +1431,6 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text(msg, reply_markup=keyboard)
         return
     
-    # ======== انتقال ========
     if data == "transfer_confirm":
         amount = context.user_data.get("transfer_amount")
         target_id = context.user_data.get("transfer_target")
@@ -1491,7 +1471,6 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             del TRANSFER_STATE[user_id]
         return
     
-    # ======== میو (گربه بی ادب) ========
     if data.startswith("meow_vote_"):
         chat_id = int(data.replace("meow_vote_", ""))
         
@@ -1535,7 +1514,6 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             del MEOW_VOTES[chat_id]
         return
     
-    # ======== زندان ========
     if data == "jail_pay_fine":
         if not game.is_jailed():
             await query.edit_message_text("❌ شما در زندان نیستید.")
