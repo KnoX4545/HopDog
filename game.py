@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 from config import *
 from database import get_user_data, save_user_data, get_user_by_card, is_card_unique
 
+
 class HopDogGame:
     def __init__(self, user_id, username=""):
         self.user_id = str(user_id)
@@ -805,6 +806,10 @@ class StreetHapo:
         status = get_street_hapo_status()
         self.active = status.get("active", False)
         self.data = status.get("data", {})
+        
+        # اطمینان از وجود فیلد failed_attempts
+        if "failed_attempts" not in self.data:
+            self.data["failed_attempts"] = []
     
     def save_status(self):
         """ذخیره وضعیت در دیتابیس"""
@@ -881,12 +886,18 @@ class StreetHapo:
         
         # افزایش تعداد تلاش‌ها
         self.data["attempts"] = attempts + 1
+        
+        # ذخیره اطلاعات تلاش
+        if "failed_attempts" not in self.data:
+            self.data["failed_attempts"] = []
+        
         self.data["failed_attempts"].append({
             "user_id": user_id,
             "user_name": user_name,
             "attempt": attempts + 1,
             "cost": cost,
-            "time": datetime.now().timestamp()
+            "time": datetime.now().timestamp(),
+            "success": False
         })
         
         # بررسی شانس موفقیت
@@ -898,6 +909,10 @@ class StreetHapo:
             self.data["rescued_by_name"] = user_name
             self.data["reward"] = reward
             self.data["status"] = "rescued"
+            
+            # به‌روزرسانی آخرین تلاش به موفقیت
+            if self.data["failed_attempts"]:
+                self.data["failed_attempts"][-1]["success"] = True
             
             # اضافه کردن جایزه به کاربر
             game.data["hop_point"] += reward
@@ -937,7 +952,7 @@ class StreetHapo:
                 "success": False,
                 "rescued": False,
                 "died": False,
-                "message": f"❌ {fail_msg}",
+                "message": fail_msg,
                 "attempt": attempts + 1,
                 "cost": cost,
                 "remaining_attempts": STREET_HAPO_MAX_ATTEMPTS - (attempts + 1)
