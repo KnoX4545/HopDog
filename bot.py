@@ -1,7 +1,7 @@
 # bot.py - فایل اصلی (ورودی برنامه)
 
 import logging
-from telegram import Update  # ✅ این خط رو اضافه کن
+from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, filters
 from config import TOKEN
 from handlers import (
@@ -31,6 +31,7 @@ def main():
     app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, group_welcome))
     
     print("🤖 بات HopDog با Supabase اجرا شد!")
+    print("⛓️ سیستم زندان هاپویی فعال است!")
     app.run_polling(allowed_updates=Update.ALL_TYPES)
 
 if __name__ == "__main__":
