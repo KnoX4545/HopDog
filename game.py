@@ -788,7 +788,7 @@ class HopDogGame:
 
 
 # ================================================================
-# کلاس هاپوی خیابونی (نسخه نهایی درست)
+# کلاس هاپوی خیابونی (نسخه نهایی با اصلاحات)
 # ================================================================
 
 class StreetHapo:
@@ -865,7 +865,7 @@ class StreetHapo:
         return max(0, int(remaining))
     
     def attempt_rescue(self, user_id, user_name, game):
-        """تلاش برای نجات هاپوی خیابونی - نسخه نهایی درست"""
+        """تلاش برای نجات هاپوی خیابونی - نسخه نهایی با اصلاحات"""
         if not self.active:
             return {"success": False, "reason": "هیچ هاپوی خیابونی در دسترس نیست!"}
         
@@ -923,7 +923,13 @@ class StreetHapo:
                 self.data["failed_attempts"][-1]["success"] = True
             
             game.data["hop_point"] += reward
-            game.data["street_hapo_rescued"] = game.data.get("street_hapo_rescued", 0) + 1
+            
+            # ✅ اصلاح: تبدیل به عدد قبل از جمع
+            current_rescued = game.data.get("street_hapo_rescued", 0)
+            if isinstance(current_rescued, str):
+                current_rescued = int(current_rescued) if current_rescued.isdigit() else 0
+            game.data["street_hapo_rescued"] = current_rescued + 1
+            
             game.save_data()
             
             self.save_status()
