@@ -1,4 +1,4 @@
-# handlers.py - هندلرهای پیام و کالبک (نسخه کامل با هاپوی خیابونی)
+# handlers.py - هندلرهای پیام و کالبک (نسخه نهایی کامل با هاپوی خیابونی)
 
 import os
 import json
@@ -293,11 +293,11 @@ async def show_jail(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
 
 # ================================================================
-# پروفایل - (هاپوهام بدون عکس)
+# پروفایل - (هاپوهام با هاپوی خیابونی)
 # ================================================================
 
 async def my_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """پروفایل خود کاربر - فقط متن، بدون عکس"""
+    """پروفایل خود کاربر - فقط متن، بدون عکس - با هاپوی خیابونی"""
     user_id = update.effective_user.id
     username = update.effective_user.username
     full_name = update.effective_user.full_name or f"کاربر{user_id}"
@@ -322,10 +322,18 @@ async def my_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg += f"┐─ 💰 هاپ پوینت ها : {format_number(game.data['hop_point'])} 🪙\n"
     msg += f"┐─ 🐾 هاپ هاپ ها : {game.data['hop_count']}\n"
     
+    # ======== هاپوی خیابونی ========
     if street_rescued > 0:
         msg += f"┐─ 🐶 هاپوی خیابونی نجات داده: {street_rescued}\n"
+    else:
+        msg += f"┐─ 🐶 هاپوی خیابونی نجات داده: 0\n"
     
-    msg += "\n"
+    # ======== هاپو ========
+    if game.data.get("hapo_owned", False):
+        msg += f"┐─ 🐕 هاپو: {game.data['hapo_name']}\n"
+        msg += f"┘─ 🌟 مقام: {RANK_NAMES[game.data['hapo_rank']]} | ⭐ سطح: {game.data['hapo_level']}/5\n\n"
+    else:
+        msg += "\n"
     
     if game.data["level"] < 20:
         msg += f"╯─ ⭐️ سطح : {game.data['level']} | {game.data['hop_count']} / {required}"
@@ -346,7 +354,7 @@ async def my_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
 
 async def show_user_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """پروفایل دیگران - با عکس (اگر مخفی نباشه)"""
+    """پروفایل دیگران - با عکس و هاپوی خیابونی"""
     user_id = update.effective_user.id
     
     if not update.message.reply_to_message:
@@ -382,10 +390,18 @@ async def show_user_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg += f"┐─ 💰 هاپ پوینت ها : {format_number(target_data['hop_point'])} 🪙\n"
     msg += f"┐─ 🐾 هاپ هاپ ها : {target_data['hop_count']}\n"
     
+    # ======== هاپوی خیابونی ========
     if street_rescued > 0:
         msg += f"┐─ 🐶 هاپوی خیابونی نجات داده: {street_rescued}\n"
+    else:
+        msg += f"┐─ 🐶 هاپوی خیابونی نجات داده: 0\n"
     
-    msg += "\n"
+    # ======== هاپو ========
+    if target_data.get("hapo_owned", False):
+        msg += f"┐─ 🐕 هاپو: {target_data['hapo_name']}\n"
+        msg += f"┘─ 🌟 مقام: {RANK_NAMES[target_data['hapo_rank']]} | ⭐ سطح: {target_data['hapo_level']}/5\n\n"
+    else:
+        msg += "\n"
     
     if target_data["level"] < 20:
         msg += f"╯─ ⭐️ سطح : {target_data['level']} | {target_data['hop_count']} / {required}"
@@ -1764,7 +1780,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
 # ================================================================
-# پروفایل از کالبک - فقط متن (بدون عکس)
+# پروفایل از کالبک - فقط متن (بدون عکس) - با هاپوی خیابونی
 # ================================================================
 
 async def my_profile_from_callback(query, game):
@@ -1786,10 +1802,18 @@ async def my_profile_from_callback(query, game):
     msg += f"┐─ 💰 هاپ پوینت ها : {format_number(game.data['hop_point'])} 🪙\n"
     msg += f"┐─ 🐾 هاپ هاپ ها : {game.data['hop_count']}\n"
     
+    # ======== هاپوی خیابونی ========
     if street_rescued > 0:
         msg += f"┐─ 🐶 هاپوی خیابونی نجات داده: {street_rescued}\n"
+    else:
+        msg += f"┐─ 🐶 هاپوی خیابونی نجات داده: 0\n"
     
-    msg += "\n"
+    # ======== هاپو ========
+    if game.data.get("hapo_owned", False):
+        msg += f"┐─ 🐕 هاپو: {game.data['hapo_name']}\n"
+        msg += f"┘─ 🌟 مقام: {RANK_NAMES[game.data['hapo_rank']]} | ⭐ سطح: {game.data['hapo_level']}/5\n\n"
+    else:
+        msg += "\n"
     
     if game.data["level"] < 20:
         msg += f"╯─ ⭐️ سطح : {game.data['level']} | {game.data['hop_count']} / {required}"
@@ -1866,6 +1890,8 @@ async def get_user_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
     street_rescued = user_data.get('street_hapo_rescued', 0)
     if street_rescued > 0:
         msg += f"\n🐶 هاپوی خیابونی نجات داده: {street_rescued}"
+    else:
+        msg += f"\n🐶 هاپوی خیابونی نجات داده: 0"
     
     msg += f"\n\n📅 آخرین بروزرسانی: {user_data.get('last_updated', 'نامشخص')}"
     
