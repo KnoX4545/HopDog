@@ -1,4 +1,4 @@
-# handlers.py - هندلرهای پیام و کالبک (نسخه اصلاح شده - حذف عکس از هاپوهام)
+# handlers.py - هندلرهای پیام و کالبک (نسخه کامل اصلاح شده)
 
 import os
 import json
@@ -15,7 +15,7 @@ from config import (
     BANK_PURCHASE_COST, JAIL_MAX_SPAM_COMMANDS, JAIL_SPAM_WINDOW,
     JAIL_DURATION_SPAM, JAIL_FINE_SPAM, JAIL_REASON_SPAM,
     JAIL_DURATION_MEOW, JAIL_FINE_MEOW, JAIL_REASON_MEOW,
-    JAIL_VOTE_DURATION, JAIL_VOTE_NEEDED
+    JAIL_VOTE_DURATION, JAIL_VOTE_NEEDED, HUNT_DECISION_TIMER
 )
 from game import HopDogGame
 from database import get_user_by_identifier, get_user_by_card
@@ -557,6 +557,7 @@ async def show_bank_menu(update: Update, game):
         )
         return
     
+    # اعمال سود بانکی
     game.apply_bank_interest()
     msg = get_bank_menu_text(game, False)
     keyboard = get_bank_keyboard(False)
@@ -1176,7 +1177,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["new_hapo_name"] = None
         return
     
-    # ======== پروفایل - ساده (بدون عکس) ========
+    # ======== پروفایل ========
     if data == "profile_hide":
         game.data["profile_hidden"] = True
         game.save_data()
@@ -1205,7 +1206,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await my_profile_from_callback(query, game)
         return
     
-    # ======== بقیه کالبک‌ها ========
+    # ======== هاپو ========
     if data == "buy_hapo":
         result = game.buy_hapo()
         if result["success"]:
@@ -1313,6 +1314,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["waiting_for_hapo_name"] = True
         return
     
+    # ======== پنجه و شکار ========
     if data == "buy_claw":
         result = game.buy_claw()
         if result["success"]:
@@ -1342,34 +1344,53 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     if data == "hunt_feed":
         result = game.feed_hapo()
+        
         if result["success"]:
             await query.edit_message_text(
                 f"🍖 {result['fed']} غذا به هاپو داده شد\n"
                 f"✅ هاپو سیر شد!"
             )
-        else:
-            error_msg = result["reason"]
-            animal = game.data.get("current_hunt_animal")
-            if animal and "فرار کرد" in error_msg:
-                await query.edit_message_text(f"❌ {error_msg}")
-            elif animal and error_msg == "هاپو سیر است":
-                await query.edit_message_text(
-                    f"❌ هاپو سیر است!\n"
-                    f"می‌تونی حیوان رو بفروشی یا بعداً به هاپو بدی.\n\n"
-                    f"{animal['emoji']} {animal['name']}\n"
-                    f"💰 ارزش: {format_number(animal['value'])} هاپو پوینت"
-                )
-                keyboard = [
-                    [InlineKeyboardButton(f"💰 فروش ({format_number(animal['value'])})", callback_data="hunt_sell")]
-                ]
-                await query.message.reply_text(
-                    "برای فروش کلیک کن:",
-                    reply_markup=InlineKeyboardMarkup(keyboard)
-                )
-            else:
-                await query.edit_message_text(f"❌ {error_msg}")
+            return
+        
+        error_msg = result["reason"]
+        animal = game.data.get("current_hunt_animal")
+        
+        # اگر هاپو سیر است
+        if error_msg == "هاپو سیر است" and animal:
+            # چک کن که حیوان فرار نکرده باشه
+            if game.data.get("hunt_time", 0) > 0:
+                now = datetime.now().timestamp()
+                if (now - game.data["hunt_time"]) > HUNT_DECISION_TIMER:
+                    game.data["current_hunt_animal"] = None
+                    game.data["hunt_time"] = 0
+                    game.save_data()
+                    await query.edit_message_text("🦌 حیوان فرار کرد! وقتت تموم شد.")
+                    return
+            
+            # پیام مناسب با گزینه فروش
+            await query.edit_message_text(
+                f"❌ هاپو سیر است!\n"
+                f"می‌تونی حیوان رو بفروشی.\n\n"
+                f"{animal['emoji']} {animal['name']}\n"
+                f"⭐ سطح : {animal['rarity_name']}\n"
+                f"⚖️ وزن : {animal['weight']} کیلو\n"
+                f"💰 ارزش فروش : {format_number(animal['value'])} 🪙"
+            )
+            
+            keyboard = [
+                [InlineKeyboardButton(f"💰 فروش ({format_number(animal['value'])})", callback_data="hunt_sell")]
+            ]
+            await query.message.reply_text(
+                "برای فروش کلیک کن:",
+                reply_markup=InlineKeyboardMarkup(keyboard)
+            )
+            return
+        
+        # سایر خطاها
+        await query.edit_message_text(f"❌ {error_msg}")
         return
     
+    # ======== بانک ========
     if data == "buy_bank":
         result = game.open_bank()
         if result["success"]:
@@ -1446,6 +1467,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text(msg, reply_markup=keyboard)
         return
     
+    # ======== انتقال ========
     if data == "transfer_confirm":
         amount = context.user_data.get("transfer_amount")
         target_id = context.user_data.get("transfer_target")
@@ -1486,6 +1508,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             del TRANSFER_STATE[user_id]
         return
     
+    # ======== میو و زندان ========
     if data.startswith("meow_vote_"):
         vote_key = data.replace("meow_vote_", "")
         
