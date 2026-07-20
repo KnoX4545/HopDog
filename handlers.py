@@ -1109,7 +1109,7 @@ async def admin_street_hapo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if len(parts) < 2:
         await update.message.reply_text(
             "❌ فرمت: `/hapo [chat_id]`\n"
-            "مثال: `/hapo 123456789`\n\n"
+            "مثال: `/hapo -1003708381360`\n\n"
             "💡 برای دریافت chat_id گروه:\n"
             "1. ربات رو به گروه اضافه کن\n"
             "2. توی گروه یه پیام بفرست\n"
@@ -1118,8 +1118,12 @@ async def admin_street_hapo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
     
-    chat_id = parts[1]
-    if not chat_id.isdigit():
+    chat_id_str = parts[1]
+    
+    # ✅ اصلاح: تبدیل به عدد با try/except (پشتیبانی از اعداد منفی)
+    try:
+        chat_id = int(chat_id_str)
+    except ValueError:
         await update.message.reply_text("❌ chat_id باید عددی باشد!")
         return
     
@@ -1129,7 +1133,7 @@ async def admin_street_hapo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("⏳ هم اکنون یک هاپوی خیابونی در حال نجات است!")
         return
     
-    success, msg = street_hapo.start_event(int(chat_id))
+    success, msg = street_hapo.start_event(chat_id)
     if not success:
         await update.message.reply_text(f"❌ {msg}")
         return
@@ -1153,13 +1157,41 @@ async def admin_street_hapo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         asyncio.create_task(street_hapo_timer(street_hapo, context))
         
-        await update.message.reply_text(f"✅ هاپوی خیابونی به گروه با chat_id `{chat_id}` ارسال شد!")
+        await update.message.reply_text(f"✅ هاپوی خیابونی به گروه با chat_id `{chat_id_str}` ارسال شد!")
         
     except Exception as e:
         logging.error(f"Error sending admin street hapo: {e}")
         street_hapo.active = False
         street_hapo.save_status()
         await update.message.reply_text(f"❌ خطا در ارسال: {e}")
+
+
+# ================================================================
+# دستور لیست گروه‌ها (فقط ادمین)
+# ================================================================
+
+async def list_groups(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """لیست همه گروه‌های ثبت شده (فقط ادمین)"""
+    user_id = update.effective_user.id
+    game = get_game(user_id)
+    
+    if not game.data.get("is_admin", False):
+        await update.message.reply_text("❌ فقط ادمین میتونه از این دستور استفاده کنه!")
+        return
+    
+    chat_ids = get_all_groups()
+    
+    if not chat_ids:
+        await update.message.reply_text("❌ هیچ گروهی در دیتابیس ثبت نشده!")
+        return
+    
+    msg = "📋 لیست گروه‌های ثبت شده:\n\n"
+    for chat_id in chat_ids:
+        msg += f"`{chat_id}`\n"
+    
+    msg += f"\n✅ تعداد: {len(chat_ids)} گروه"
+    
+    await update.message.reply_text(msg, parse_mode="Markdown")
 
 
 # ================================================================
@@ -1293,7 +1325,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "setpoint [شناسه] [عدد] - تنظیم پوینت\n"
                 "addpoint [شناسه] [عدد] - اضافه کردن پوینت\n"
                 "jail [شناسه] [مدت دقیقه] [دلیل] - زندانی کردن کاربر\n"
-                "/hapo [chat_id] - ارسال هاپوی خیابونی به گروه خاص"
+                "/hapo [chat_id] - ارسال هاپوی خیابونی به گروه خاص\n"
+                "/groups - لیست گروه‌های ثبت شده"
             )
         else:
             await update.message.reply_text("❌ رمز اشتباه است")
