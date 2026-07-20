@@ -1,4 +1,4 @@
-# handlers.py - هندلرهای پیام و کالبک (نسخه نهایی کامل با هاپوی خیابونی)
+# handlers.py - هندلرهای پیام و کالبک (نسخه نهایی کامل با هاپوی خیابونی و عکس پنجه)
 
 import os
 import json
@@ -19,10 +19,10 @@ from config import (
     JAIL_VOTE_DURATION, JAIL_VOTE_NEEDED, HUNT_DECISION_TIMER,
     STREET_HAPO_DECISION_TIME, STREET_HAPO_COSTS, STREET_HAPO_SUCCESS_CHANCE,
     STREET_HAPO_IMAGE_URL, STREET_HAPO_REWARD_MIN, STREET_HAPO_REWARD_MAX,
-    STREET_HAPO_FAIL_MESSAGES
+    STREET_HAPO_FAIL_MESSAGES, CLAW_IMAGES
 )
 from game import HopDogGame, StreetHapo
-from database import get_user_by_identifier, get_user_by_card
+from database import get_user_by_identifier, get_user_by_card, get_all_groups, add_group, remove_group
 from bank import (
     get_bank_menu_text, get_bank_keyboard, get_change_card_confirm_text,
     get_card_to_card_text, format_number
@@ -151,7 +151,6 @@ def check_spam(user_id):
         return True
     
     return False
-
 # ================================================================
 # هندلر گروه
 # ================================================================
@@ -162,6 +161,11 @@ async def group_welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if member.id == context.bot.id:
                 try:
                     chat_id = update.message.chat.id
+                    chat_title = update.message.chat.title or "گروه بدون نام"
+                    
+                    # ذخیره گروه در دیتابیس
+                    add_group(chat_id, chat_title)
+                    
                     members_count = await context.bot.get_chat_member_count(chat_id)
                     
                     if members_count < MIN_MEMBERS_TO_STAY:
@@ -170,6 +174,7 @@ async def group_welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
                             f"🔺 برای فعال کردن من باید حداقل {MIN_MEMBERS_TO_STAY} عضو داشته باشید.\n\n"
                             f"📊 تعداد اعضای فعلی: {members_count} نفر"
                         )
+                        remove_group(chat_id)
                         await context.bot.leave_chat(chat_id)
                     else:
                         await update.message.reply_text(
@@ -322,13 +327,13 @@ async def my_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg += f"┐─ 💰 هاپ پوینت ها : {format_number(game.data['hop_point'])} 🪙\n"
     msg += f"┐─ 🐾 هاپ هاپ ها : {game.data['hop_count']}\n"
     
-    # ======== هاپوی خیابونی ========
+    # هاپوی خیابونی
     if street_rescued > 0:
         msg += f"┐─ 🐶 هاپوی خیابونی نجات داده: {street_rescued}\n"
     else:
         msg += f"┐─ 🐶 هاپوی خیابونی نجات داده: 0\n"
     
-    # ======== هاپو ========
+    # هاپو
     if game.data.get("hapo_owned", False):
         msg += f"┐─ 🐕 هاپو: {game.data['hapo_name']}\n"
         msg += f"┘─ 🌟 مقام: {RANK_NAMES[game.data['hapo_rank']]} | ⭐ سطح: {game.data['hapo_level']}/5\n\n"
@@ -390,13 +395,13 @@ async def show_user_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg += f"┐─ 💰 هاپ پوینت ها : {format_number(target_data['hop_point'])} 🪙\n"
     msg += f"┐─ 🐾 هاپ هاپ ها : {target_data['hop_count']}\n"
     
-    # ======== هاپوی خیابونی ========
+    # هاپوی خیابونی
     if street_rescued > 0:
         msg += f"┐─ 🐶 هاپوی خیابونی نجات داده: {street_rescued}\n"
     else:
         msg += f"┐─ 🐶 هاپوی خیابونی نجات داده: 0\n"
     
-    # ======== هاپو ========
+    # هاپو
     if target_data.get("hapo_owned", False):
         msg += f"┐─ 🐕 هاپو: {target_data['hapo_name']}\n"
         msg += f"┘─ 🌟 مقام: {RANK_NAMES[target_data['hapo_rank']]} | ⭐ سطح: {target_data['hapo_level']}/5\n\n"
@@ -421,9 +426,8 @@ async def show_user_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
         pass
     
     await update.message.reply_text(msg)
-
 # ================================================================
-# دستورات هاپ، هاپو، پنجه، شکار
+# دستورات هاپ، هاپو، پنجه (با عکس)، شکار
 # ================================================================
 
 async def do_hop(update: Update, game):
@@ -477,6 +481,7 @@ async def show_hapo_menu(update: Update, game):
     await update.message.reply_text(msg, reply_markup=keyboard)
 
 async def show_claw_menu(update: Update, game):
+    """نمایش پنجه با عکس"""
     if game.is_jailed():
         await update.message.reply_text("⛓️ شما در زندان هستید و نمی‌توانید این کار را انجام دهید.")
         return
@@ -490,15 +495,22 @@ async def show_claw_menu(update: Update, game):
         keyboard = [
             [InlineKeyboardButton(f"🛒 خرید پنجه ({format_number(cost)})", callback_data="buy_claw")]
         ]
-        await update.message.reply_text(
-            f"🦞 شما پنجه ندارید\n"
-            f"💰 هزینه خرید: {format_number(cost)} هاپو پوینت\n"
-            f"⏳ زمان استراحت: 60:00\n"
-            f"🍀 شانس شکار:\n"
-            f"  ⚪ معمولی: 95%\n"
-            f"  🔵 کمیاب: 5%",
-            reply_markup=InlineKeyboardMarkup(keyboard)
-        )
+        
+        msg = f"🦞 شما پنجه ندارید\n\n"
+        msg += f"💰 هزینه خرید: {format_number(cost)} هاپو پوینت\n"
+        msg += f"⏳ زمان استراحت: 60:00\n"
+        msg += f"🍀 شانس شکار:\n"
+        msg += f"  ⚪ معمولی: 95%\n"
+        msg += f"  🔵 کمیاب: 5%"
+        
+        try:
+            await update.message.reply_photo(
+                photo=CLAW_IMAGES[1],
+                caption=msg,
+                reply_markup=InlineKeyboardMarkup(keyboard)
+            )
+        except:
+            await update.message.reply_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
         return
     
     claw_data = game.get_claw_data(game.data["claw_level"])
@@ -522,7 +534,15 @@ async def show_claw_menu(update: Update, game):
             InlineKeyboardButton(f"⬆️ سطح {next_level} ({format_number(next_data['cost'])})", callback_data="upgrade_claw")
         ])
     
-    await update.message.reply_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
+    current_level = game.data["claw_level"]
+    try:
+        await update.message.reply_photo(
+            photo=CLAW_IMAGES[current_level],
+            caption=msg,
+            reply_markup=InlineKeyboardMarkup(keyboard) if keyboard else None
+        )
+    except:
+        await update.message.reply_text(msg, reply_markup=InlineKeyboardMarkup(keyboard) if keyboard else None)
 
 async def do_hunt(update: Update, game):
     if game.is_jailed():
@@ -734,7 +754,6 @@ async def process_transfer_amount(update: Update, context: ContextTypes.DEFAULT_
     context.user_data["waiting_for_transfer_amount"] = False
     if user_id in TRANSFER_STATE:
         del TRANSFER_STATE[user_id]
-
 # ================================================================
 # سیستم میو
 # ================================================================
@@ -894,14 +913,11 @@ async def jail_user_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def send_street_hapo_notification(context: ContextTypes.DEFAULT_TYPE):
     """ارسال پیام هاپوی خیابونی به همه گروه‌ها (هر ۶ ساعت)"""
     try:
-        groups_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "groups.json")
-        if not os.path.exists(groups_file):
-            return
+        # دریافت لیست گروه‌ها از دیتابیس
+        chat_ids = get_all_groups()
         
-        with open(groups_file, "r", encoding="utf-8") as f:
-            groups_data = json.load(f)
-        
-        if not groups_data:
+        if not chat_ids:
+            logging.info("هیچ گروهی در دیتابیس ثبت نشده است!")
             return
         
         street_hapo = get_street_hapo()
@@ -909,7 +925,7 @@ async def send_street_hapo_notification(context: ContextTypes.DEFAULT_TYPE):
         if street_hapo.active:
             return
         
-        chat_ids = list(groups_data.keys())
+        # انتخاب یک گروه رندوم
         chat_id = random.choice(chat_ids)
         
         success, msg = street_hapo.start_event(int(chat_id))
@@ -1045,6 +1061,93 @@ async def handle_street_hapo_rescue(update: Update, context: ContextTypes.DEFAUL
         )
 
 # ================================================================
+# دستور ادمین - ارسال هاپوی خیابونی به گروه خاص
+# ================================================================
+
+async def admin_street_hapo(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """دستور ادمین برای ارسال هاپوی خیابونی به یک گروه خاص"""
+    user_id = update.effective_user.id
+    game = get_game(user_id)
+    
+    if not game.data.get("is_admin", False):
+        await update.message.reply_text("❌ فقط ادمین میتونه از این دستور استفاده کنه!")
+        return
+    
+    parts = update.message.text.split()
+    if len(parts) < 2:
+        await update.message.reply_text(
+            "❌ فرمت: `hapo [chat_id]`\n"
+            "مثال: `hapo 123456789`\n\n"
+            "برای دریافت chat_id گروه، ربات رو به گروه اضافه کن و پیام بفرست.",
+            parse_mode="Markdown"
+        )
+        return
+    
+    chat_id = parts[1]
+    if not chat_id.isdigit():
+        await update.message.reply_text("❌ chat_id باید عددی باشد!")
+        return
+    
+    street_hapo = get_street_hapo()
+    
+    if street_hapo.active:
+        await update.message.reply_text("⏳ هم اکنون یک هاپوی خیابونی در حال نجات است!")
+        return
+    
+    success, msg = street_hapo.start_event(int(chat_id))
+    if not success:
+        await update.message.reply_text(f"❌ {msg}")
+        return
+    
+    keyboard = [[InlineKeyboardButton("🐶 نجات هاپوی خیابونی", callback_data="street_hapo_rescue")]]
+    
+    try:
+        message = await context.bot.send_photo(
+            chat_id=chat_id,
+            photo=STREET_HAPO_IMAGE_URL,
+            caption=f"🐶 یک هاپوی خیابونی پیدا شده!\n\n"
+                   f"⏳ زمان برای نجات: {STREET_HAPO_DECISION_TIME} ثانیه\n"
+                   f"💰 هزینه تلاش اول: {STREET_HAPO_COSTS[0]} 🪙\n"
+                   f"🍀 شانس موفقیت: {int(STREET_HAPO_SUCCESS_CHANCE * 100)}%\n\n"
+                   f"برای نجاتش کلیک کن 👇",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+        
+        street_hapo.data["message_id"] = message.message_id
+        street_hapo.save_status()
+        
+        asyncio.create_task(street_hapo_timer(street_hapo, context))
+        
+        await update.message.reply_text(f"✅ هاپوی خیابونی به گروه با chat_id `{chat_id}` ارسال شد!")
+        
+    except Exception as e:
+        logging.error(f"Error sending admin street hapo: {e}")
+        street_hapo.active = False
+        street_hapo.save_status()
+        await update.message.reply_text(f"❌ خطا در ارسال: {e}")
+
+# ================================================================
+# دستور تست هاپوی خیابونی (فقط ادمین)
+# ================================================================
+
+async def test_street_hapo(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """دستور تست هاپوی خیابونی (فقط ادمین)"""
+    user_id = update.effective_user.id
+    game = get_game(user_id)
+    
+    if not game.data.get("is_admin", False):
+        await update.message.reply_text("❌ فقط ادمین میتونه تست کنه!")
+        return
+    
+    chat_ids = get_all_groups()
+    if not chat_ids:
+        await update.message.reply_text("❌ هیچ گروهی در دیتابیس ثبت نشده! ربات رو به یک گروه اضافه کن.")
+        return
+    
+    await update.message.reply_text("🔄 در حال ارسال هاپوی خیابونی...")
+    await send_street_hapo_notification(context)
+    await update.message.reply_text("✅ هاپوی خیابونی با موفقیت ارسال شد!")
+# ================================================================
 # هندلر اصلی پیام‌ها
 # ================================================================
 
@@ -1062,17 +1165,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         try:
             chat_id = update.message.chat.id
             chat_title = update.message.chat.title
-            groups_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "groups.json")
-            groups_data = {}
-            if os.path.exists(groups_file):
-                with open(groups_file, "r", encoding="utf-8") as f:
-                    groups_data = json.load(f)
-            groups_data[str(chat_id)] = {
-                "title": chat_title,
-                "added_at": datetime.now().isoformat()
-            }
-            with open(groups_file, "w", encoding="utf-8") as f:
-                json.dump(groups_data, f, ensure_ascii=False, indent=2)
+            # ذخیره گروه در دیتابیس (اگر نباشه)
+            from database import add_group
+            add_group(chat_id, chat_title)
         except:
             pass
     
@@ -1183,7 +1278,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "addlevel [شناسه] [عدد] - اضافه کردن سطح\n"
                 "setpoint [شناسه] [عدد] - تنظیم پوینت\n"
                 "addpoint [شناسه] [عدد] - اضافه کردن پوینت\n"
-                "jail [شناسه] [مدت دقیقه] [دلیل] - زندانی کردن کاربر"
+                "jail [شناسه] [مدت دقیقه] [دلیل] - زندانی کردن کاربر\n"
+                "hapo [chat_id] - ارسال هاپوی خیابونی به گروه خاص"
             )
         else:
             await update.message.reply_text("❌ رمز اشتباه است")
@@ -1258,7 +1354,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if text_lower in ["بانک هاپویی", "هاپو بانک", "بانک"]:
             await show_bank_menu(update, game)
             return
-
 # ================================================================
 # هندلر Callback
 # ================================================================
@@ -1494,7 +1589,34 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if data == "buy_claw":
         result = game.buy_claw()
         if result["success"]:
-            await query.edit_message_text("✅ پنجه خریداری شد!\nحالا میتونی با دستور شکار بری شکار")
+            await query.edit_message_text("✅ پنجه خریداری شد!")
+            await asyncio.sleep(1)
+            
+            # نمایش پنجه با عکس
+            claw_data = game.get_claw_data(1)
+            next_data = game.get_claw_data(2)
+            
+            msg = f"🦞 پنجه شما\n"
+            msg += f"⭐ سطح: 1\n"
+            msg += f"⏳ زمان استراحت: 60:00\n"
+            msg += f"🍀 شانس شکار:\n"
+            msg += f"  ⚪ معمولی: 95%\n"
+            msg += f"  🔵 کمیاب: 5%\n"
+            
+            keyboard = []
+            if next_data:
+                keyboard.append([
+                    InlineKeyboardButton(f"⬆️ سطح 2 ({format_number(next_data['cost'])})", callback_data="upgrade_claw")
+                ])
+            
+            try:
+                await query.message.reply_photo(
+                    photo=CLAW_IMAGES[1],
+                    caption=msg,
+                    reply_markup=InlineKeyboardMarkup(keyboard) if keyboard else None
+                )
+            except:
+                await query.message.reply_text(msg, reply_markup=InlineKeyboardMarkup(keyboard) if keyboard else None)
         else:
             await query.edit_message_text(f"❌ {result['reason']}")
         return
@@ -1503,6 +1625,38 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         result = game.upgrade_claw()
         if result["success"]:
             await query.edit_message_text(f"✅ پنجه به سطح {result['new_level']} ارتقا یافت")
+            await asyncio.sleep(1)
+            
+            # نمایش مجدد پنجه با عکس جدید
+            claw_data = game.get_claw_data(game.data["claw_level"])
+            next_level = game.data["claw_level"] + 1
+            next_data = game.get_claw_data(next_level)
+            
+            msg = f"🦞 پنجه شما\n"
+            msg += f"⭐ سطح: {game.data['claw_level']}\n"
+            msg += f"⏳ زمان استراحت: {claw_data['cooldown']:02d}:00\n"
+            msg += f"🍀 شانس شکار:\n"
+            msg += f"  ⚪ معمولی: {claw_data['common']}%\n"
+            msg += f"  🔵 کمیاب: {claw_data['uncommon']}%\n"
+            if claw_data['epic'] > 0:
+                msg += f"  🟣 حماسی: {claw_data['epic']}%\n"
+            if claw_data['legendary'] > 0:
+                msg += f"  🟡 افسانه‌ای: {claw_data['legendary']}%\n"
+            
+            keyboard = []
+            if next_data:
+                keyboard.append([
+                    InlineKeyboardButton(f"⬆️ سطح {next_level} ({format_number(next_data['cost'])})", callback_data="upgrade_claw")
+                ])
+            
+            try:
+                await query.message.reply_photo(
+                    photo=CLAW_IMAGES[game.data["claw_level"]],
+                    caption=msg,
+                    reply_markup=InlineKeyboardMarkup(keyboard) if keyboard else None
+                )
+            except:
+                await query.message.reply_text(msg, reply_markup=InlineKeyboardMarkup(keyboard) if keyboard else None)
         else:
             await query.edit_message_text(f"❌ {result['reason']}")
         return
@@ -1778,7 +1932,6 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if data == "jail_pay_fine_no":
         await query.edit_message_text("❌ پرداخت جریمه لغو شد.")
         return
-
 # ================================================================
 # پروفایل از کالبک - فقط متن (بدون عکس) - با هاپوی خیابونی
 # ================================================================
@@ -1802,13 +1955,13 @@ async def my_profile_from_callback(query, game):
     msg += f"┐─ 💰 هاپ پوینت ها : {format_number(game.data['hop_point'])} 🪙\n"
     msg += f"┐─ 🐾 هاپ هاپ ها : {game.data['hop_count']}\n"
     
-    # ======== هاپوی خیابونی ========
+    # هاپوی خیابونی
     if street_rescued > 0:
         msg += f"┐─ 🐶 هاپوی خیابونی نجات داده: {street_rescued}\n"
     else:
         msg += f"┐─ 🐶 هاپوی خیابونی نجات داده: 0\n"
     
-    # ======== هاپو ========
+    # هاپو
     if game.data.get("hapo_owned", False):
         msg += f"┐─ 🐕 هاپو: {game.data['hapo_name']}\n"
         msg += f"┘─ 🌟 مقام: {RANK_NAMES[game.data['hapo_rank']]} | ⭐ سطح: {game.data['hapo_level']}/5\n\n"
