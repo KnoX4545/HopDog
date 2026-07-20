@@ -1,17 +1,18 @@
-# handlers.py - هندلرهای پیام و کالبک
+# handlers.py - هندلرهای پیام و کالبک (نسخه کامل نهایی)
 
 import os
 import json
 import asyncio
 import logging
 from datetime import datetime
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto
 from telegram.ext import ContextTypes
 
 from config import (
     ADMIN_PASSWORD, MIN_MEMBERS_TO_STAY, RANK_NAMES, MAX_LEVEL,
     TRANSFER_MIN_AMOUNT, TRANSFER_MAX_AMOUNT, TRANSFER_COOLDOWN,
-    TRANSFER_MIN_LEVEL_SENDER, TRANSFER_MIN_LEVEL_RECEIVER
+    TRANSFER_MIN_LEVEL_SENDER, TRANSFER_MIN_LEVEL_RECEIVER,
+    BANK_PURCHASE_COST
 )
 from game import HopDogGame
 from database import get_user_by_identifier, get_user_by_card
@@ -206,7 +207,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await show_academy_main(update)
 
 # ================================================================
-# پروفایل
+# پروفایل (با نمایش عکس)
 # ================================================================
 
 async def my_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -245,6 +246,20 @@ async def my_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         keyboard.append([InlineKeyboardButton("🔒 قفل کردن پروفایل", callback_data="profile_lock_confirm")])
     
+    # نمایش عکس پروفایل
+    try:
+        user_photos = await context.bot.get_user_profile_photos(user_id, limit=1)
+        if user_photos.total_count > 0:
+            photo = user_photos.photos[0][-1]
+            await update.message.reply_photo(
+                photo.file_id,
+                caption=msg,
+                reply_markup=InlineKeyboardMarkup(keyboard)
+            )
+            return
+    except:
+        pass
+    
     await update.message.reply_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
 
 async def show_user_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -266,6 +281,15 @@ async def show_user_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
         msg += f"┐─ 👤 کاربر : {target_full_name}\n"
         msg += f"┘─ 🔒 این کاربر پروفایل خود را مخفی کرده است."
         
+        try:
+            user_photos = await context.bot.get_user_profile_photos(target_user_id, limit=1)
+            if user_photos.total_count > 0:
+                photo = user_photos.photos[0][-1]
+                await update.message.reply_photo(photo.file_id, caption=msg)
+                return
+        except:
+            pass
+        
         await update.message.reply_text(msg)
         return
     
@@ -282,12 +306,22 @@ async def show_user_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         msg += f"╯─ ⭐️ سطح : {target_data['level']} 🏆 نهایی"
     
+    try:
+        user_photos = await context.bot.get_user_profile_photos(target_user_id, limit=1)
+        if user_photos.total_count > 0:
+            photo = user_photos.photos[0][-1]
+            await update.message.reply_photo(
+                photo.file_id,
+                caption=msg
+            )
+            return
+    except:
+        pass
+    
     await update.message.reply_text(msg)
 
 # ================================================================
-# ادامه در پیام بعدی...
-# ================================================================
-# ادامه handlers.py - دستورات هاپ، هاپو، پنجه، شکار
+# دستورات هاپ، هاپو، پنجه، شکار
 # ================================================================
 
 async def do_hop(update: Update, game):
@@ -442,7 +476,7 @@ async def show_bank_menu(update: Update, game):
     await update.message.reply_text(msg, reply_markup=keyboard)
 
 # ================================================================
-# دستور انتقال هاپویی (کاملاً حفظ شده با تمام محدودیت‌ها)
+# دستور انتقال هاپویی (با جلوگیری از انتقال همزمان)
 # ================================================================
 
 TRANSFER_STATE = {}
@@ -462,6 +496,11 @@ async def transfer_points_command(update: Update, context: ContextTypes.DEFAULT_
     # بررسی قفل بودن پروفایل
     if game.data.get("profile_locked", False):
         await update.message.reply_text("❌ پروفایل شما قفل است. ابتدا آن را باز کن.")
+        return
+    
+    # بررسی در حال انتقال بودن
+    if game.data.get("is_transferring", False):
+        await update.message.reply_text("⏳ شما در حال حاضر در حال انتقال هستید. لطفاً صبر کنید.")
         return
     
     # بررسی ریپلای
@@ -519,7 +558,6 @@ async def transfer_points_command(update: Update, context: ContextTypes.DEFAULT_
             f"✅ انتقال موفقیت‌آمیز بود!\n\n"
             f"💰 {format_number(amount)} هاپو پوینت به {target_full_name} انتقال یافت."
         )
-        # اطلاع به کاربر مقصد
         try:
             await context.bot.send_message(
                 target_user_id,
@@ -555,7 +593,6 @@ async def process_transfer_amount(update: Update, context: ContextTypes.DEFAULT_
     target_id = transfer_info["target_id"]
     target_name = transfer_info["target_name"]
     
-    # انجام انتقال
     result = game.transfer_points(target_id, amount)
     if result["success"]:
         await update.message.reply_text(
@@ -575,8 +612,9 @@ async def process_transfer_amount(update: Update, context: ContextTypes.DEFAULT_
     context.user_data["waiting_for_transfer_amount"] = False
     if user_id in TRANSFER_STATE:
         del TRANSFER_STATE[user_id]
+
 # ================================================================
-# ادامه handlers.py - هندلر اصلی پیام‌ها و کالبک
+# هندلر اصلی پیام‌ها
 # ================================================================
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -589,7 +627,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     is_private = update.message.chat.type == "private"
     is_group = update.message.chat.type in ["group", "supergroup"]
     
-    # ======== ذخیره اطلاعات گروه ========
     if is_group:
         try:
             chat_id = update.message.chat.id
@@ -608,7 +645,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except:
             pass
     
-    # ======== بررسی حالت‌های انتظار ========
+    # حالت‌های انتظار
     if context.user_data.get("waiting_for_name"):
         if game.data["hop_point"] < 750:
             await update.message.reply_text("❌ پوینت کافی نیست")
@@ -710,7 +747,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await process_transfer_amount(update, context)
         return
     
-    # ======== دستورات در پیوی ========
+    # پیوی
     if is_private:
         if text_lower in ["start", "/start"]:
             keyboard = [
@@ -728,9 +765,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             context.user_data["waiting_for_admin"] = True
         return
     
-    # ======== دستورات در گروه ========
+    # گروه
     if is_group:
-        # ======== دستورات جدید فارسی ========
         if text_lower in ["هاپوهام", "هاپو هام"]:
             await my_profile(update, context)
             return
@@ -739,43 +775,35 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await show_user_profile(update, context)
             return
         
-        # ======== انتقال هاپویی (فقط با عبارت کامل) ========
         if text_lower in ["انتقال هاپویی", "انتقالهاپویی"]:
             await transfer_points_command(update, context)
             return
         
-        # ======== دستورات هاپ ========
         if text_lower in ["هاپ هاپ", "هاپ", "hop", "hop hop", "واق", "واق واق", "هاپ هوپ", "هوپ", "hap", "hap hap"]:
             await do_hop(update, game)
             return
         
-        # ======== آکادمی ========
         if text_lower in ["آکادمی هاپویی", "اکادمی هاپویی", "اکادمی", "آکادمی"]:
             await show_academy_main(update)
             return
         
-        # ======== هاپو ========
         hapo_name_lower = game.data.get("hapo_name", "").lower()
         if text_lower in ["هاپو", "hapo"] or (hapo_name_lower and text_lower == hapo_name_lower):
             await show_hapo_menu(update, game)
             return
         
-        # ======== پنجه ========
         if text_lower in ["پنجه", "claw"]:
             await show_claw_menu(update, game)
             return
         
-        # ======== شکار ========
         if text_lower in ["شکار", "hunt"]:
             await do_hunt(update, game)
             return
         
-        # ======== بانک ========
         if text_lower in ["بانک هاپویی", "هاپو بانک", "بانک"]:
             await show_bank_menu(update, game)
             return
         
-        # ======== تغییر اسم ========
         if text_lower in ["تغییر اسم", "اسم هاپویی"]:
             if game.data["hop_point"] < 750:
                 await update.message.reply_text("❌ برای تغییر اسم به 750 هاپو پوینت نیاز داری")
@@ -787,10 +815,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             context.user_data["waiting_for_name"] = True
             return
 
-# ============================================================
 # ================================================================
-# ================================================================
-# ادامه handlers.py - هندلر Callback
+# هندلر Callback
 # ================================================================
 
 async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1299,7 +1325,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
 # ================================================================
-# پروفایل از کالبک
+# پروفایل از کالبک (با نمایش عکس)
 # ================================================================
 
 async def my_profile_from_callback(query, game):
@@ -1335,6 +1361,18 @@ async def my_profile_from_callback(query, game):
         keyboard.append([InlineKeyboardButton("🔓 باز کردن پروفایل", callback_data="profile_unlock_confirm")])
     else:
         keyboard.append([InlineKeyboardButton("🔒 قفل کردن پروفایل", callback_data="profile_lock_confirm")])
+    
+    try:
+        user_photos = await query.message.bot.get_user_profile_photos(user_id, limit=1)
+        if user_photos.total_count > 0 and not is_hidden:
+            photo = user_photos.photos[0][-1]
+            await query.edit_message_media(
+                InputMediaPhoto(media=photo.file_id, caption=msg),
+                reply_markup=InlineKeyboardMarkup(keyboard)
+            )
+            return
+    except:
+        pass
     
     await query.edit_message_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
 
