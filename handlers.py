@@ -731,7 +731,7 @@ async def handle_meow(update: Update, context: ContextTypes.DEFAULT_TYPE):
     last_meow = game.data.get("jail_meow_last", 0)
     if last_meow > 0 and (now - last_meow) < JAIL_MEOW_COOLDOWN:
         remaining = int(JAIL_MEOW_COOLDOWN - (now - last_meow))
-        await update.message.reply_text(f"😺 آروم باش! {remaining} ثانیه صبر کن بعد دوباره میو بگو.")
+        await update.message.reply_text(f" آروم باش! {remaining} .")
         return
     
     game.data["jail_meow_last"] = now
@@ -742,7 +742,7 @@ async def handle_meow(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if now > vote_data["until"]:
             del MEOW_VOTES[chat_id]
         else:
-            await update.message.reply_text("😺 یک رای گیری در حال انجام است! صبر کنید تا تموم بشه.")
+            await update.message.reply_text(" یک رای گیری در حال انجام است! صبر کنید تا تموم بشه.")
             return
     
     keyboard = [[InlineKeyboardButton("🗳️ رای به زندان", callback_data=f"meow_vote_{chat_id}")]]
@@ -787,7 +787,7 @@ async def meow_vote_timer(chat_id, context, msg_id):
         else:
             try:
                 await context.bot.edit_message_text(
-                    f"😺 گربه ی بی ادب!\n\n"
+                    f" گربه ی بی ادب!\n\n"
                     f"❌ رای‌گیری به پایان رسید. کاربر آزاد است.",
                     chat_id=chat_id,
                     message_id=msg_id
