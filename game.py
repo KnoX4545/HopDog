@@ -788,7 +788,7 @@ class HopDogGame:
 
 
 # ================================================================
-# کلاس هاپوی خیابونی
+# کلاس هاپوی خیابونی (نسخه نهایی درست)
 # ================================================================
 
 class StreetHapo:
@@ -807,9 +807,15 @@ class StreetHapo:
         self.active = status.get("active", False)
         self.data = status.get("data", {})
         
-        # اطمینان از وجود فیلد failed_attempts
+        # اطمینان از وجود فیلدها
+        if "attempts" not in self.data:
+            self.data["attempts"] = 0
         if "failed_attempts" not in self.data:
             self.data["failed_attempts"] = []
+        if "rescued" not in self.data:
+            self.data["rescued"] = False
+        if "status" not in self.data:
+            self.data["status"] = "waiting"
     
     def save_status(self):
         """ذخیره وضعیت در دیتابیس"""
@@ -859,7 +865,7 @@ class StreetHapo:
         return max(0, int(remaining))
     
     def attempt_rescue(self, user_id, user_name, game):
-        """تلاش برای نجات هاپوی خیابونی"""
+        """تلاش برای نجات هاپوی خیابونی - نسخه نهایی درست"""
         if not self.active:
             return {"success": False, "reason": "هیچ هاپوی خیابونی در دسترس نیست!"}
         
@@ -872,6 +878,8 @@ class StreetHapo:
             return {"success": False, "reason": "این هاپوی خیابونی قبلاً نجات پیدا کرده!"}
         
         attempts = self.data.get("attempts", 0)
+        
+        # اگر همه شانس‌ها تموم شده
         if attempts >= STREET_HAPO_MAX_ATTEMPTS:
             return {"success": False, "reason": "همه شانس‌ها از دست رفته!"}
         
@@ -885,7 +893,8 @@ class StreetHapo:
         game.save_data()
         
         # افزایش تعداد تلاش‌ها
-        self.data["attempts"] = attempts + 1
+        current_attempt = attempts + 1
+        self.data["attempts"] = current_attempt
         
         # ذخیره اطلاعات تلاش
         if "failed_attempts" not in self.data:
@@ -894,7 +903,7 @@ class StreetHapo:
         self.data["failed_attempts"].append({
             "user_id": user_id,
             "user_name": user_name,
-            "attempt": attempts + 1,
+            "attempt": current_attempt,
             "cost": cost,
             "time": datetime.now().timestamp(),
             "success": False
@@ -910,11 +919,9 @@ class StreetHapo:
             self.data["reward"] = reward
             self.data["status"] = "rescued"
             
-            # به‌روزرسانی آخرین تلاش به موفقیت
             if self.data["failed_attempts"]:
                 self.data["failed_attempts"][-1]["success"] = True
             
-            # اضافه کردن جایزه به کاربر
             game.data["hop_point"] += reward
             game.data["street_hapo_rescued"] = game.data.get("street_hapo_rescued", 0) + 1
             game.save_data()
@@ -924,8 +931,7 @@ class StreetHapo:
                 "success": True,
                 "rescued": True,
                 "reward": reward,
-                "rescued_by": user_name,
-                "attempt": attempts + 1,
+                "attempt": current_attempt,
                 "cost": cost,
                 "message": f"🎉 {user_name} هاپوی خیابونی رو نجات داد و {reward} 🪙 جایزه گرفت!"
             }
@@ -933,8 +939,8 @@ class StreetHapo:
             # ناموفق
             fail_msg = random.choice(STREET_HAPO_FAIL_MESSAGES).format(name=user_name)
             
-            # اگر تلاش آخر بود و موفق نشد، هاپو میمیره
-            if attempts + 1 >= STREET_HAPO_MAX_ATTEMPTS:
+            # اگر تلاش آخر بود، هاپو میمیره
+            if current_attempt >= STREET_HAPO_MAX_ATTEMPTS:
                 self.data["status"] = "died"
                 self.active = False
                 self.save_status()
@@ -943,8 +949,9 @@ class StreetHapo:
                     "rescued": False,
                     "died": True,
                     "message": f"💀 {fail_msg}\n\nهاپوی خیابونی مرد... 😢",
-                    "attempt": attempts + 1,
-                    "cost": cost
+                    "attempt": current_attempt,
+                    "cost": cost,
+                    "remaining_attempts": 0
                 }
             
             self.save_status()
@@ -953,9 +960,9 @@ class StreetHapo:
                 "rescued": False,
                 "died": False,
                 "message": fail_msg,
-                "attempt": attempts + 1,
+                "attempt": current_attempt,
                 "cost": cost,
-                "remaining_attempts": STREET_HAPO_MAX_ATTEMPTS - (attempts + 1)
+                "remaining_attempts": STREET_HAPO_MAX_ATTEMPTS - current_attempt
             }
     
     def get_status_text(self):
