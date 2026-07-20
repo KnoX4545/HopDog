@@ -592,7 +592,7 @@ class HopDogGame:
         if amount <= 0:
             return {"success": False, "reason": "مبلغ نامعتبر است"}
         if len(target_card) != 16 or not target_card.isdigit():
-            return {"success": False, "reason": "❌ شماره کارت باید ۱۳ رقم باشد"}
+            return {"success": False, "reason": "❌ شماره کارت باید ۱۶ رقم باشد"}
         if target_card == self.data["bank_card_number"]:
             return {"success": False, "reason": "❌ نمی‌تونی به کارت خودت انتقال بدی"}
         
