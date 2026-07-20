@@ -1,4 +1,4 @@
-# handlers.py - هندلرهای پیام و کالبک (نسخه کامل نهایی)
+# handlers.py - هندلرهای پیام و کالبک (نسخه کامل اصلاح شده)
 
 import os
 import json
@@ -235,7 +235,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await show_academy_main(update)
 
 # ================================================================
-# زندان هاپویی (با تاریخ دقیق دستگیری)
+# زندان هاپویی (با تاریخ دستگیری - فقط تاریخ)
 # ================================================================
 
 async def show_jail(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -256,8 +256,8 @@ async def show_jail(update: Update, context: ContextTypes.DEFAULT_TYPE):
     arrest_time = jail_info["arrest_time"]
     admin_id = jail_info.get("admin_id", None)
     
-    # تاریخ دقیق دستگیری
-    arrest_date = datetime.fromtimestamp(arrest_time).strftime("%d %B %Y, %H:%M")
+    # فقط تاریخ (بدون ساعت)
+    arrest_date = datetime.fromtimestamp(arrest_time).strftime("%d %B %Y")
     
     msg = f"🐶 زندان هاپویی ⛓️\n\n"
     msg += f"🚨 شما هاپوی بدی بودین و زندانی شدید ❗️\n\n"
@@ -718,7 +718,7 @@ async def process_transfer_amount(update: Update, context: ContextTypes.DEFAULT_
         del TRANSFER_STATE[user_id]
 
 # ================================================================
-# سیستم میو (گربه بی ادب) - نسخه همزمان
+# سیستم میو (گربه بی ادب) - نسخه همزمان اصلاح شده
 # ================================================================
 
 async def handle_meow(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -730,7 +730,13 @@ async def handle_meow(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("⛓️ شما در زندان هستید و نمی‌توانید این کار را انجام دهید.")
         return
     
-    # کلید منحصر به فرد برای هر رای‌گیری
+    # بررسی اینکه آیا خود این کاربر قبلاً نظرسنجی فعال داره
+    for key, vote_data in MEOW_VOTES.items():
+        if vote_data.get("target_id") == user_id:
+            await update.message.reply_text("⚠️ شما یک نظرسنجی فعال دارید! صبر کنید تا تموم بشه.")
+            return
+    
+    # کلید منحصر به فرد
     vote_key = f"{chat_id}_{user_id}_{int(datetime.now().timestamp())}"
     
     keyboard = [[InlineKeyboardButton("🗳️ رای به زندان", callback_data=f"meow_vote_{vote_key}")]]
@@ -747,7 +753,8 @@ async def handle_meow(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "msg_id": msg.message_id,
         "until": datetime.now().timestamp() + JAIL_VOTE_DURATION,
         "chat_id": chat_id,
-        "msg_text": msg
+        "msg_text": msg,
+        "voters": []
     }
     
     asyncio.create_task(meow_vote_timer(vote_key, context))
@@ -774,20 +781,23 @@ async def meow_vote_timer(vote_key, context):
                     chat_id=chat_id,
                     message_id=msg_id
                 )
-            except:
-                pass
+            except Exception as e:
+                logging.error(f"Error editing meow vote result: {e}")
         else:
             try:
                 await context.bot.edit_message_text(
-                    f"گربه ی بی ادب!\n\n"
+                    f"😺 گربه ی بی ادب!\n\n"
                     f"❌ رای‌گیری به پایان رسید. کاربر آزاد است.",
                     chat_id=chat_id,
                     message_id=msg_id
                 )
-            except:
-                pass
+            except Exception as e:
+                logging.error(f"Error editing meow vote result: {e}")
         
-        del MEOW_VOTES[vote_key]
+        try:
+            del MEOW_VOTES[vote_key]
+        except KeyError:
+            pass
 
 # ================================================================
 # کامند ادمین - jail (زندانی کردن کاربر)
@@ -1192,6 +1202,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["new_hapo_name"] = None
         return
     
+    # ======== پروفایل - اصلاح شده ========
     if data == "profile_hide_confirm":
         keyboard = get_confirm_keyboard("profile_hide_yes", "profile_hide_no")
         await query.edit_message_text(
@@ -1284,6 +1295,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await my_profile_from_callback(query, game)
         return
     
+    # ======== هاپو ========
     if data == "buy_hapo":
         result = game.buy_hapo()
         if result["success"]:
@@ -1564,7 +1576,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             del TRANSFER_STATE[user_id]
         return
     
-    # ======== میو (گربه بی ادب) - نسخه همزمان ========
+    # ======== میو (گربه بی ادب) - اصلاح شده ========
     if data.startswith("meow_vote_"):
         vote_key = data.replace("meow_vote_", "")
         
@@ -1635,7 +1647,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
 # ================================================================
-# پروفایل از کالبک (با نمایش عکس)
+# پروفایل از کالبک (اصلاح شده - با edit_message_text)
 # ================================================================
 
 async def my_profile_from_callback(query, game):
@@ -1672,19 +1684,15 @@ async def my_profile_from_callback(query, game):
     else:
         keyboard.append([InlineKeyboardButton("🔒 قفل کردن پروفایل", callback_data="profile_lock_confirm")])
     
+    # ✅ استفاده از edit_message_text برای جلوگیری از خطا
     try:
-        user_photos = await query.message.bot.get_user_profile_photos(user_id, limit=1)
-        if user_photos.total_count > 0 and not is_hidden:
-            photo = user_photos.photos[0][-1]
-            await query.edit_message_media(
-                InputMediaPhoto(media=photo.file_id, caption=msg),
-                reply_markup=InlineKeyboardMarkup(keyboard)
-            )
-            return
-    except:
-        pass
-    
-    await query.edit_message_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
+        await query.edit_message_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
+    except Exception as e:
+        logging.error(f"Error in my_profile_from_callback: {e}")
+        try:
+            await query.message.reply_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
+        except:
+            pass
 
 # ================================================================
 # دستورات ادمین (فقط در پیوی) - ادامه
