@@ -1,4 +1,4 @@
-# handlers.py - هندلرهای پیام و کالبک (نسخه کامل اصلاح شده)
+# handlers.py - هندلرهای پیام و کالبک (نسخه اصلاح شده - حذف عکس از هاپوهام)
 
 import os
 import json
@@ -282,10 +282,11 @@ async def show_jail(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
 
 # ================================================================
-# پروفایل
+# پروفایل - (هاپوهام بدون عکس)
 # ================================================================
 
 async def my_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """پروفایل خود کاربر - فقط متن، بدون عکس"""
     user_id = update.effective_user.id
     username = update.effective_user.username
     full_name = update.effective_user.full_name or f"کاربر{user_id}"
@@ -325,24 +326,11 @@ async def my_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         keyboard.append([InlineKeyboardButton("🔒 قفل کردن پروفایل", callback_data="profile_lock")])
     
-    # نمایش عکس پروفایل (اگه مخفی نباشه)
-    if not is_hidden:
-        try:
-            user_photos = await context.bot.get_user_profile_photos(user_id, limit=1)
-            if user_photos.total_count > 0:
-                photo = user_photos.photos[0][-1]
-                await update.message.reply_photo(
-                    photo.file_id,
-                    caption=msg,
-                    reply_markup=InlineKeyboardMarkup(keyboard)
-                )
-                return
-        except:
-            pass
-    
+    # ❌ بدون عکس - فقط متن
     await update.message.reply_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
 
 async def show_user_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """پروفایل دیگران - با عکس (اگر مخفی نباشه)"""
     user_id = update.effective_user.id
     
     if not update.message.reply_to_message:
@@ -382,7 +370,7 @@ async def show_user_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         msg += f"╯─ ⭐️ سطح : {target_data['level']} 🏆 نهایی"
     
-    # نمایش عکس پروفایل (اگه مخفی نباشه)
+    # ✅ نمایش عکس پروفایل (فقط برای پروفایل دیگران)
     try:
         user_photos = await context.bot.get_user_profile_photos(target_user_id, limit=1)
         if user_photos.total_count > 0 and not target_data.get("profile_hidden", False):
@@ -1188,7 +1176,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["new_hapo_name"] = None
         return
     
-    # ======== پروفایل - ساده (بدون تیک/ضربدر) ========
+    # ======== پروفایل - ساده (بدون عکس) ========
     if data == "profile_hide":
         game.data["profile_hidden"] = True
         game.save_data()
@@ -1568,7 +1556,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
 # ================================================================
-# پروفایل از کالبک - فقط متن
+# پروفایل از کالبک - فقط متن (بدون عکس)
 # ================================================================
 
 async def my_profile_from_callback(query, game):
@@ -1605,6 +1593,7 @@ async def my_profile_from_callback(query, game):
     else:
         keyboard.append([InlineKeyboardButton("🔒 قفل کردن پروفایل", callback_data="profile_lock")])
     
+    # ❌ بدون عکس - فقط متن
     await query.edit_message_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
 
 # ================================================================
