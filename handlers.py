@@ -1018,7 +1018,7 @@ async def street_hapo_timer(street_hapo, context):
 
 
 async def handle_street_hapo_rescue(update: Update, context: ContextTypes.DEFAULT_TYPE, query):
-    """هندلر دکمه نجات هاپوی خیابونی - با پیام جدید برای هر تلاش"""
+    """هندلر دکمه نجات هاپوی خیابونی - پیام اصلی ادیت نمیشه"""
     user_id = update.effective_user.id
     username = update.effective_user.username
     full_name = update.effective_user.full_name or f"کاربر{user_id}"
@@ -1030,6 +1030,7 @@ async def handle_street_hapo_rescue(update: Update, context: ContextTypes.DEFAUL
     
     street_hapo = get_street_hapo()
     
+    # ======== چک کردن وضعیت ========
     if not street_hapo.active:
         await query.answer("🐶 هیچ هاپوی خیابونی در دسترس نیست!")
         await query.message.reply_text("🐶 هیچ هاپوی خیابونی در دسترس نیست!")
@@ -1044,12 +1045,12 @@ async def handle_street_hapo_rescue(update: Update, context: ContextTypes.DEFAUL
     
     if street_hapo.data.get("rescued", False):
         await query.answer("❌ این هاپوی خیابونی قبلاً نجات پیدا کرده!")
+        await query.message.reply_text("❌ این هاپوی خیابونی قبلاً نجات پیدا کرده!")
         return
     
     # ======== تلاش برای نجات ========
     result = street_hapo.attempt_rescue(user_id, full_name, game)
     
-    # تعداد تلاش‌های انجام شده
     attempts = street_hapo.data.get("attempts", 0)
     total_attempts = STREET_HAPO_MAX_ATTEMPTS
     
@@ -1062,17 +1063,11 @@ async def handle_street_hapo_rescue(update: Update, context: ContextTypes.DEFAUL
         msg += f"🐶 تعداد هاپوهای نجات داده شده: {game.data.get('street_hapo_rescued', 0)}\n\n"
         msg += f"🔄 تعداد تلاش‌ها: {attempts}/{total_attempts}"
         
-        # پیام جدید بفرست (بدون عکس)
+        # ✅ پیام جدید بفرست (پیام اصلی دست نخورده میمونه)
         await query.message.reply_text(
             msg,
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
-        
-        # پیام اصلی رو حذف کن
-        try:
-            await query.message.delete()
-        except:
-            pass
         
         try:
             await context.bot.send_message(
@@ -1089,12 +1084,8 @@ async def handle_street_hapo_rescue(update: Update, context: ContextTypes.DEFAUL
         msg = f"💀 {result['message']}\n\n"
         msg += f"🔄 تعداد تلاش‌ها: {attempts}/{total_attempts}"
         
-        # پیام جدید بفرست
+        # ✅ پیام جدید بفرست
         await query.message.reply_text(msg)
-        try:
-            await query.message.delete()
-        except:
-            pass
         
     elif not result.get("success", False):
         # ======== خطا ========
@@ -1117,17 +1108,17 @@ async def handle_street_hapo_rescue(update: Update, context: ContextTypes.DEFAUL
         else:
             msg += f"❌ همه شانس‌ها از دست رفته!"
         
-        # پیام جدید بفرست (با دکمه تلاش مجدد)
+        # ✅ پیام جدید بفرست (پیام اصلی دست نخورده میمونه)
         await query.message.reply_text(
             msg,
             reply_markup=InlineKeyboardMarkup(keyboard) if keyboard else None
         )
-        
-        # پیام اصلی رو حذف کن تا گیج کننده نباشه
-        try:
-            await query.message.delete()
-        except:
-            pass
+    
+    # ✅ پیام اصلی رو ادیت نکن! فقط دکمه رو غیرفعال کن
+    try:
+        await query.answer()  # فقط کلیک رو تایید کن
+    except:
+        pass
 
 
 # ================================================================
