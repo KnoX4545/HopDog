@@ -788,7 +788,7 @@ class HopDogGame:
 
 
 # ================================================================
-# کلاس هاپوی خیابونی (نسخه نهایی با اصلاحات)
+# کلاس هاپوی خیابونی (نسخه نهایی با اصلاحات کامل)
 # ================================================================
 
 class StreetHapo:
@@ -815,7 +815,7 @@ class StreetHapo:
         if "rescued" not in self.data:
             self.data["rescued"] = False
         if "status" not in self.data:
-            self.data["status"] = "waiting"
+            self.data["status"] = "waiting"  # waiting, rescued, died, expired
     
     def save_status(self):
         """ذخیره وضعیت در دیتابیس"""
@@ -845,9 +845,11 @@ class StreetHapo:
         return True, "هاپوی خیابونی پیدا شد!"
     
     def is_expired(self):
-        """بررسی اینکه آیا زمان به پایان رسیده"""
+        """بررسی اینکه آیا زمان به پایان رسیده - فقط در صورتی که رویداد فعال و نجات نیافته باشد"""
         if not self.active:
             return True
+        if self.data.get("rescued", False):
+            return False
         now = datetime.now().timestamp()
         return now >= self.data.get("expires_at", 0)
     
@@ -860,22 +862,24 @@ class StreetHapo:
     
     def get_remaining_time(self):
         """دریافت زمان باقی مانده"""
+        if not self.active or self.data.get("rescued", False):
+            return 0
         now = datetime.now().timestamp()
         remaining = self.data.get("expires_at", 0) - now
         return max(0, int(remaining))
     
     def attempt_rescue(self, user_id, user_name, game):
-        """تلاش برای نجات هاپوی خیابونی - نسخه نهایی با اصلاحات"""
+        """تلاش برای نجات هاپوی خیابونی - نسخه نهایی"""
         if not self.active:
             return {"success": False, "reason": "هیچ هاپوی خیابونی در دسترس نیست!"}
+        
+        if self.data.get("rescued", False):
+            return {"success": False, "reason": "این هاپوی خیابونی قبلاً نجات پیدا کرده!"}
         
         if self.is_expired():
             self.active = False
             self.save_status()
             return {"success": False, "reason": "⏰ هاپوی خیابونی فرار کرد!"}
-        
-        if self.data.get("rescued", False):
-            return {"success": False, "reason": "این هاپوی خیابونی قبلاً نجات پیدا کرده!"}
         
         attempts = self.data.get("attempts", 0)
         
@@ -911,7 +915,7 @@ class StreetHapo:
         
         # بررسی شانس موفقیت
         if random.random() < STREET_HAPO_SUCCESS_CHANCE:
-            # موفقیت!
+            # ======== موفقیت ========
             reward = random.randint(STREET_HAPO_REWARD_MIN, STREET_HAPO_REWARD_MAX)
             self.data["rescued"] = True
             self.data["rescued_by"] = user_id
@@ -924,7 +928,7 @@ class StreetHapo:
             
             game.data["hop_point"] += reward
             
-            # ✅ اصلاح: تبدیل به عدد قبل از جمع
+            # تبدیل به عدد
             current_rescued = game.data.get("street_hapo_rescued", 0)
             if isinstance(current_rescued, str):
                 current_rescued = int(current_rescued) if current_rescued.isdigit() else 0
@@ -932,7 +936,10 @@ class StreetHapo:
             
             game.save_data()
             
+            # ======== غیرفعال کردن رویداد ========
+            self.active = False
             self.save_status()
+            
             return {
                 "success": True,
                 "rescued": True,
@@ -942,7 +949,7 @@ class StreetHapo:
                 "message": f"🎉 {user_name} هاپوی خیابونی رو نجات داد و {reward} 🪙 جایزه گرفت!"
             }
         else:
-            # ناموفق
+            # ======== ناموفق ========
             fail_msg = random.choice(STREET_HAPO_FAIL_MESSAGES).format(name=user_name)
             
             # اگر تلاش آخر بود، هاپو میمیره
@@ -960,6 +967,7 @@ class StreetHapo:
                     "remaining_attempts": 0
                 }
             
+            # رویداد همچنان فعال است
             self.save_status()
             return {
                 "success": False,
@@ -974,13 +982,19 @@ class StreetHapo:
     def get_status_text(self):
         """دریافت متن وضعیت"""
         if not self.active:
-            return "🐶 هیچ هاپوی خیابونی در دسترس نیست."
+            if self.data.get("rescued", False):
+                return f"🎉 هاپوی خیابونی توسط {self.data.get('rescued_by_name', 'نامشخص')} نجات پیدا کرد!"
+            elif self.data.get("status") == "died":
+                return "💀 هاپوی خیابونی مرد... 😢"
+            elif self.data.get("status") == "expired":
+                return "⏰ هاپوی خیابونی فرار کرد!"
+            else:
+                return "🐶 هیچ هاپوی خیابونی در دسترس نیست."
         
         if self.is_expired():
+            self.active = False
+            self.save_status()
             return "⏰ هاپوی خیابونی فرار کرد!"
-        
-        if self.data.get("rescued", False):
-            return f"🎉 هاپوی خیابونی توسط {self.data.get('rescued_by_name', 'نامشخص')} نجات پیدا کرد!"
         
         remaining = self.get_remaining_time()
         attempts = self.data.get("attempts", 0)
