@@ -1,4 +1,4 @@
-# handlers.py - هندلرهای پیام و کالبک (نسخه کامل نهایی با رفع پروفایل)
+# handlers.py - هندلرهای پیام و کالبک (نسخه کامل نهایی)
 
 import os
 import json
@@ -1202,7 +1202,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["new_hapo_name"] = None
         return
     
-    # ======== پروفایل - اصلاح شده ========
+    # ======== پروفایل - با حذف پیام و ارسال جدید ========
     if data == "profile_hide_confirm":
         keyboard = get_confirm_keyboard("profile_hide_yes", "profile_hide_no")
         await query.edit_message_text(
@@ -1217,7 +1217,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if data == "profile_hide_yes":
         game.data["profile_hidden"] = True
         game.save_data()
-        await query.edit_message_text("✅ پروفایل شما مخفی شد.")
+        await query.message.delete()
         await my_profile_from_callback(query, game)
         return
     
@@ -1240,7 +1240,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if data == "profile_show_yes":
         game.data["profile_hidden"] = False
         game.save_data()
-        await query.edit_message_text("✅ پروفایل شما نمایش داده شد.")
+        await query.message.delete()
         await my_profile_from_callback(query, game)
         return
     
@@ -1263,7 +1263,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if data == "profile_lock_yes":
         game.data["profile_locked"] = True
         game.save_data()
-        await query.edit_message_text("✅ پروفایل شما قفل شد.")
+        await query.message.delete()
         await my_profile_from_callback(query, game)
         return
     
@@ -1286,7 +1286,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if data == "profile_unlock_yes":
         game.data["profile_locked"] = False
         game.save_data()
-        await query.edit_message_text("✅ پروفایل شما باز شد.")
+        await query.message.delete()
         await my_profile_from_callback(query, game)
         return
     
@@ -1647,7 +1647,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
 # ================================================================
-# پروفایل از کالبک (رفع مشکل - نسخه نهایی)
+# پروفایل از کالبک (نسخه نهایی - با حذف پیام قبلی)
 # ================================================================
 
 async def my_profile_from_callback(query, game):
@@ -1684,21 +1684,13 @@ async def my_profile_from_callback(query, game):
     else:
         keyboard.append([InlineKeyboardButton("🔒 قفل کردن پروفایل", callback_data="profile_lock_confirm")])
     
+    # ======== حذف پیام قبلی و ارسال جدید ========
     try:
-        # ✅ روش اول: سعی کن با edit_message_text ادیت کنه
-        await query.edit_message_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
-    except Exception as e:
-        logging.error(f"Error editing profile: {e}")
-        try:
-            # ✅ روش دوم: اگه خطا داد، پیام جدید بفرست و پیام قبلی رو حذف کن
-            await query.message.delete()
-            await query.message.reply_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
-        except:
-            try:
-                # ✅ روش سوم: فقط پیام جدید بفرست
-                await query.message.reply_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
-            except:
-                pass
+        await query.message.delete()
+    except:
+        pass
+    
+    await query.message.reply_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
 
 # ================================================================
 # دستورات ادمین (فقط در پیوی)
