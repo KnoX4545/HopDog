@@ -14,7 +14,6 @@ def get_user_data(user_id):
         response = supabase.table("users").select("*").eq("user_id", str(user_id)).execute()
         if response.data and len(response.data) > 0:
             data = response.data[0]
-            # تبدیل فیلدهای JSON
             if "current_hunt_animal" in data and data["current_hunt_animal"]:
                 try:
                     data["current_hunt_animal"] = json.loads(data["current_hunt_animal"])
@@ -73,7 +72,7 @@ def get_user_by_identifier(identifier):
         return None
 
 def get_user_by_card(card_number):
-    """دریافت اطلاعات کاربر با شماره کارت"""
+    """دریافت اطلاعات کاربر با شماره کارت (منحصر به فرد)"""
     try:
         response = supabase.table("users").select("*").eq("bank_card_number", card_number).execute()
         if response.data and len(response.data) > 0:
@@ -82,3 +81,12 @@ def get_user_by_card(card_number):
     except Exception as e:
         logging.error(f"Error getting user by card: {e}")
         return None
+
+def is_card_unique(card_number):
+    """بررسی منحصر به فرد بودن شماره کارت"""
+    try:
+        response = supabase.table("users").select("user_id").eq("bank_card_number", card_number).execute()
+        return len(response.data) == 0
+    except Exception as e:
+        logging.error(f"Error checking card uniqueness: {e}")
+        return False
