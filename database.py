@@ -45,6 +45,9 @@ def get_user_data(user_id):
                 data["profile_hidden"] = False
             if "profile_locked" not in data:
                 data["profile_locked"] = False
+            # فیلد هاپوی خیابونی
+            if "street_hapo_rescued" not in data:
+                data["street_hapo_rescued"] = 0
             return data
         return None
     except Exception as e:
@@ -106,4 +109,51 @@ def is_card_unique(card_number):
         return len(response.data) == 0
     except Exception as e:
         logging.error(f"Error checking card uniqueness: {e}")
+        return False
+
+# ================================================================
+# توابع هاپوی خیابونی
+# ================================================================
+
+def reset_street_hapo_global():
+    """ریست کردن وضعیت جهانی هاپوی خیابونی"""
+    try:
+        supabase.table("settings").upsert({
+            "key": "street_hapo_active",
+            "value": "false",
+            "data": {},
+            "updated_at": datetime.now().isoformat()
+        }).execute()
+        return True
+    except Exception as e:
+        logging.error(f"Error resetting street hapo: {e}")
+        return False
+
+def get_street_hapo_status():
+    """دریافت وضعیت فعلی هاپوی خیابونی"""
+    try:
+        response = supabase.table("settings").select("*").eq("key", "street_hapo_active").execute()
+        if response.data and len(response.data) > 0:
+            data = response.data[0]
+            return {
+                "active": data.get("value") == "true",
+                "data": data.get("data", {})
+            }
+        return {"active": False, "data": {}}
+    except Exception as e:
+        logging.error(f"Error getting street hapo status: {e}")
+        return {"active": False, "data": {}}
+
+def set_street_hapo_status(active, data=None):
+    """تنظیم وضعیت هاپوی خیابونی"""
+    try:
+        supabase.table("settings").upsert({
+            "key": "street_hapo_active",
+            "value": "true" if active else "false",
+            "data": data or {},
+            "updated_at": datetime.now().isoformat()
+        }).execute()
+        return True
+    except Exception as e:
+        logging.error(f"Error setting street hapo status: {e}")
         return False
