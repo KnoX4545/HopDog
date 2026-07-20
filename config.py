@@ -75,17 +75,17 @@ CLAW_DATA = {
 MAX_CLAW_LEVEL = 7
 
 # ================================================================
-# عکس‌های پنجه (هر سطح)
+# عکس‌های پنجه (هر سطح) - آدرس مستقیم از GitHub
 # ================================================================
 
 CLAW_IMAGES = {
-    1: "https://raw.githubusercontent.com/YOUR_USERNAME/YOUR_REPO/main/claw_1.jpg",
-    2: "https://raw.githubusercontent.com/YOUR_USERNAME/YOUR_REPO/main/claw_2.jpg",
-    3: "https://raw.githubusercontent.com/YOUR_USERNAME/YOUR_REPO/main/claw_3.jpg",
-    4: "https://raw.githubusercontent.com/YOUR_USERNAME/YOUR_REPO/main/claw_4.jpg",
-    5: "https://raw.githubusercontent.com/YOUR_USERNAME/YOUR_REPO/main/claw_5.jpg",
-    6: "https://raw.githubusercontent.com/YOUR_USERNAME/YOUR_REPO/main/claw_6.jpg",
-    7: "https://raw.githubusercontent.com/YOUR_USERNAME/YOUR_REPO/main/claw_7.jpg",
+    1: "https://raw.githubusercontent.com/KnoX4545/HopDog/main/claw_1.jpg",
+    2: "https://raw.githubusercontent.com/KnoX4545/HopDog/main/claw_2.jpg",
+    3: "https://raw.githubusercontent.com/KnoX4545/HopDog/main/claw_3.jpg",
+    4: "https://raw.githubusercontent.com/KnoX4545/HopDog/main/claw_4.jpg",
+    5: "https://raw.githubusercontent.com/KnoX4545/HopDog/main/claw_5.jpg",
+    6: "https://raw.githubusercontent.com/KnoX4545/HopDog/main/claw_6.jpg",
+    7: "https://raw.githubusercontent.com/KnoX4545/HopDog/main/claw_7.jpg",
 }
 
 ANIMALS = {
@@ -175,7 +175,7 @@ STREET_HAPO_FAIL_MESSAGES = [
     "{name} باعث شد با یک گربه وحشی درگیر بشه و بمیره 🐱⚔️"
 ]
 
-STREET_HAPO_IMAGE_URL = "https://raw.githubusercontent.com/YOUR_USERNAME/YOUR_REPO/main/street_hapo.jpg"
+STREET_HAPO_IMAGE_URL = "https://raw.githubusercontent.com/KnoX4545/HopDog/main/street_hapo.jpg"
 
 # ================================================================
 # سایر تنظیمات
