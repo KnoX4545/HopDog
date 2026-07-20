@@ -7,7 +7,8 @@ from config import TOKEN, STREET_HAPO_INTERVAL
 from handlers import (
     start, help_command, handle_message, handle_callback, group_welcome,
     set_user_level, add_user_level, set_user_point, add_user_point, get_user_info,
-    jail_user_command, send_street_hapo_notification, admin_street_hapo, list_groups
+    jail_user_command, send_street_hapo_notification, admin_street_hapo,
+    list_groups, reset_user_command
 )
 
 logging.basicConfig(level=logging.INFO)
@@ -31,6 +32,9 @@ def main():
     app.add_handler(CommandHandler("hapo", admin_street_hapo))
     app.add_handler(CommandHandler("groups", list_groups))
     
+    # ======== دستور ریست کاربر (فقط ادمین - فقط پیوی) ========
+    app.add_handler(CommandHandler("rest", reset_user_command))
+    
     # ======== هندلرهای پیام و کالبک ========
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     app.add_handler(CallbackQueryHandler(handle_callback))
@@ -49,9 +53,10 @@ def main():
     print("⛓️ سیستم زندان هاپویی فعال است!")
     print("👥 سیستم رای‌گیری میو فعال است!")
     print("🐶 سیستم هاپوی خیابونی فعال است! (هر ۶ ساعت)")
-    print("📋 دستورات ادمین (فقط در پیوی):")
+    print("\n📋 دستورات ادمین (فقط در پیوی):")
     print("  - /hapo [chat_id] : ارسال هاپوی خیابونی به گروه خاص")
     print("  - /groups : لیست گروه‌های ثبت شده")
+    print("  - /rest [user_id/@username] : ریست کردن کامل یک کاربر")
     print("  - /setlevel [id] [level] : تنظیم سطح کاربر")
     print("  - /addlevel [id] [level] : اضافه کردن سطح کاربر")
     print("  - /setpoint [id] [point] : تنظیم پوینت کاربر")
