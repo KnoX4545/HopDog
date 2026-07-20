@@ -143,7 +143,7 @@ JAIL_MEOW_COOLDOWN = 60
 # تنظیمات هاپوی خیابونی
 # ================================================================
 
-STREET_HAPO_INTERVAL = 6 * 3600  # هر ۶ ساعت یکبار (به ثانیه)
+STREET_HAPO_INTERVAL = 60  # هر ۶ ساعت یکبار (به ثانیه)
 STREET_HAPO_DECISION_TIME = 60  # ۶۰ ثانیه فرصت برای نجات
 STREET_HAPO_MAX_ATTEMPTS = 3  # حداکثر ۳ تلاش
 STREET_HAPO_SUCCESS_CHANCE = 0.30  # ۳۰% شانس موفقیت
