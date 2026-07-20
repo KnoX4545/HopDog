@@ -1,4 +1,4 @@
-# handlers.py - هندلرهای پیام و کالبک (نسخه کامل اصلاح شده)
+# handlers.py - هندلرهای پیام و کالبک (نسخه کامل نهایی با رفع پروفایل)
 
 import os
 import json
@@ -1576,7 +1576,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             del TRANSFER_STATE[user_id]
         return
     
-    # ======== میو (گربه بی ادب) - اصلاح شده ========
+    # ======== میو (گربه بی ادب) ========
     if data.startswith("meow_vote_"):
         vote_key = data.replace("meow_vote_", "")
         
@@ -1647,7 +1647,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
 # ================================================================
-# پروفایل از کالبک (اصلاح شده - با edit_message_text)
+# پروفایل از کالبک (رفع مشکل - نسخه نهایی)
 # ================================================================
 
 async def my_profile_from_callback(query, game):
@@ -1684,18 +1684,24 @@ async def my_profile_from_callback(query, game):
     else:
         keyboard.append([InlineKeyboardButton("🔒 قفل کردن پروفایل", callback_data="profile_lock_confirm")])
     
-    # ✅ استفاده از edit_message_text برای جلوگیری از خطا
     try:
+        # ✅ روش اول: سعی کن با edit_message_text ادیت کنه
         await query.edit_message_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
     except Exception as e:
-        logging.error(f"Error in my_profile_from_callback: {e}")
+        logging.error(f"Error editing profile: {e}")
         try:
+            # ✅ روش دوم: اگه خطا داد، پیام جدید بفرست و پیام قبلی رو حذف کن
+            await query.message.delete()
             await query.message.reply_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
         except:
-            pass
+            try:
+                # ✅ روش سوم: فقط پیام جدید بفرست
+                await query.message.reply_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
+            except:
+                pass
 
 # ================================================================
-# دستورات ادمین (فقط در پیوی) - ادامه
+# دستورات ادمین (فقط در پیوی)
 # ================================================================
 
 async def get_user_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
