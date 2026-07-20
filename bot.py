@@ -32,7 +32,7 @@ def main():
     
     print("🤖 بات HopDog با Supabase اجرا شد!")
     print("⛓️ سیستم زندان هاپویی فعال است!")
-    print("👥 سیستم رای‌گیری میو: همزمان چندین رای‌گیری قابل انجام است!")
+    print("👥 سیستم رای‌گیری میو فعال است!")
     app.run_polling(allowed_updates=Update.ALL_TYPES)
 
 if __name__ == "__main__":
