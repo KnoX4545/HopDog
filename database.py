@@ -32,11 +32,19 @@ def get_user_data(user_id):
                     data["jail_voted"] = []
             else:
                 data["jail_voted"] = []
-            # فیلدهای جدید
+            # فیلدهای جدید - اطمینان از وجود
             if "bank_card_number" not in data:
                 data["bank_card_number"] = ""
             if "jail_admin_id" not in data:
                 data["jail_admin_id"] = None
+            if "hunt_time" not in data:
+                data["hunt_time"] = 0
+            if "is_transferring" not in data:
+                data["is_transferring"] = False
+            if "profile_hidden" not in data:
+                data["profile_hidden"] = False
+            if "profile_locked" not in data:
+                data["profile_locked"] = False
             return data
         return None
     except Exception as e:
