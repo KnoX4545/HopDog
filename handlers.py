@@ -1202,7 +1202,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["new_hapo_name"] = None
         return
     
-    # ======== پروفایل - با حذف پیام و ارسال جدید ========
+    # ======== پروفایل - با حذف پیام و ارسال مجدد ========
     if data == "profile_hide_confirm":
         keyboard = get_confirm_keyboard("profile_hide_yes", "profile_hide_no")
         await query.edit_message_text(
@@ -1217,7 +1217,10 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if data == "profile_hide_yes":
         game.data["profile_hidden"] = True
         game.save_data()
-        await query.message.delete()
+        try:
+            await query.message.delete()
+        except:
+            pass
         await my_profile_from_callback(query, game)
         return
     
@@ -1240,7 +1243,10 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if data == "profile_show_yes":
         game.data["profile_hidden"] = False
         game.save_data()
-        await query.message.delete()
+        try:
+            await query.message.delete()
+        except:
+            pass
         await my_profile_from_callback(query, game)
         return
     
@@ -1263,7 +1269,10 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if data == "profile_lock_yes":
         game.data["profile_locked"] = True
         game.save_data()
-        await query.message.delete()
+        try:
+            await query.message.delete()
+        except:
+            pass
         await my_profile_from_callback(query, game)
         return
     
@@ -1286,7 +1295,10 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if data == "profile_unlock_yes":
         game.data["profile_locked"] = False
         game.save_data()
-        await query.message.delete()
+        try:
+            await query.message.delete()
+        except:
+            pass
         await my_profile_from_callback(query, game)
         return
     
@@ -1647,7 +1659,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
 # ================================================================
-# پروفایل از کالبک (نسخه نهایی - با حذف پیام قبلی)
+# پروفایل از کالبک (نسخه نهایی - حذف و ارسال مجدد)
 # ================================================================
 
 async def my_profile_from_callback(query, game):
@@ -1684,7 +1696,7 @@ async def my_profile_from_callback(query, game):
     else:
         keyboard.append([InlineKeyboardButton("🔒 قفل کردن پروفایل", callback_data="profile_lock_confirm")])
     
-    # ======== حذف پیام قبلی و ارسال جدید ========
+    # ✅ حذف پیام قبلی و ارسال جدید
     try:
         await query.message.delete()
     except:
