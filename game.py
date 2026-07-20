@@ -44,8 +44,8 @@ class HopDogGame:
                 data["jail_arrest_time"] = 0
             if "jail_voted" not in data:
                 data["jail_voted"] = []
-            if "jail_meow_last" not in data:
-                data["jail_meow_last"] = 0
+            if "jail_admin_id" not in data:
+                data["jail_admin_id"] = None
             # چک کردن خودکار آزادی
             if data.get("jailed", False):
                 now = datetime.now().timestamp()
@@ -55,6 +55,7 @@ class HopDogGame:
                     data["jail_until"] = 0
                     data["jail_fine"] = 0
                     data["jail_arrest_time"] = 0
+                    data["jail_admin_id"] = None
                     save_user_data(self.user_id, data)
             return data
         return None
@@ -99,7 +100,7 @@ class HopDogGame:
             "jail_fine": 0,
             "jail_arrest_time": 0,
             "jail_voted": [],
-            "jail_meow_last": 0,
+            "jail_admin_id": None,
             "last_updated": datetime.now().isoformat()
         }
         self.save_data()
@@ -673,6 +674,7 @@ class HopDogGame:
             self.data["jail_until"] = 0
             self.data["jail_fine"] = 0
             self.data["jail_arrest_time"] = 0
+            self.data["jail_admin_id"] = None
             self.save_data()
             return False
         return True
@@ -691,6 +693,18 @@ class HopDogGame:
         self.data["jail_until"] = now + duration
         self.data["jail_fine"] = fine
         self.data["jail_arrest_time"] = now
+        self.data["jail_admin_id"] = None
+        self.save_data()
+        return {"success": True}
+
+    def jail_user_with_admin(self, reason, duration, fine, admin_id):
+        now = datetime.now().timestamp()
+        self.data["jailed"] = True
+        self.data["jail_reason"] = reason
+        self.data["jail_until"] = now + duration
+        self.data["jail_fine"] = fine
+        self.data["jail_arrest_time"] = now
+        self.data["jail_admin_id"] = admin_id
         self.save_data()
         return {"success": True}
 
@@ -708,6 +722,7 @@ class HopDogGame:
         self.data["jail_until"] = 0
         self.data["jail_fine"] = 0
         self.data["jail_arrest_time"] = 0
+        self.data["jail_admin_id"] = None
         self.save_data()
         return {"success": True}
 
@@ -725,7 +740,8 @@ class HopDogGame:
             "reason": self.data.get("jail_reason", "نامشخص"),
             "remaining": remaining,
             "fine": self.data.get("jail_fine", 0),
-            "arrest_time": self.data.get("jail_arrest_time", 0)
+            "arrest_time": self.data.get("jail_arrest_time", 0),
+            "admin_id": self.data.get("jail_admin_id", None)
         }
 
     def add_meow_vote(self, voter_id):
