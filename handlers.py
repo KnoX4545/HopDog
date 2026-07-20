@@ -1,4 +1,4 @@
-# handlers.py - هندلرهای پیام و کالبک (نسخه کامل نهایی)
+# handlers.py - هندلرهای پیام و کالبک (نسخه کامل اصلاح شده)
 
 import os
 import json
@@ -141,7 +141,7 @@ def check_spam(user_id):
     return False
 
 # ================================================================
-# هندلر گروه (چک کردن تعداد ممبر)
+# هندلر گروه
 # ================================================================
 
 async def group_welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -235,7 +235,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await show_academy_main(update)
 
 # ================================================================
-# زندان هاپویی (با تاریخ دستگیری - فقط تاریخ)
+# زندان هاپویی
 # ================================================================
 
 async def show_jail(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -280,8 +280,9 @@ async def show_jail(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     keyboard = [[InlineKeyboardButton("💰 پرداخت جریمه", callback_data="jail_pay_fine")]]
     await update.message.reply_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
+
 # ================================================================
-# پروفایل - نسخه ساده شده (بدون تیک/ضربدر)
+# پروفایل
 # ================================================================
 
 async def my_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -397,81 +398,7 @@ async def show_user_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(msg)
 
 # ================================================================
-# پروفایل از کالبک - فقط متن (بدون عکس)
-# ================================================================
-
-async def my_profile_from_callback(query, game):
-    user_id = int(game.user_id)
-    full_name = game.data["player_name"]
-    
-    required = game.get_required_for_level(game.data["level"])
-    is_hidden = game.data.get("profile_hidden", False)
-    is_locked = game.data.get("profile_locked", False)
-    
-    msg = f"╮──「 🐶 پروفایل هاپویی 🐶 」\n\n"
-    msg += f"┐─ 👤 کاربر : {full_name}\n"
-    if not is_hidden:
-        msg += f"‏┘─ 🪪 آیدی : {user_id}\n\n"
-    else:
-        msg += f"‏┘─ 🪪 آیدی : 🔒 مخفی\n\n"
-    
-    msg += f"┐─ 💰 هاپ پوینت ها : {format_number(game.data['hop_point'])} 🪙\n"
-    msg += f"┐─ 🐾 هاپ هاپ ها : {game.data['hop_count']}\n\n"
-    
-    if game.data["level"] < 20:
-        msg += f"╯─ ⭐️ سطح : {game.data['level']} | {game.data['hop_count']} / {required}"
-    else:
-        msg += f"╯─ ⭐️ سطح : {game.data['level']} 🏆 نهایی"
-    
-    keyboard = []
-    if is_hidden:
-        keyboard.append([InlineKeyboardButton("👀 نمایش پروفایل", callback_data="profile_show")])
-    else:
-        keyboard.append([InlineKeyboardButton("👀 مخفی کردن پروفایل", callback_data="profile_hide")])
-    
-    if is_locked:
-        keyboard.append([InlineKeyboardButton("🔓 باز کردن پروفایل", callback_data="profile_unlock")])
-    else:
-        keyboard.append([InlineKeyboardButton("🔒 قفل کردن پروفایل", callback_data="profile_lock")])
-    
-    # ✅ فقط متن، بدون عکس
-    await query.edit_message_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
-
-# ================================================================
-# و در handle_callback - بخش پروفایل
-# ================================================================
-
-# ======== پروفایل - ساده (بدون تیک/ضربدر) ========
-if data == "profile_hide":
-    game.data["profile_hidden"] = True
-    game.save_data()
-    await query.edit_message_text("✅ پروفایل شما مخفی شد.")
-    await my_profile_from_callback(query, game)
-    return
-
-if data == "profile_show":
-    game.data["profile_hidden"] = False
-    game.save_data()
-    await query.edit_message_text("✅ پروفایل شما نمایش داده شد.")
-    await my_profile_from_callback(query, game)
-    return
-
-if data == "profile_lock":
-    game.data["profile_locked"] = True
-    game.save_data()
-    await query.edit_message_text("✅ پروفایل شما قفل شد.")
-    await my_profile_from_callback(query, game)
-    return
-
-if data == "profile_unlock":
-    game.data["profile_locked"] = False
-    game.save_data()
-    await query.edit_message_text("✅ پروفایل شما باز شد.")
-    await my_profile_from_callback(query, game)
-    return
-
-# ================================================================
-# دستورات هاپ، هاپو، پنجه، شکار (با چک زندان)
+# دستورات هاپ، هاپو، پنجه، شکار
 # ================================================================
 
 async def do_hop(update: Update, game):
@@ -648,7 +575,7 @@ async def show_bank_menu(update: Update, game):
     await update.message.reply_text(msg, reply_markup=keyboard)
 
 # ================================================================
-# دستور انتقال هاپویی (با چک زندان و جلوگیری از انتقال همزمان)
+# دستور انتقال هاپویی
 # ================================================================
 
 async def transfer_points_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -784,7 +711,7 @@ async def process_transfer_amount(update: Update, context: ContextTypes.DEFAULT_
         del TRANSFER_STATE[user_id]
 
 # ================================================================
-# سیستم میو (گربه بی ادب) - نسخه همزمان اصلاح شده
+# سیستم میو
 # ================================================================
 
 async def handle_meow(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -826,7 +753,6 @@ async def handle_meow(update: Update, context: ContextTypes.DEFAULT_TYPE):
     asyncio.create_task(meow_vote_timer(vote_key, context))
 
 async def meow_vote_timer(vote_key, context):
-    """تایمر رای‌گیری میو"""
     await asyncio.sleep(JAIL_VOTE_DURATION)
     
     if vote_key in MEOW_VOTES:
@@ -866,11 +792,10 @@ async def meow_vote_timer(vote_key, context):
             pass
 
 # ================================================================
-# کامند ادمین - jail (زندانی کردن کاربر)
+# کامند ادمین - jail
 # ================================================================
 
 async def jail_user_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """دستور jail - زندانی کردن کاربر (فقط ادمین در پیوی)"""
     chat_type = update.message.chat.type
     if chat_type in ["group", "supergroup"]:
         return
@@ -915,10 +840,7 @@ async def jail_user_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     target_user_id = user_data['user_id']
     target_game = get_game(int(target_user_id))
     
-    # جریمه: 250 پوینت به ازای هر دقیقه
     fine = duration_minutes * 250
-    
-    # زندانی کردن با ذخیره آیدی ادمین
     target_game.jail_user_with_admin(reason, duration_minutes * 60, fine, user_id)
     
     admin_name = full_name or username or f"کاربر{user_id}"
@@ -929,7 +851,6 @@ async def jail_user_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"🏦 جریمه: {format_number(fine)} 🪙"
     )
     
-    # ارسال پیام به کاربر زندانی شده
     try:
         await context.bot.send_message(
             int(target_user_id),
@@ -975,7 +896,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except:
             pass
     
-    # ======== چک کردن زندان (فقط برای کامندهای بات) ========
+    # ======== چک کردن زندان ========
     if is_group and game.is_jailed():
         allowed_commands = ["زندان هاپویی", "زندان", "بانک هاپویی", "هاپو بانک", "بانک", "kknoxx1"]
         
@@ -986,8 +907,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "هاپو", "hapo", "پنجه", "claw", "شکار", "hunt",
                 "هاپوهام", "هاپو هام", "هاپوهاش", "هاپو هاش",
                 "انتقال هاپویی", "انتقالهاپویی",
-                "آکادمی هاپویی", "اکادمی هاپویی", "اکادمی", "آکادمی",
-                "تغییر اسم", "اسم هاپویی"
+                "آکادمی هاپویی", "اکادمی هاپویی", "اکادمی", "آکادمی"
             ]
             
             for cmd in bot_commands:
@@ -999,7 +919,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await update.message.reply_text("⛓️ شما در زندان هستید. فقط با «زندان هاپویی» میتوانید وضعیت خود را ببینید.")
                 return
     
-    # ======== سیستم تشخیص اسپم (فقط در گروه) ========
+    # ======== اسپم ========
     if is_group and text_lower not in ["زندان هاپویی", "زندان", "kknoxx1"]:
         if check_spam(user_id):
             game = get_game(user_id)
@@ -1094,7 +1014,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await process_transfer_amount(update, context)
         return
     
-    # ======== دستورات در پیوی ========
+    # ======== پیوی ========
     if is_private:
         if text_lower in ["start", "/start"]:
             keyboard = [
@@ -1112,7 +1032,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             context.user_data["waiting_for_admin"] = True
         return
     
-    # ======== دستورات در گروه ========
+    # ======== گروه ========
     if is_group:
         if text_lower in ["زندان هاپویی", "زندان"]:
             await show_jail(update, context)
@@ -1297,7 +1217,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await my_profile_from_callback(query, game)
         return
     
-    # ======== هاپو ========
+    # ======== بقیه کالبک‌ها ========
     if data == "buy_hapo":
         result = game.buy_hapo()
         if result["success"]:
@@ -1578,7 +1498,6 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             del TRANSFER_STATE[user_id]
         return
     
-    # ======== میو (گربه بی ادب) ========
     if data.startswith("meow_vote_"):
         vote_key = data.replace("meow_vote_", "")
         
@@ -1649,7 +1568,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
 # ================================================================
-# پروفایل از کالبک - ساده شده (بدون عکس)
+# پروفایل از کالبک - فقط متن
 # ================================================================
 
 async def my_profile_from_callback(query, game):
@@ -1689,7 +1608,7 @@ async def my_profile_from_callback(query, game):
     await query.edit_message_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
 
 # ================================================================
-# دستورات ادمین (فقط در پیوی)
+# دستورات ادمین
 # ================================================================
 
 async def get_user_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
