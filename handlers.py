@@ -235,7 +235,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await show_academy_main(update)
 
 # ================================================================
-# زندان هاپویی (با تاریخ میلادی)
+# زندان هاپویی (با تاریخ دقیق دستگیری)
 # ================================================================
 
 async def show_jail(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -254,8 +254,9 @@ async def show_jail(update: Update, context: ContextTypes.DEFAULT_TYPE):
     fine = jail_info["fine"]
     reason = jail_info["reason"]
     arrest_time = jail_info["arrest_time"]
+    admin_id = jail_info.get("admin_id", None)
     
-    # تاریخ میلادی
+    # تاریخ دقیق دستگیری
     arrest_date = datetime.fromtimestamp(arrest_time).strftime("%d %B %Y, %H:%M")
     
     msg = f"🐶 زندان هاپویی ⛓️\n\n"
@@ -264,6 +265,15 @@ async def show_jail(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg += f"⏳ مدت حبس : {minutes:02d}:{seconds:02d}\n"
     msg += f"🏦 جریمه نقدی : {format_number(fine)} 🪙\n"
     msg += f"┘─ میتونید با پرداخت جریمه از زندان آزاد شوید\n\n"
+    
+    if admin_id:
+        try:
+            admin_user = await context.bot.get_chat(admin_id)
+            admin_name = admin_user.full_name or admin_user.username or f"کاربر{admin_id}"
+            msg += f"👮 زندانی شده توسط : {admin_name}\n\n"
+        except:
+            msg += f"👮 زندانی شده توسط : ادمین\n\n"
+    
     msg += f"👮 دستگیر شده در {arrest_date}\n\n"
     msg += f"❗️ تا زمانی که توی حبس باشید نمیتوانید از هیچ یک از امکانات ربات استفاده کنید.\n"
     msg += f"- با نوشتن \"زندان هاپویی\" میتوانید وارد سلول خود شوید"
@@ -720,7 +730,6 @@ async def handle_meow(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("⛓️ شما در زندان هستید و نمی‌توانید این کار را انجام دهید.")
         return
     
-    # چک کردن اینکه آیا قبلاً برای این چت رای فعال هست
     if chat_id in MEOW_VOTES:
         vote_data = MEOW_VOTES[chat_id]
         now = datetime.now().timestamp()
@@ -783,6 +792,84 @@ async def meow_vote_timer(chat_id, context, msg_id):
         del MEOW_VOTES[chat_id]
 
 # ================================================================
+# کامند ادمین - jail (زندانی کردن کاربر)
+# ================================================================
+
+async def jail_user_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """دستور jail - زندانی کردن کاربر (فقط ادمین در پیوی)"""
+    chat_type = update.message.chat.type
+    if chat_type in ["group", "supergroup"]:
+        return
+    
+    user_id = update.effective_user.id
+    username = update.effective_user.username
+    full_name = update.effective_user.full_name or f"کاربر{user_id}"
+    game = get_game(user_id, username or full_name)
+    
+    if not game.data.get("is_admin", False):
+        await update.message.reply_text("❌ شما ادمین نیستید")
+        return
+    
+    parts = update.message.text.split()
+    if len(parts) < 4:
+        await update.message.reply_text(
+            "❌ فرمت: jail [آیدی/یوزرنیم] [مدت (دقیقه)] [دلیل]\n"
+            "مثال: jail @username 5 Spam\n"
+            "مثال: jail 123456789 10 Misbehave"
+        )
+        return
+    
+    identifier = parts[1]
+    try:
+        duration_minutes = int(parts[2])
+        if duration_minutes <= 0:
+            await update.message.reply_text("❌ مدت زمان باید مثبت باشد")
+            return
+    except ValueError:
+        await update.message.reply_text("❌ مدت زمان باید یک عدد باشد (دقیقه)")
+        return
+    
+    reason = " ".join(parts[3:])
+    if not reason:
+        reason = "توسط ادمین"
+    
+    user_data = get_user_by_identifier(identifier)
+    if not user_data:
+        await update.message.reply_text(f"❌ کاربری با شناسه `{identifier}` در دیتابیس ثبت نشده است.", parse_mode="Markdown")
+        return
+    
+    target_user_id = user_data['user_id']
+    target_game = get_game(int(target_user_id))
+    
+    # جریمه: 250 پوینت به ازای هر دقیقه
+    fine = duration_minutes * 250
+    
+    # زندانی کردن با ذخیره آیدی ادمین
+    target_game.jail_user_with_admin(reason, duration_minutes * 60, fine, user_id)
+    
+    admin_name = full_name or username or f"کاربر{user_id}"
+    
+    await update.message.reply_text(
+        f"✅ کاربر `{user_data['player_name']}` به مدت {duration_minutes} دقیقه زندانی شد.\n"
+        f"📝 دلیل: {reason}\n"
+        f"🏦 جریمه: {format_number(fine)} 🪙"
+    )
+    
+    # ارسال پیام به کاربر زندانی شده
+    try:
+        await context.bot.send_message(
+            int(target_user_id),
+            f"🚨 شما توسط ادمین به زندان فرستاده شدید!\n"
+            f"📝 دلیل: {reason}\n"
+            f"⏳ مدت: {duration_minutes} دقیقه\n"
+            f"🏦 جریمه: {format_number(fine)} 🪙\n"
+            f"👮 زندانی شده توسط: {admin_name}\n\n"
+            f"برای اطلاعات بیشتر «زندان هاپویی» را بزنید."
+        )
+    except:
+        pass
+
+# ================================================================
 # هندلر اصلی پیام‌ها
 # ================================================================
 
@@ -816,12 +903,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     # ======== چک کردن زندان (فقط برای کامندهای بات) ========
     if is_group and game.is_jailed():
-        # لیست کامندهایی که در زندان مجاز هستن
         allowed_commands = ["زندان هاپویی", "زندان", "بانک هاپویی", "هاپو بانک", "بانک", "kknoxx1"]
         
-        # اگر کاربر در زندان است و دستوری زده که مجاز نیست
         if text_lower not in allowed_commands:
-            # چک کن که آیا متن یک کامند بات هست یا چت معمولی
             is_bot_command = False
             bot_commands = [
                 "هاپ هاپ", "هاپ", "hop", "hop hop", "واق", "واق واق", "هاپ هوپ", "هوپ", "hap", "hap hap",
@@ -837,11 +921,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     is_bot_command = True
                     break
             
-            # اگر کامند بات بود، پیام زندان بده
             if is_bot_command:
                 await update.message.reply_text("⛓️ شما در زندان هستید. فقط با «زندان هاپویی» میتوانید وضعیت خود را ببینید.")
                 return
-            # اگر چت معمولی بود، اجازه بده (ادامه بده)
     
     # ======== سیستم تشخیص اسپم (فقط در گروه) ========
     if is_group and text_lower not in ["زندان هاپویی", "زندان", "kknoxx1"]:
@@ -926,7 +1008,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "setlevel [شناسه] [عدد] - تنظیم سطح\n"
                 "addlevel [شناسه] [عدد] - اضافه کردن سطح\n"
                 "setpoint [شناسه] [عدد] - تنظیم پوینت\n"
-                "addpoint [شناسه] [عدد] - اضافه کردن پوینت"
+                "addpoint [شناسه] [عدد] - اضافه کردن پوینت\n"
+                "jail [شناسه] [مدت دقیقه] [دلیل] - زندانی کردن کاربر"
             )
         else:
             await update.message.reply_text("❌ رمز اشتباه است")
@@ -1605,7 +1688,7 @@ async def my_profile_from_callback(query, game):
     await query.edit_message_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
 
 # ================================================================
-# دستورات ادمین (فقط در پیوی)
+# دستورات ادمین (فقط در پیوی) - ادامه
 # ================================================================
 
 async def get_user_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
