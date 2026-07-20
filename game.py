@@ -1,10 +1,10 @@
-# game.py - کلاس اصلی بازی (بخش ۱)
+# game.py - کلاس اصلی بازی (نسخه اصلاح شده)
 
 import random
 import json
 from datetime import datetime
 from config import *
-from database import get_user_data, save_user_data
+from database import get_user_data, save_user_data, get_user_by_card, is_card_unique
 
 class HopDogGame:
     def __init__(self, user_id, username=""):
@@ -17,7 +17,6 @@ class HopDogGame:
     def load_data(self):
         data = get_user_data(self.user_id)
         if data:
-            # اطمینان از وجود فیلدهای جدید
             if "bank_card_number" not in data:
                 data["bank_card_number"] = ""
             if "bank_transactions" not in data:
@@ -30,6 +29,8 @@ class HopDogGame:
                 data["hunt_time"] = 0
             if "last_transfer_time" not in data:
                 data["last_transfer_time"] = 0
+            if "is_transferring" not in data:
+                data["is_transferring"] = False
             return data
         return None
 
@@ -64,6 +65,7 @@ class HopDogGame:
             "profile_locked": False,
             "hunt_time": 0,
             "last_transfer_time": 0,
+            "is_transferring": False,
             "bank_card_number": "",
             "bank_transactions": [],
             "last_updated": datetime.now().isoformat()
@@ -71,7 +73,7 @@ class HopDogGame:
         self.save_data()
 
     # ============================================================
-    # متدهای سطح و هاپ
+    # متدهای سطح و هاپ (همون قبلی)
     # ============================================================
 
     def get_level_data(self, level):
@@ -119,7 +121,7 @@ class HopDogGame:
         return {"success": True, "earned": earned, "level_up": False}
 
     # ============================================================
-    # متدهای هاپو
+    # متدهای هاپو (همون قبلی)
     # ============================================================
 
     def get_hapo_total_level(self):
@@ -226,7 +228,7 @@ class HopDogGame:
         }
 
     # ============================================================
-    # متدهای پنجه و شکار
+    # متدهای پنجه و شکار (همون قبلی)
     # ============================================================
 
     def get_claw_data(self, level):
@@ -396,19 +398,28 @@ class HopDogGame:
         self.data["hunt_time"] = 0
         self.save_data()
         return {"success": True, "fed": actual}
-# game.py - کلاس اصلی بازی (بخش ۲ - ادامه)
 
     # ============================================================
-    # متدهای بانک (با کارت و تراکنش)
+    # متدهای بانک (با کارت و تراکنش - اصلاح شده)
     # ============================================================
 
     def generate_card_number(self):
-        """تولید شماره کارت ۱۳ رقمی رندوم"""
-        first_part = str(random.randint(1000, 9999))
-        second_part = str(random.randint(1000, 9999))
-        third_part = str(random.randint(1000, 9999))
-        fourth_part = str(random.randint(1000, 9999))
-        return first_part + second_part + third_part + fourth_part
+        """تولید شماره کارت ۱۳ رقمی منحصر به فرد"""
+        import random
+        from database import is_card_unique
+        
+        for _ in range(100):  # حداکثر 100 بار تلاش
+            first = str(random.randint(1000, 9999))
+            second = str(random.randint(1000, 9999))
+            third = str(random.randint(1000, 9999))
+            fourth = str(random.randint(1000, 9999))
+            card = first + second + third + fourth
+            if is_card_unique(card):
+                return card
+        
+        # اگر بعد از 100 بار نتونست، با timestamp بساز
+        import time
+        return str(int(time.time() * 1000))[:16].zfill(16)
 
     def open_bank(self):
         if self.data["level"] < BANK_REQUIRED_LEVEL:
@@ -426,13 +437,11 @@ class HopDogGame:
         self.data["bank_transactions"] = []
         self.save_data()
         
-        # اضافه کردن تراکنش افتتاح حساب
         self.add_bank_transaction("افتتاح حساب", 0, f"شماره کارت: {self.data['bank_card_number']}")
         
         return {"success": True, "card_number": self.data["bank_card_number"]}
 
     def add_bank_transaction(self, type, amount, detail=""):
-        """افزودن تراکنش به تاریخچه (حداکثر ۳ تراکنش)"""
         transactions = self.data.get("bank_transactions", [])
         now = datetime.now()
         transaction = {
@@ -442,7 +451,6 @@ class HopDogGame:
             "date": now.strftime("%H:%M %Y/%m/%d")
         }
         transactions.insert(0, transaction)
-        # فقط ۳ تراکنش آخر رو نگه دار
         self.data["bank_transactions"] = transactions[:3]
         self.save_data()
 
@@ -458,14 +466,12 @@ class HopDogGame:
         interest = min(int(self.data["bank_balance"] * BANK_INTEREST_RATE), BANK_MAX_DAILY_INTEREST)
         if interest > 0:
             self.data["bank_balance"] += interest
-            # ثبت تراکنش سود
             self.add_bank_transaction("سود بانکی", interest, f"سود {int(BANK_INTEREST_RATE*100)}%")
         
         self.data["bank_last_interest_at"] = now
         self.save_data()
 
     def get_next_interest_time(self):
-        """دریافت زمان بعدی واریز سود"""
         from datetime import timedelta
         now = datetime.now()
         next_time = now.replace(hour=BANK_INTEREST_HOUR, minute=0, second=0, microsecond=0)
@@ -502,7 +508,6 @@ class HopDogGame:
         return {"success": True, "new_balance": self.data["bank_balance"]}
 
     def change_card_number(self):
-        """تغییر شماره کارت"""
         if not self.data["bank_opened"]:
             return {"success": False, "reason": "بانک باز نشده است"}
         if self.data["hop_point"] < BANK_ACCOUNT_CHANGE_COST:
@@ -520,23 +525,30 @@ class HopDogGame:
         }
 
     def card_to_card(self, amount, target_card):
-        """کارت به کارت هاپویی"""
+        """کارت به کارت هاپویی با اعتبارسنجی کامل"""
         if not self.data["bank_opened"]:
             return {"success": False, "reason": "بانک باز نشده است"}
         if self.data["bank_balance"] < amount:
             return {"success": False, "reason": "موجودی بانک کافی نیست"}
         if amount <= 0:
             return {"success": False, "reason": "مبلغ نامعتبر است"}
-        if len(target_card) != 16 or not target_card.isdigit():
-            return {"success": False, "reason": "شماره کارت باید ۱۳ رقم باشد"}
-        if target_card == self.data["bank_card_number"]:
-            return {"success": False, "reason": "نمی‌تونی به کارت خودت انتقال بدی"}
         
-        # پیدا کردن کاربر با شماره کارت مقصد
+        # اعتبارسنجی شماره کارت: ۱۳ رقم و فقط عدد
+        if len(target_card) != 16 or not target_card.isdigit():
+            return {"success": False, "reason": "❌ شماره کارت باید ۱۳ رقم باشد"}
+        
+        if target_card == self.data["bank_card_number"]:
+            return {"success": False, "reason": "❌ نمی‌تونی به کارت خودت انتقال بدی"}
+        
+        # بررسی وجود شماره کارت در دیتابیس
         from database import get_user_by_card
         target_user = get_user_by_card(target_card)
         if not target_user:
-            return {"success": False, "reason": "کارت مقصد در سیستم ثبت نشده است"}
+            return {"success": False, "reason": "❌ کارت مقصد در سیستم ثبت نشده است"}
+        
+        # بررسی اینکه کاربر مقصد خودش نباشه
+        if str(target_user['user_id']) == self.user_id:
+            return {"success": False, "reason": "❌ نمی‌تونی به کارت خودت انتقال بدی"}
         
         # انتقال پول
         self.data["bank_balance"] -= amount
@@ -559,15 +571,18 @@ class HopDogGame:
         }
 
     def get_bank_transactions(self):
-        """دریافت تراکنش‌های بانکی"""
         return self.data.get("bank_transactions", [])
 
     # ============================================================
-    # متدهای انتقال هاپویی (کاملاً حفظ شده با تمام محدودیت‌ها)
+    # متدهای انتقال هاپویی (با جلوگیری از انتقال همزمان)
     # ============================================================
 
     def can_transfer(self):
         """بررسی امکان انتقال هاپویی"""
+        # بررسی در حال انتقال بودن
+        if self.data.get("is_transferring", False):
+            return {"success": False, "reason": "⏳ شما در حال حاضر در حال انتقال هستید. لطفاً صبر کنید."}
+        
         if self.data["level"] < TRANSFER_MIN_LEVEL_SENDER:
             return {"success": False, "reason": f"برای انتقال هاپو پوینت باید سطح {TRANSFER_MIN_LEVEL_SENDER} باشی"}
         
@@ -583,7 +598,7 @@ class HopDogGame:
         return {"success": True}
 
     def transfer_points(self, target_user_id, amount):
-        """انتقال هاپو پوینت به کاربر دیگر (با تمام محدودیت‌ها)"""
+        """انتقال هاپو پوینت به کاربر دیگر (با جلوگیری از انتقال همزمان)"""
         can = self.can_transfer()
         if not can["success"]:
             return can
@@ -606,16 +621,30 @@ class HopDogGame:
         if target_data.get("profile_locked", False):
             return {"success": False, "reason": "پروفایل کاربر مقصد قفل است"}
         
-        self.data["hop_point"] -= amount
-        target_game.data["hop_point"] += amount
-        self.data["last_transfer_time"] = datetime.now().timestamp()
-        
+        # علامت‌گذاری در حال انتقال (هم برای خودش هم برای مقصد)
+        self.data["is_transferring"] = True
+        target_game.data["is_transferring"] = True
         self.save_data()
         target_game.save_data()
         
-        return {
-            "success": True, 
-            "amount": amount, 
-            "target_name": target_data["player_name"],
-            "target_id": target_user_id
-        }
+        try:
+            # انجام انتقال
+            self.data["hop_point"] -= amount
+            target_game.data["hop_point"] += amount
+            self.data["last_transfer_time"] = datetime.now().timestamp()
+            
+            self.save_data()
+            target_game.save_data()
+            
+            return {
+                "success": True, 
+                "amount": amount, 
+                "target_name": target_data["player_name"],
+                "target_id": target_user_id
+            }
+        finally:
+            # رفع علامت در حال انتقال
+            self.data["is_transferring"] = False
+            target_game.data["is_transferring"] = False
+            self.save_data()
+            target_game.save_data()
