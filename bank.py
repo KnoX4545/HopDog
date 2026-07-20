@@ -1,4 +1,4 @@
-# bank.py - منطق بانک (منوها، کارت، تراکنش‌ها) - نسخه اصلاح شده
+# bank.py - منطق بانک (منوها، کارت، تراکنش‌ها)
 
 from datetime import datetime, timedelta
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
