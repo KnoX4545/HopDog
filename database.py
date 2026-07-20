@@ -112,6 +112,58 @@ def is_card_unique(card_number):
         return False
 
 # ================================================================
+# توابع گروه
+# ================================================================
+
+def add_group(chat_id, title):
+    """اضافه کردن گروه به دیتابیس"""
+    try:
+        supabase.table("groups").upsert({
+            "chat_id": str(chat_id),
+            "title": title,
+            "added_at": datetime.now().isoformat(),
+            "is_active": True,
+            "last_activity": datetime.now().isoformat()
+        }).execute()
+        return True
+    except Exception as e:
+        logging.error(f"Error adding group: {e}")
+        return False
+
+def get_all_groups():
+    """دریافت لیست همه گروه‌ها"""
+    try:
+        response = supabase.table("groups").select("chat_id").eq("is_active", True).execute()
+        if response.data:
+            return [row["chat_id"] for row in response.data]
+        return []
+    except Exception as e:
+        logging.error(f"Error getting groups: {e}")
+        return []
+
+def update_group_activity(chat_id):
+    """به‌روزرسانی زمان آخرین فعالیت گروه"""
+    try:
+        supabase.table("groups").update({
+            "last_activity": datetime.now().isoformat()
+        }).eq("chat_id", str(chat_id)).execute()
+        return True
+    except Exception as e:
+        logging.error(f"Error updating group activity: {e}")
+        return False
+
+def remove_group(chat_id):
+    """غیرفعال کردن یک گروه"""
+    try:
+        supabase.table("groups").update({
+            "is_active": False
+        }).eq("chat_id", str(chat_id)).execute()
+        return True
+    except Exception as e:
+        logging.error(f"Error removing group: {e}")
+        return False
+
+# ================================================================
 # توابع هاپوی خیابونی
 # ================================================================
 
