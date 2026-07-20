@@ -19,7 +19,7 @@ from config import (
     JAIL_VOTE_DURATION, JAIL_VOTE_NEEDED, HUNT_DECISION_TIMER,
     STREET_HAPO_DECISION_TIME, STREET_HAPO_COSTS, STREET_HAPO_SUCCESS_CHANCE,
     STREET_HAPO_IMAGE_URL, STREET_HAPO_REWARD_MIN, STREET_HAPO_REWARD_MAX,
-    STREET_HAPO_FAIL_MESSAGES, CLAW_IMAGES
+    STREET_HAPO_FAIL_MESSAGES, STREET_HAPO_MAX_ATTEMPTS, CLAW_IMAGES
 )
 from game import HopDogGame, StreetHapo
 from database import get_user_by_identifier, get_user_by_card, get_all_groups, add_group, remove_group
@@ -1031,31 +1031,48 @@ async def handle_street_hapo_rescue(update: Update, context: ContextTypes.DEFAUL
     street_hapo = get_street_hapo()
     
     if not street_hapo.active:
-        await query.edit_message_caption(
-            caption="🐶 هیچ هاپوی خیابونی در دسترس نیست!"
-        )
+        await query.answer("🐶 هیچ هاپوی خیابونی در دسترس نیست!")
+        await query.message.reply_text("🐶 هیچ هاپوی خیابونی در دسترس نیست!")
         return
     
     if street_hapo.is_expired():
         street_hapo.active = False
         street_hapo.save_status()
-        await query.edit_message_caption(
-            caption="⏰ هاپوی خیابونی فرار کرد!"
-        )
+        await query.answer("⏰ هاپوی خیابونی فرار کرد!")
+        await query.message.reply_text("⏰ هاپوی خیابونی فرار کرد!")
         return
     
     if street_hapo.data.get("rescued", False):
         await query.answer("❌ این هاپوی خیابونی قبلاً نجات پیدا کرده!")
         return
     
+    # ======== تلاش برای نجات ========
     result = street_hapo.attempt_rescue(user_id, full_name, game)
     
+    # تعداد تلاش‌های انجام شده
+    attempts = street_hapo.data.get("attempts", 0)
+    total_attempts = STREET_HAPO_MAX_ATTEMPTS
+    
     if result.get("success", False) and result.get("rescued", False):
+        # ======== موفقیت ========
         keyboard = [[InlineKeyboardButton("🎉 تبریک!", callback_data="street_hapo_ignore")]]
-        await query.edit_message_caption(
-            caption=result["message"],
+        
+        msg = f"🎉 {full_name} هاپوی خیابونی رو نجات داد!\n\n"
+        msg += f"💰 {result['reward']} 🪙 هاپو پوینت جایزه گرفتی!\n"
+        msg += f"🐶 تعداد هاپوهای نجات داده شده: {game.data.get('street_hapo_rescued', 0)}\n\n"
+        msg += f"🔄 تعداد تلاش‌ها: {attempts}/{total_attempts}"
+        
+        # پیام جدید بفرست (بدون عکس)
+        await query.message.reply_text(
+            msg,
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
+        
+        # پیام اصلی رو حذف کن
+        try:
+            await query.message.delete()
+        except:
+            pass
         
         try:
             await context.bot.send_message(
@@ -1068,28 +1085,49 @@ async def handle_street_hapo_rescue(update: Update, context: ContextTypes.DEFAUL
             pass
         
     elif result.get("died", False):
-        await query.edit_message_caption(
-            caption=result["message"]
-        )
+        # ======== هاپو مرد ========
+        msg = f"💀 {result['message']}\n\n"
+        msg += f"🔄 تعداد تلاش‌ها: {attempts}/{total_attempts}"
+        
+        await query.message.reply_text(msg)
+        try:
+            await query.message.delete()
+        except:
+            pass
         
     elif not result.get("success", False):
+        # ======== خطا ========
         await query.answer(result.get("reason", "خطا!"))
         
     else:
+        # ======== تلاش ناموفق ولی هاپو زنده‌ست ========
         remaining = result.get("remaining_attempts", 0)
         cost = street_hapo.get_attempt_cost()
+        remaining_time = street_hapo.get_remaining_time()
+        
+        msg = f"❌ {result['message']}\n\n"
+        msg += f"🔄 تلاش‌های انجام شده: {attempts}/{total_attempts}\n"
+        msg += f"⏳ زمان باقی‌مونده: {remaining_time} ثانیه\n"
         
         keyboard = []
         if cost is not None and remaining > 0:
             keyboard.append([InlineKeyboardButton(f"🐶 تلاش مجدد ({cost} 🪙)", callback_data="street_hapo_rescue")])
+            msg += f"💰 هزینه تلاش بعدی: {cost} 🪙"
+        else:
+            msg += f"❌ همه شانس‌ها از دست رفته!"
         
-        await query.edit_message_caption(
-            caption=f"{result['message']}\n\n"
-                   f"🔄 تلاش‌های باقی‌مونده: {remaining}\n"
-                   f"💰 هزینه تلاش بعدی: {cost} 🪙\n"
-                   f"⏳ زمان باقی‌مونده: {street_hapo.get_remaining_time()} ثانیه",
-            reply_markup=InlineKeyboardMarkup(keyboard) if keyboard else None
-        )
+        # ویرایش پیام اصلی (چون عکس داره از edit_message_caption استفاده کن)
+        try:
+            await query.edit_message_caption(
+                caption=msg,
+                reply_markup=InlineKeyboardMarkup(keyboard) if keyboard else None
+            )
+        except:
+            # اگر نتونست ادیت کنه، پیام جدید بفرست
+            await query.message.reply_text(
+                msg,
+                reply_markup=InlineKeyboardMarkup(keyboard) if keyboard else None
+            )
 
 
 # ================================================================
