@@ -1018,7 +1018,7 @@ async def street_hapo_timer(street_hapo, context):
 
 
 async def handle_street_hapo_rescue(update: Update, context: ContextTypes.DEFAULT_TYPE, query):
-    """هندلر دکمه نجات هاپوی خیابونی"""
+    """هندلر دکمه نجات هاپوی خیابونی - با پیام جدید برای هر تلاش"""
     user_id = update.effective_user.id
     username = update.effective_user.username
     full_name = update.effective_user.full_name or f"کاربر{user_id}"
@@ -1089,6 +1089,7 @@ async def handle_street_hapo_rescue(update: Update, context: ContextTypes.DEFAUL
         msg = f"💀 {result['message']}\n\n"
         msg += f"🔄 تعداد تلاش‌ها: {attempts}/{total_attempts}"
         
+        # پیام جدید بفرست
         await query.message.reply_text(msg)
         try:
             await query.message.delete()
@@ -1116,26 +1117,31 @@ async def handle_street_hapo_rescue(update: Update, context: ContextTypes.DEFAUL
         else:
             msg += f"❌ همه شانس‌ها از دست رفته!"
         
-        # ویرایش پیام اصلی (چون عکس داره از edit_message_caption استفاده کن)
+        # پیام جدید بفرست (با دکمه تلاش مجدد)
+        await query.message.reply_text(
+            msg,
+            reply_markup=InlineKeyboardMarkup(keyboard) if keyboard else None
+        )
+        
+        # پیام اصلی رو حذف کن تا گیج کننده نباشه
         try:
-            await query.edit_message_caption(
-                caption=msg,
-                reply_markup=InlineKeyboardMarkup(keyboard) if keyboard else None
-            )
+            await query.message.delete()
         except:
-            # اگر نتونست ادیت کنه، پیام جدید بفرست
-            await query.message.reply_text(
-                msg,
-                reply_markup=InlineKeyboardMarkup(keyboard) if keyboard else None
-            )
+            pass
 
 
 # ================================================================
-# دستور ادمین - ارسال هاپوی خیابونی به گروه خاص (/hapo)
+# دستور ادمین - ارسال هاپوی خیابونی به گروه خاص (/hapo) - فقط پیوی
 # ================================================================
 
 async def admin_street_hapo(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """دستور ادمین برای ارسال هاپوی خیابونی به یک گروه خاص"""
+    """دستور ادمین برای ارسال هاپوی خیابونی به یک گروه خاص - فقط در پیوی"""
+    
+    # چک کردن اینکه در پیوی هست یا نه
+    if update.message.chat.type in ["group", "supergroup"]:
+        await update.message.reply_text("❌ این دستور فقط در پیوی بات قابل استفاده است!")
+        return
+    
     user_id = update.effective_user.id
     game = get_game(user_id)
     
@@ -1158,7 +1164,6 @@ async def admin_street_hapo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     chat_id_str = parts[1]
     
-    # ✅ اصلاح: تبدیل به عدد با try/except (پشتیبانی از اعداد منفی)
     try:
         chat_id = int(chat_id_str)
     except ValueError:
@@ -1205,11 +1210,17 @@ async def admin_street_hapo(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 # ================================================================
-# دستور لیست گروه‌ها (فقط ادمین)
+# دستور لیست گروه‌ها (فقط ادمین) - فقط پیوی
 # ================================================================
 
 async def list_groups(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """لیست همه گروه‌های ثبت شده (فقط ادمین)"""
+    """لیست همه گروه‌های ثبت شده (فقط ادمین) - فقط در پیوی"""
+    
+    # چک کردن اینکه در پیوی هست یا نه
+    if update.message.chat.type in ["group", "supergroup"]:
+        await update.message.reply_text("❌ این دستور فقط در پیوی بات قابل استفاده است!")
+        return
+    
     user_id = update.effective_user.id
     game = get_game(user_id)
     
