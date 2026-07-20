@@ -314,7 +314,7 @@ async def show_jail(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 # ================================================================
-# پروفایل
+# پروفایل - (هاپوهام با هاپوی خیابونی)
 # ================================================================
 
 async def my_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -671,13 +671,12 @@ async def transfer_points_command(update: Update, context: ContextTypes.DEFAULT_
         await update.message.reply_text("⏳ شما در حال حاضر در حال انتقال هستید. لطفاً صبر کنید.")
         return
     
+    # ======== بررسی ریپلای ========
     if not update.message.reply_to_message:
         await update.message.reply_text(
             "❌ لطفاً روی پیام یک کاربر ریپلای کن و «انتقال هاپویی» رو بزن.\n\n"
-            "یا از این فرمت استفاده کن:\n"
-            "`انتقال هاپویی @username 1000`\n"
-            "`انتقال هاپویی 123456789 1000`",
-            parse_mode="Markdown"
+            "💰 سپس مبلغ مورد نظر را به عدد وارد کن.\n"
+            f"(حداقل: {format_number(TRANSFER_MIN_AMOUNT)} - حداکثر: {format_number(TRANSFER_MAX_AMOUNT)})"
         )
         return
     
@@ -697,6 +696,7 @@ async def transfer_points_command(update: Update, context: ContextTypes.DEFAULT_
         await update.message.reply_text("❌ پروفایل کاربر مقصد قفل است.")
         return
     
+    # ======== دریافت مبلغ ========
     parts = update.message.text.split()
     if len(parts) < 2:
         await update.message.reply_text(
@@ -716,21 +716,18 @@ async def transfer_points_command(update: Update, context: ContextTypes.DEFAULT_
         await update.message.reply_text("❌ لطفاً یک عدد معتبر برای مبلغ وارد کن.")
         return
     
-    result = game.transfer_points(target_user_id, amount)
-    if result["success"]:
-        await update.message.reply_text(
-            f"✅ انتقال موفقیت‌آمیز بود!\n\n"
-            f"💰 {format_number(amount)} هاپو پوینت به {target_full_name} انتقال یافت."
-        )
-        try:
-            await context.bot.send_message(
-                target_user_id,
-                f"💰 {full_name} مبلغ {format_number(amount)} هاپو پوینت به شما انتقال داد!"
-            )
-        except:
-            pass
-    else:
-        await update.message.reply_text(f"❌ {result['reason']}")
+    # ======== تایید انتقال ========
+    keyboard = get_confirm_keyboard(f"transfer_confirm_{target_user_id}_{amount}", "transfer_cancel")
+    await update.message.reply_text(
+        f"⚠️ آیا از انتقال {format_number(amount)} 🪙 به {target_full_name} مطمئنی؟\n\n"
+        f"💰 مبلغ: {format_number(amount)} 🪙\n"
+        f"👤 گیرنده: {target_full_name}",
+        reply_markup=keyboard
+    )
+    
+    context.user_data["transfer_amount"] = amount
+    context.user_data["transfer_target"] = target_user_id
+    context.user_data["transfer_target_name"] = target_full_name
 
 
 async def process_transfer_amount(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -762,25 +759,19 @@ async def process_transfer_amount(update: Update, context: ContextTypes.DEFAULT_
     target_id = transfer_info["target_id"]
     target_name = transfer_info["target_name"]
     
-    result = game.transfer_points(target_id, amount)
-    if result["success"]:
-        await update.message.reply_text(
-            f"✅ انتقال موفقیت‌آمیز بود!\n\n"
-            f"💰 {format_number(amount)} هاپو پوینت به {target_name} انتقال یافت."
-        )
-        try:
-            await context.bot.send_message(
-                target_id,
-                f"💰 {full_name} مبلغ {format_number(amount)} هاپو پوینت به شما انتقال داد!"
-            )
-        except:
-            pass
-    else:
-        await update.message.reply_text(f"❌ {result['reason']}")
+    # ======== تایید انتقال ========
+    keyboard = get_confirm_keyboard(f"transfer_confirm_{target_id}_{amount}", "transfer_cancel")
+    await update.message.reply_text(
+        f"⚠️ آیا از انتقال {format_number(amount)} 🪙 به {target_name} مطمئنی؟\n\n"
+        f"💰 مبلغ: {format_number(amount)} 🪙\n"
+        f"👤 گیرنده: {target_name}",
+        reply_markup=keyboard
+    )
     
+    context.user_data["transfer_amount"] = amount
+    context.user_data["transfer_target"] = target_id
+    context.user_data["transfer_target_name"] = target_name
     context.user_data["waiting_for_transfer_amount"] = False
-    if user_id in TRANSFER_STATE:
-        del TRANSFER_STATE[user_id]
 
 
 # ================================================================
@@ -1368,6 +1359,13 @@ async def list_groups(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ================================================================
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # ✅ چک کردن اینکه پیام وجود داره
+    if not update.message:
+        return
+    
+    if not update.message.text:
+        return
+    
     user_id = update.effective_user.id
     username = update.effective_user.username
     full_name = update.effective_user.full_name or f"کاربر{user_id}"
@@ -1678,15 +1676,55 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.answer()
         return
     
+    # ======== انتقال هاپویی ========
+    if data.startswith("transfer_confirm_"):
+        parts = data.replace("transfer_confirm_", "").split("_")
+        if len(parts) >= 2:
+            target_id = int(parts[0])
+            amount = int(parts[1])
+            
+            # انجام انتقال
+            result = game.transfer_points(target_id, amount)
+            
+            # پیدا کردن نام گیرنده
+            target_game = get_game(target_id)
+            target_name = target_game.data.get("player_name", f"کاربر{target_id}")
+            
+            if result["success"]:
+                await query.edit_message_text(
+                    f"✅ انتقال موفقیت‌آمیز بود!\n\n"
+                    f"💰 {format_number(amount)} هاپو پوینت به {target_name} انتقال یافت."
+                )
+                try:
+                    await context.bot.send_message(
+                        target_id,
+                        f"💰 {full_name} مبلغ {format_number(amount)} هاپو پوینت به شما انتقال داد!"
+                    )
+                except:
+                    pass
+            else:
+                await query.edit_message_text(f"❌ {result['reason']}")
+        return
+    
+    if data == "transfer_cancel":
+        await query.edit_message_text("❌ انتقال لغو شد.")
+        context.user_data["transfer_amount"] = None
+        context.user_data["transfer_target"] = None
+        context.user_data["transfer_target_name"] = None
+        context.user_data["waiting_for_transfer_amount"] = False
+        if user_id in TRANSFER_STATE:
+            del TRANSFER_STATE[user_id]
+        return
+    
     # ======== هاپو ========
     if data == "confirm_hapo_name":
         new_name = context.user_data.get("new_hapo_name", "")
         if not new_name:
-            await query.message.reply_text("❌ خطا در تغییر اسم")
+            await query.edit_message_text("❌ خطا در تغییر اسم")
             return
         
         if game.data["hop_point"] < 750:
-            await query.message.reply_text("❌ پوینت کافی نیست")
+            await query.edit_message_text("❌ پوینت کافی نیست")
             return
         
         old_name = game.data["hapo_name"]
@@ -1694,29 +1732,29 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         game.data["hop_point"] -= 750
         game.save_data()
         
-        await query.message.reply_text(f"✅ اسم هاپو از «{old_name}» به «{new_name}» تغییر یافت")
+        await query.edit_message_text(f"✅ اسم هاپو از «{old_name}» به «{new_name}» تغییر یافت")
         context.user_data["new_hapo_name"] = None
         await asyncio.sleep(2)
         msg = get_hapo_menu_text(game)
         keyboard = get_hapo_menu_keyboard(game)
-        await query.message.reply_text(msg, reply_markup=keyboard)
+        await query.edit_message_text(msg, reply_markup=keyboard)
         return
     
     if data == "cancel_hapo_name":
-        await query.message.reply_text("❌ تغییر اسم هاپو لغو شد")
+        await query.edit_message_text("❌ تغییر اسم هاپو لغو شد")
         context.user_data["new_hapo_name"] = None
         return
     
     if data == "buy_hapo":
         result = game.buy_hapo()
         if result["success"]:
-            await query.message.reply_text(
+            await query.edit_message_text(
                 f"✅ هاپو خریداری شد!\n"
                 f"اسم هاپو: {result['name']}\n\n"
                 f"💡 برای دیدن منوی هاپو، کلمه «هاپو» رو بزن"
             )
         else:
-            await query.message.reply_text(f"❌ {result['reason']}")
+            await query.edit_message_text(f"❌ {result['reason']}")
         return
     
     if data == "hapo_harvest":
@@ -1725,44 +1763,44 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             game.data["hop_point"] += amount
             game.data["hapo_harvest"] = 0
             game.save_data()
-            await query.message.reply_text(f"✅ {format_number(amount)} هاپو پوینت برداشت شد")
+            await query.edit_message_text(f"✅ {format_number(amount)} هاپو پوینت برداشت شد")
             await asyncio.sleep(2)
             msg = get_hapo_menu_text(game)
             keyboard = get_hapo_menu_keyboard(game)
-            await query.message.reply_text(msg, reply_markup=keyboard)
+            await query.edit_message_text(msg, reply_markup=keyboard)
         else:
-            await query.message.reply_text("❌ هیچ هاپو پوینتی برای برداشت نیست")
+            await query.edit_message_text("❌ هیچ هاپو پوینتی برای برداشت نیست")
             await asyncio.sleep(2)
             msg = get_hapo_menu_text(game)
             keyboard = get_hapo_menu_keyboard(game)
-            await query.message.reply_text(msg, reply_markup=keyboard)
+            await query.edit_message_text(msg, reply_markup=keyboard)
         return
     
     if data == "hapo_level_up":
         price = game.get_hapo_upgrade_price()
         if game.data["hop_point"] < price:
-            await query.message.reply_text(f"❌ به {format_number(price)} هاپو پوینت نیاز داری")
+            await query.edit_message_text(f"❌ به {format_number(price)} هاپو پوینت نیاز داری")
             return
         game.data["hop_point"] -= price
         game.data["hapo_level"] += 1
         game.data["hapo_food"] = min(game.get_hapo_max_food(), int(game.data["hapo_food"] + 2))
         game.save_data()
-        await query.message.reply_text(f"✅ سطح هاپو به {game.data['hapo_level']} ارتقا یافت")
+        await query.edit_message_text(f"✅ سطح هاپو به {game.data['hapo_level']} ارتقا یافت")
         await asyncio.sleep(2)
         msg = get_hapo_menu_text(game)
         keyboard = get_hapo_menu_keyboard(game)
-        await query.message.reply_text(msg, reply_markup=keyboard)
+        await query.edit_message_text(msg, reply_markup=keyboard)
         return
     
     if data == "hapo_rank_up_confirm":
         check = game.can_rank_up()
         if not check["success"]:
-            await query.message.reply_text(f"❌ {check['reason']}")
+            await query.edit_message_text(f"❌ {check['reason']}")
             return
         
         price = game.get_hapo_rank_up_price()
         if game.data["hop_point"] < price:
-            await query.message.reply_text(f"❌ به {format_number(price)} هاپو پوینت نیاز داری")
+            await query.edit_message_text(f"❌ به {format_number(price)} هاپو پوینت نیاز داری")
             return
         
         msg = f"⚠️ آیا از ارتقا مقام هاپو مطمئنی؟\n\n"
@@ -1775,13 +1813,13 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         msg += "┘─ ظرفیت هاپو افزایش می‌یابد\n"
         
         keyboard = get_confirm_keyboard("hapo_rank_up_yes", "hapo_rank_up_no")
-        await query.message.reply_text(msg, reply_markup=keyboard)
+        await query.edit_message_text(msg, reply_markup=keyboard)
         return
     
     if data == "hapo_rank_up_yes":
         result = game.confirm_rank_up()
         if result["success"]:
-            await query.message.reply_text(
+            await query.edit_message_text(
                 f"✅ مقام هاپو به {result['new_rank_name']} ارتقا یافت!\n\n"
                 f"🌟 سطح هاپو به 1 ریست شد\n"
                 f"💰 تولیدی هاپو صفر شد\n"
@@ -1790,24 +1828,24 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await asyncio.sleep(2)
             msg = get_hapo_menu_text(game)
             keyboard = get_hapo_menu_keyboard(game)
-            await query.message.reply_text(msg, reply_markup=keyboard)
+            await query.edit_message_text(msg, reply_markup=keyboard)
         else:
-            await query.message.reply_text(f"❌ {result['reason']}")
+            await query.edit_message_text(f"❌ {result['reason']}")
         return
     
     if data == "hapo_rank_up_no":
-        await query.message.reply_text("❌ ارتقا مقام لغو شد.")
+        await query.edit_message_text("❌ ارتقا مقام لغو شد.")
         await asyncio.sleep(1)
         msg = get_hapo_menu_text(game)
         keyboard = get_hapo_menu_keyboard(game)
-        await query.message.reply_text(msg, reply_markup=keyboard)
+        await query.edit_message_text(msg, reply_markup=keyboard)
         return
     
     if data == "hapo_rename":
         if game.data["hop_point"] < 750:
-            await query.message.reply_text("❌ به 750 هاپو پوینت نیاز داری")
+            await query.edit_message_text("❌ به 750 هاپو پوینت نیاز داری")
             return
-        await query.message.reply_text(
+        await query.edit_message_text(
             "✏️ اسم جدید هاپو رو وارد کن:\n\n"
             "💡 فقط اسم جدید رو تایپ کن و ارسال کن."
         )
@@ -1818,8 +1856,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if data == "buy_claw":
         result = game.buy_claw()
         if result["success"]:
-            # ✅ پیام جدید بفرست، ادیت نکن
-            await query.message.reply_text("✅ پنجه خریداری شد!")
+            await query.edit_message_text("✅ پنجه خریداری شد!")
             await asyncio.sleep(1)
             
             # نمایش پنجه با عکس
@@ -1847,24 +1884,14 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 )
             except:
                 await query.message.reply_text(msg, reply_markup=InlineKeyboardMarkup(keyboard) if keyboard else None)
-            
-            try:
-                await query.answer()
-            except:
-                pass
         else:
-            await query.message.reply_text(f"❌ {result['reason']}")
-            try:
-                await query.answer()
-            except:
-                pass
+            await query.edit_message_text(f"❌ {result['reason']}")
         return
     
     if data == "upgrade_claw":
         result = game.upgrade_claw()
         if result["success"]:
-            # ✅ پیام جدید بفرست، ادیت نکن
-            await query.message.reply_text(f"✅ پنجه به سطح {result['new_level']} ارتقا یافت")
+            await query.edit_message_text(f"✅ پنجه به سطح {result['new_level']} ارتقا یافت")
             await asyncio.sleep(1)
             
             # نمایش مجدد پنجه با عکس جدید
@@ -1897,35 +1924,26 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 )
             except:
                 await query.message.reply_text(msg, reply_markup=InlineKeyboardMarkup(keyboard) if keyboard else None)
-            
-            try:
-                await query.answer()
-            except:
-                pass
         else:
-            await query.message.reply_text(f"❌ {result['reason']}")
-            try:
-                await query.answer()
-            except:
-                pass
+            await query.edit_message_text(f"❌ {result['reason']}")
         return
     
     if data == "hunt_sell":
         result = game.sell_animal()
         if result["success"]:
-            await query.message.reply_text(
+            await query.edit_message_text(
                 f"💰 حیوان فروخته شد!\n"
                 f"✅ {format_number(result['value'])} هاپو پوینت دریافت کردی"
             )
         else:
-            await query.message.reply_text(f"❌ {result['reason']}")
+            await query.edit_message_text(f"❌ {result['reason']}")
         return
     
     if data == "hunt_feed":
         result = game.feed_hapo()
         
         if result["success"]:
-            await query.message.reply_text(
+            await query.edit_message_text(
                 f"🍖 {result['fed']} غذا به هاپو داده شد\n"
                 f"✅ هاپو سیر شد!"
             )
@@ -1944,10 +1962,10 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     game.data["current_hunt_animal"] = None
                     game.data["hunt_time"] = 0
                     game.save_data()
-                    await query.message.reply_text("🦌 حیوان فرار کرد! وقتت تموم شد.")
+                    await query.edit_message_text("🦌 حیوان فرار کرد! وقتت تموم شد.")
                     return
             
-            await query.message.reply_text(
+            await query.edit_message_text(
                 f"❌ هاپو سیر است!\n"
                 f"می‌تونی حیوان رو بفروشی.\n\n"
                 f"{animal['emoji']} {animal['name']}\n"
@@ -1965,35 +1983,35 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
             return
         
-        await query.message.reply_text(f"❌ {error_msg}")
+        await query.edit_message_text(f"❌ {error_msg}")
         return
     
     # ======== پروفایل ========
     if data == "profile_hide":
         game.data["profile_hidden"] = True
         game.save_data()
-        await query.message.reply_text("✅ پروفایل شما مخفی شد.")
+        await query.edit_message_text("✅ پروفایل شما مخفی شد.")
         await my_profile_from_callback(query, game)
         return
 
     if data == "profile_show":
         game.data["profile_hidden"] = False
         game.save_data()
-        await query.message.reply_text("✅ پروفایل شما نمایش داده شد.")
+        await query.edit_message_text("✅ پروفایل شما نمایش داده شد.")
         await my_profile_from_callback(query, game)
         return
 
     if data == "profile_lock":
         game.data["profile_locked"] = True
         game.save_data()
-        await query.message.reply_text("✅ پروفایل شما قفل شد.")
+        await query.edit_message_text("✅ پروفایل شما قفل شد.")
         await my_profile_from_callback(query, game)
         return
 
     if data == "profile_unlock":
         game.data["profile_locked"] = False
         game.save_data()
-        await query.message.reply_text("✅ پروفایل شما باز شد.")
+        await query.edit_message_text("✅ پروفایل شما باز شد.")
         await my_profile_from_callback(query, game)
         return
     
@@ -2001,20 +2019,20 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if data == "buy_bank":
         result = game.open_bank()
         if result["success"]:
-            await query.message.reply_text(
+            await query.edit_message_text(
                 f"🏦 بانک هاپویی خریداری شد!\n"
                 f"💳 شماره کارت شما: {result['card_number']}"
             )
             await asyncio.sleep(2)
             msg = get_bank_menu_text(game, False)
             keyboard = get_bank_keyboard(False)
-            await query.message.reply_text(msg, reply_markup=keyboard)
+            await query.edit_message_text(msg, reply_markup=keyboard)
         else:
-            await query.message.reply_text(f"❌ {result['reason']}")
+            await query.edit_message_text(f"❌ {result['reason']}")
         return
     
     if data == "bank_deposit":
-        await query.message.reply_text(
+        await query.edit_message_text(
             "💰 مبلغ واریزی رو بنویس:\n\n"
             "💡 فقط عدد مبلغ رو تایپ کن و ارسال کن."
         )
@@ -2022,7 +2040,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     
     if data == "bank_withdraw":
-        await query.message.reply_text(
+        await query.edit_message_text(
             "💰 مبلغ برداشت رو بنویس:\n\n"
             "💡 فقط عدد مبلغ رو تایپ کن و ارسال کن."
         )
@@ -2030,30 +2048,30 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     
     if data == "bank_card_to_card":
-        await query.message.reply_text(get_card_to_card_text())
+        await query.edit_message_text(get_card_to_card_text())
         context.user_data["waiting_for_card_to_card"] = True
         return
     
     if data == "bank_transactions":
         msg = get_bank_menu_text(game, True)
         keyboard = get_bank_keyboard(True)
-        await query.message.reply_text(msg, reply_markup=keyboard)
+        await query.edit_message_text(msg, reply_markup=keyboard)
         return
     
     if data == "bank_change_card":
         if not game.data["bank_opened"]:
-            await query.message.reply_text("❌ شما بانک ندارید.")
+            await query.edit_message_text("❌ شما بانک ندارید.")
             return
         
         msg = get_change_card_confirm_text(game)
         keyboard = get_confirm_keyboard("bank_change_card_yes", "bank_change_card_no")
-        await query.message.reply_text(msg, reply_markup=keyboard)
+        await query.edit_message_text(msg, reply_markup=keyboard)
         return
     
     if data == "bank_change_card_yes":
         result = game.change_card_number()
         if result["success"]:
-            await query.message.reply_text(
+            await query.edit_message_text(
                 f"✅ شماره حساب شما تغییر کرد!\n"
                 f"🔄 شماره قدیم: {result['old_card']}\n"
                 f"🔄 شماره جدید: {result['new_card']}"
@@ -2061,58 +2079,17 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await asyncio.sleep(2)
             msg = get_bank_menu_text(game, False)
             keyboard = get_bank_keyboard(False)
-            await query.message.reply_text(msg, reply_markup=keyboard)
+            await query.edit_message_text(msg, reply_markup=keyboard)
         else:
-            await query.message.reply_text(f"❌ {result['reason']}")
+            await query.edit_message_text(f"❌ {result['reason']}")
         return
     
     if data == "bank_change_card_no":
-        await query.message.reply_text("❌ تغییر شماره حساب لغو شد.")
+        await query.edit_message_text("❌ تغییر شماره حساب لغو شد.")
         await asyncio.sleep(1)
         msg = get_bank_menu_text(game, False)
         keyboard = get_bank_keyboard(False)
-        await query.message.reply_text(msg, reply_markup=keyboard)
-        return
-    
-    # ======== انتقال ========
-    if data == "transfer_confirm":
-        amount = context.user_data.get("transfer_amount")
-        target_id = context.user_data.get("transfer_target")
-        target_name = context.user_data.get("transfer_target_name")
-        
-        if not amount or not target_id:
-            await query.message.reply_text("❌ خطا در انتقال. لطفاً دوباره تلاش کن.")
-            return
-        
-        result = game.transfer_points(target_id, amount)
-        if result["success"]:
-            await query.message.reply_text(
-                f"✅ انتقال موفقیت‌آمیز بود!\n\n"
-                f"💰 {format_number(amount)} هاپو پوینت به {target_name} انتقال یافت."
-            )
-            try:
-                await context.bot.send_message(
-                    target_id,
-                    f"💰 {game.data['player_name']} مبلغ {format_number(amount)} هاپو پوینت به شما انتقال داد!"
-                )
-            except:
-                pass
-        else:
-            await query.message.reply_text(f"❌ {result['reason']}")
-        
-        context.user_data["transfer_amount"] = None
-        context.user_data["transfer_target"] = None
-        context.user_data["transfer_target_name"] = None
-        return
-    
-    if data == "transfer_cancel":
-        await query.message.reply_text("❌ انتقال لغو شد.")
-        context.user_data["transfer_amount"] = None
-        context.user_data["transfer_target"] = None
-        context.user_data["transfer_target_name"] = None
-        context.user_data["waiting_for_transfer_amount"] = False
-        if user_id in TRANSFER_STATE:
-            del TRANSFER_STATE[user_id]
+        await query.edit_message_text(msg, reply_markup=keyboard)
         return
     
     # ======== میو و زندان ========
@@ -2120,7 +2097,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         vote_key = data.replace("meow_vote_", "")
         
         if vote_key not in MEOW_VOTES:
-            await query.message.reply_text("❌ رای‌گیری به پایان رسیده است.")
+            await query.edit_message_text("❌ رای‌گیری به پایان رسیده است.")
             return
         
         vote_data = MEOW_VOTES[vote_key]
@@ -2161,12 +2138,12 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     if data == "jail_pay_fine":
         if not game.is_jailed():
-            await query.message.reply_text("❌ شما در زندان نیستید.")
+            await query.edit_message_text("❌ شما در زندان نیستید.")
             return
         
         fine = game.data.get("jail_fine", 0)
         keyboard = get_confirm_keyboard("jail_pay_fine_yes", "jail_pay_fine_no")
-        await query.message.reply_text(
+        await query.edit_message_text(
             f"⚠️ آیا از پرداخت جریمه {format_number(fine)} 🪙 مطمئنی؟\n\n"
             f"با پرداخت جریمه از زندان آزاد میشوی.",
             reply_markup=keyboard
@@ -2176,13 +2153,13 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if data == "jail_pay_fine_yes":
         result = game.pay_jail_fine()
         if result["success"]:
-            await query.message.reply_text("✅ جریمه پرداخت شد و شما آزاد شدید! 🎉")
+            await query.edit_message_text("✅ جریمه پرداخت شد و شما آزاد شدید! 🎉")
         else:
-            await query.message.reply_text(f"❌ {result['reason']}")
+            await query.edit_message_text(f"❌ {result['reason']}")
         return
     
     if data == "jail_pay_fine_no":
-        await query.message.reply_text("❌ پرداخت جریمه لغو شد.")
+        await query.edit_message_text("❌ پرداخت جریمه لغو شد.")
         return
 
 
