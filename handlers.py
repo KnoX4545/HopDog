@@ -282,7 +282,7 @@ async def show_jail(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
 
 # ================================================================
-# پروفایل (با نمایش عکس)
+# پروفایل - نسخه ساده شده (بدون تیک/ضربدر)
 # ================================================================
 
 async def my_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -316,27 +316,29 @@ async def my_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     keyboard = []
     if is_hidden:
-        keyboard.append([InlineKeyboardButton("👀 نمایش پروفایل", callback_data="profile_show_confirm")])
+        keyboard.append([InlineKeyboardButton("👀 نمایش پروفایل", callback_data="profile_show")])
     else:
-        keyboard.append([InlineKeyboardButton("👀 مخفی کردن پروفایل", callback_data="profile_hide_confirm")])
+        keyboard.append([InlineKeyboardButton("👀 مخفی کردن پروفایل", callback_data="profile_hide")])
     
     if is_locked:
-        keyboard.append([InlineKeyboardButton("🔓 باز کردن پروفایل", callback_data="profile_unlock_confirm")])
+        keyboard.append([InlineKeyboardButton("🔓 باز کردن پروفایل", callback_data="profile_unlock")])
     else:
-        keyboard.append([InlineKeyboardButton("🔒 قفل کردن پروفایل", callback_data="profile_lock_confirm")])
+        keyboard.append([InlineKeyboardButton("🔒 قفل کردن پروفایل", callback_data="profile_lock")])
     
-    try:
-        user_photos = await context.bot.get_user_profile_photos(user_id, limit=1)
-        if user_photos.total_count > 0:
-            photo = user_photos.photos[0][-1]
-            await update.message.reply_photo(
-                photo.file_id,
-                caption=msg,
-                reply_markup=InlineKeyboardMarkup(keyboard)
-            )
-            return
-    except:
-        pass
+    # نمایش عکس پروفایل (اگه مخفی نباشه)
+    if not is_hidden:
+        try:
+            user_photos = await context.bot.get_user_profile_photos(user_id, limit=1)
+            if user_photos.total_count > 0:
+                photo = user_photos.photos[0][-1]
+                await update.message.reply_photo(
+                    photo.file_id,
+                    caption=msg,
+                    reply_markup=InlineKeyboardMarkup(keyboard)
+                )
+                return
+        except:
+            pass
     
     await update.message.reply_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
 
@@ -364,16 +366,6 @@ async def show_user_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
         msg = f"╮──「 🐶 پروفایل هاپویی 🐶 」\n\n"
         msg += f"┐─ 👤 کاربر : {target_full_name}\n"
         msg += f"┘─ 🔒 این کاربر پروفایل خود را مخفی کرده است."
-        
-        try:
-            user_photos = await context.bot.get_user_profile_photos(target_user_id, limit=1)
-            if user_photos.total_count > 0:
-                photo = user_photos.photos[0][-1]
-                await update.message.reply_photo(photo.file_id, caption=msg)
-                return
-        except:
-            pass
-        
         await update.message.reply_text(msg)
         return
     
@@ -390,6 +382,7 @@ async def show_user_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         msg += f"╯─ ⭐️ سطح : {target_data['level']} 🏆 نهایی"
     
+    # نمایش عکس پروفایل
     try:
         user_photos = await context.bot.get_user_profile_photos(target_user_id, limit=1)
         if user_photos.total_count > 0:
@@ -1202,108 +1195,32 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["new_hapo_name"] = None
         return
     
-    # ======== پروفایل - با حذف پیام و ارسال مجدد ========
-    if data == "profile_hide_confirm":
-        keyboard = get_confirm_keyboard("profile_hide_yes", "profile_hide_no")
-        await query.edit_message_text(
-            "⚠️ آیا از مخفی کردن پروفایل خود مطمئنی؟\n\n"
-            "با این کار:\n"
-            "┘─ 👀 پروفایل شما برای دیگران مخفی میشود\n"
-            "┘─ 🪪 آیدی شما در بخش های مختلف مخفی میشود",
-            reply_markup=keyboard
-        )
-        return
-    
-    if data == "profile_hide_yes":
+    # ======== پروفایل - ساده (بدون تیک/ضربدر) ========
+    if data == "profile_hide":
         game.data["profile_hidden"] = True
         game.save_data()
-        try:
-            await query.message.delete()
-        except:
-            pass
+        await query.edit_message_text("✅ پروفایل شما مخفی شد.")
         await my_profile_from_callback(query, game)
         return
-    
-    if data == "profile_hide_no":
-        await query.edit_message_text("❌ مخفی کردن پروفایل لغو شد.")
-        await my_profile_from_callback(query, game)
-        return
-    
-    if data == "profile_show_confirm":
-        keyboard = get_confirm_keyboard("profile_show_yes", "profile_show_no")
-        await query.edit_message_text(
-            "⚠️ آیا از نمایش پروفایل خود مطمئنی؟\n\n"
-            "با این کار:\n"
-            "┘─ 👀 پروفایل شما برای دیگران نمایش داده میشود\n"
-            "┘─ 🪪 آیدی شما در بخش های مختلف نمایش داده میشود",
-            reply_markup=keyboard
-        )
-        return
-    
-    if data == "profile_show_yes":
+
+    if data == "profile_show":
         game.data["profile_hidden"] = False
         game.save_data()
-        try:
-            await query.message.delete()
-        except:
-            pass
+        await query.edit_message_text("✅ پروفایل شما نمایش داده شد.")
         await my_profile_from_callback(query, game)
         return
-    
-    if data == "profile_show_no":
-        await query.edit_message_text("❌ نمایش پروفایل لغو شد.")
-        await my_profile_from_callback(query, game)
-        return
-    
-    if data == "profile_lock_confirm":
-        keyboard = get_confirm_keyboard("profile_lock_yes", "profile_lock_no")
-        await query.edit_message_text(
-            "⚠️ آیا از قفل کردن پروفایل خود مطمئنی؟\n\n"
-            "با این کار:\n"
-            "┘─ 🧲 جلوگیری از دریافت انتقال هاپویی\n"
-            "┘─ هیچ کس نمی‌تواند به شما هاپو پوینت انتقال دهد",
-            reply_markup=keyboard
-        )
-        return
-    
-    if data == "profile_lock_yes":
+
+    if data == "profile_lock":
         game.data["profile_locked"] = True
         game.save_data()
-        try:
-            await query.message.delete()
-        except:
-            pass
+        await query.edit_message_text("✅ پروفایل شما قفل شد.")
         await my_profile_from_callback(query, game)
         return
-    
-    if data == "profile_lock_no":
-        await query.edit_message_text("❌ قفل کردن پروفایل لغو شد.")
-        await my_profile_from_callback(query, game)
-        return
-    
-    if data == "profile_unlock_confirm":
-        keyboard = get_confirm_keyboard("profile_unlock_yes", "profile_unlock_no")
-        await query.edit_message_text(
-            "⚠️ آیا از باز کردن پروفایل خود مطمئنی؟\n\n"
-            "با این کار:\n"
-            "┘─ 🧲 امکان دریافت انتقال هاپویی فعال میشود\n"
-            "┘─ دیگران می‌توانند به شما هاپو پوینت انتقال دهند",
-            reply_markup=keyboard
-        )
-        return
-    
-    if data == "profile_unlock_yes":
+
+    if data == "profile_unlock":
         game.data["profile_locked"] = False
         game.save_data()
-        try:
-            await query.message.delete()
-        except:
-            pass
-        await my_profile_from_callback(query, game)
-        return
-    
-    if data == "profile_unlock_no":
-        await query.edit_message_text("❌ باز کردن پروفایل لغو شد.")
+        await query.edit_message_text("✅ پروفایل شما باز شد.")
         await my_profile_from_callback(query, game)
         return
     
@@ -1659,7 +1576,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
 # ================================================================
-# پروفایل از کالبک (نسخه نهایی - حذف و ارسال مجدد)
+# پروفایل از کالبک - ساده شده (بدون عکس)
 # ================================================================
 
 async def my_profile_from_callback(query, game):
@@ -1687,22 +1604,16 @@ async def my_profile_from_callback(query, game):
     
     keyboard = []
     if is_hidden:
-        keyboard.append([InlineKeyboardButton("👀 نمایش پروفایل", callback_data="profile_show_confirm")])
+        keyboard.append([InlineKeyboardButton("👀 نمایش پروفایل", callback_data="profile_show")])
     else:
-        keyboard.append([InlineKeyboardButton("👀 مخفی کردن پروفایل", callback_data="profile_hide_confirm")])
+        keyboard.append([InlineKeyboardButton("👀 مخفی کردن پروفایل", callback_data="profile_hide")])
     
     if is_locked:
-        keyboard.append([InlineKeyboardButton("🔓 باز کردن پروفایل", callback_data="profile_unlock_confirm")])
+        keyboard.append([InlineKeyboardButton("🔓 باز کردن پروفایل", callback_data="profile_unlock")])
     else:
-        keyboard.append([InlineKeyboardButton("🔒 قفل کردن پروفایل", callback_data="profile_lock_confirm")])
+        keyboard.append([InlineKeyboardButton("🔒 قفل کردن پروفایل", callback_data="profile_lock")])
     
-    # ✅ حذف پیام قبلی و ارسال جدید
-    try:
-        await query.message.delete()
-    except:
-        pass
-    
-    await query.message.reply_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
+    await query.edit_message_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
 
 # ================================================================
 # دستورات ادمین (فقط در پیوی)
