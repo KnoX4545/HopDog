@@ -212,7 +212,13 @@ class HopDogGame:
     def update_hapo_production(self):
         """به‌روزرسانی تولید هاپو - حداکثر ۲۴ ساعت"""
         now = datetime.now().timestamp()
-        elapsed = now - self.data["hapo_last_update"]
+        
+        # ✅ تبدیل به عدد
+        hapo_last_update = self.data["hapo_last_update"]
+        if isinstance(hapo_last_update, str):
+            hapo_last_update = float(hapo_last_update)
+        
+        elapsed = now - hapo_last_update
         
         # حداکثر ۲۴ ساعت برای جلوگیری از تولید یکباره زیاد
         MAX_ELAPSED = 24 * 3600
