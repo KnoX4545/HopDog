@@ -396,3 +396,226 @@ class HopDogGame:
         self.data["hunt_time"] = 0
         self.save_data()
         return {"success": True, "fed": actual}
+# game.py - کلاس اصلی بازی (بخش ۲ - ادامه)
+
+    # ============================================================
+    # متدهای بانک (با کارت و تراکنش)
+    # ============================================================
+
+    def generate_card_number(self):
+        """تولید شماره کارت ۱۳ رقمی رندوم"""
+        first_part = str(random.randint(1000, 9999))
+        second_part = str(random.randint(1000, 9999))
+        third_part = str(random.randint(1000, 9999))
+        fourth_part = str(random.randint(1000, 9999))
+        return first_part + second_part + third_part + fourth_part
+
+    def open_bank(self):
+        if self.data["level"] < BANK_REQUIRED_LEVEL:
+            return {"success": False, "reason": f"سطح {BANK_REQUIRED_LEVEL} لازم است"}
+        if self.data["bank_opened"]:
+            return {"success": False, "reason": "بانک قبلاً باز شده است"}
+        if self.data["hop_point"] < BANK_PURCHASE_COST:
+            return {"success": False, "reason": f"{BANK_PURCHASE_COST} هاپو پوینت لازم است"}
+        
+        self.data["hop_point"] -= BANK_PURCHASE_COST
+        self.data["bank_opened"] = True
+        self.data["bank_balance"] = 0
+        self.data["bank_last_interest_at"] = datetime.now().timestamp()
+        self.data["bank_card_number"] = self.generate_card_number()
+        self.data["bank_transactions"] = []
+        self.save_data()
+        
+        # اضافه کردن تراکنش افتتاح حساب
+        self.add_bank_transaction("افتتاح حساب", 0, f"شماره کارت: {self.data['bank_card_number']}")
+        
+        return {"success": True, "card_number": self.data["bank_card_number"]}
+
+    def add_bank_transaction(self, type, amount, detail=""):
+        """افزودن تراکنش به تاریخچه (حداکثر ۳ تراکنش)"""
+        transactions = self.data.get("bank_transactions", [])
+        now = datetime.now()
+        transaction = {
+            "type": type,
+            "amount": amount,
+            "detail": detail,
+            "date": now.strftime("%H:%M %Y/%m/%d")
+        }
+        transactions.insert(0, transaction)
+        # فقط ۳ تراکنش آخر رو نگه دار
+        self.data["bank_transactions"] = transactions[:3]
+        self.save_data()
+
+    def apply_bank_interest(self):
+        if not self.data["bank_opened"]:
+            return
+        
+        now = datetime.now().timestamp()
+        if self.data["bank_last_interest_at"] == 0:
+            self.data["bank_last_interest_at"] = now
+            return
+        
+        interest = min(int(self.data["bank_balance"] * BANK_INTEREST_RATE), BANK_MAX_DAILY_INTEREST)
+        if interest > 0:
+            self.data["bank_balance"] += interest
+            # ثبت تراکنش سود
+            self.add_bank_transaction("سود بانکی", interest, f"سود {int(BANK_INTEREST_RATE*100)}%")
+        
+        self.data["bank_last_interest_at"] = now
+        self.save_data()
+
+    def get_next_interest_time(self):
+        """دریافت زمان بعدی واریز سود"""
+        from datetime import timedelta
+        now = datetime.now()
+        next_time = now.replace(hour=BANK_INTEREST_HOUR, minute=0, second=0, microsecond=0)
+        if next_time <= now:
+            next_time = next_time + timedelta(days=1)
+        return next_time
+
+    def deposit(self, amount):
+        if not self.data["bank_opened"]:
+            return {"success": False, "reason": "بانک باز نشده است"}
+        if self.data["hop_point"] < amount:
+            return {"success": False, "reason": "موجودی قابل استفاده کافی نیست"}
+        if amount <= 0:
+            return {"success": False, "reason": "مبلغ نامعتبر است"}
+        
+        self.data["hop_point"] -= amount
+        self.data["bank_balance"] += amount
+        self.add_bank_transaction("واریز به حساب بانکی", amount, f"واریز {amount:,}")
+        self.save_data()
+        return {"success": True, "new_balance": self.data["bank_balance"]}
+
+    def withdraw(self, amount):
+        if not self.data["bank_opened"]:
+            return {"success": False, "reason": "بانک باز نشده است"}
+        if self.data["bank_balance"] < amount:
+            return {"success": False, "reason": "موجودی بانک کافی نیست"}
+        if amount <= 0:
+            return {"success": False, "reason": "مبلغ نامعتبر است"}
+        
+        self.data["bank_balance"] -= amount
+        self.data["hop_point"] += amount
+        self.add_bank_transaction("برداشت از حساب بانکی", -amount, f"برداشت {amount:,}")
+        self.save_data()
+        return {"success": True, "new_balance": self.data["bank_balance"]}
+
+    def change_card_number(self):
+        """تغییر شماره کارت"""
+        if not self.data["bank_opened"]:
+            return {"success": False, "reason": "بانک باز نشده است"}
+        if self.data["hop_point"] < BANK_ACCOUNT_CHANGE_COST:
+            return {"success": False, "reason": f"به {BANK_ACCOUNT_CHANGE_COST:,} هاپو پوینت نیاز داری"}
+        
+        self.data["hop_point"] -= BANK_ACCOUNT_CHANGE_COST
+        old_card = self.data["bank_card_number"]
+        self.data["bank_card_number"] = self.generate_card_number()
+        self.add_bank_transaction("تغییر شماره حساب", -BANK_ACCOUNT_CHANGE_COST, f"شماره جدید: {self.data['bank_card_number']}")
+        self.save_data()
+        return {
+            "success": True, 
+            "old_card": old_card, 
+            "new_card": self.data["bank_card_number"]
+        }
+
+    def card_to_card(self, amount, target_card):
+        """کارت به کارت هاپویی"""
+        if not self.data["bank_opened"]:
+            return {"success": False, "reason": "بانک باز نشده است"}
+        if self.data["bank_balance"] < amount:
+            return {"success": False, "reason": "موجودی بانک کافی نیست"}
+        if amount <= 0:
+            return {"success": False, "reason": "مبلغ نامعتبر است"}
+        if len(target_card) != 16 or not target_card.isdigit():
+            return {"success": False, "reason": "شماره کارت باید ۱۳ رقم باشد"}
+        if target_card == self.data["bank_card_number"]:
+            return {"success": False, "reason": "نمی‌تونی به کارت خودت انتقال بدی"}
+        
+        # پیدا کردن کاربر با شماره کارت مقصد
+        from database import get_user_by_card
+        target_user = get_user_by_card(target_card)
+        if not target_user:
+            return {"success": False, "reason": "کارت مقصد در سیستم ثبت نشده است"}
+        
+        # انتقال پول
+        self.data["bank_balance"] -= amount
+        
+        # اضافه کردن به حساب کاربر مقصد
+        target_user_id = target_user['user_id']
+        target_game = HopDogGame(int(target_user_id))
+        target_game.data["bank_balance"] += amount
+        target_game.add_bank_transaction("دریافت کارت به کارت", amount, f"از {self.data['bank_card_number']}")
+        target_game.save_data()
+        
+        self.add_bank_transaction("کارت به کارت هاپویی", -amount, f"به {target_card}")
+        self.save_data()
+        
+        return {
+            "success": True, 
+            "amount": amount, 
+            "target_card": target_card,
+            "target_name": target_user.get('player_name', 'کاربر')
+        }
+
+    def get_bank_transactions(self):
+        """دریافت تراکنش‌های بانکی"""
+        return self.data.get("bank_transactions", [])
+
+    # ============================================================
+    # متدهای انتقال هاپویی (کاملاً حفظ شده با تمام محدودیت‌ها)
+    # ============================================================
+
+    def can_transfer(self):
+        """بررسی امکان انتقال هاپویی"""
+        if self.data["level"] < TRANSFER_MIN_LEVEL_SENDER:
+            return {"success": False, "reason": f"برای انتقال هاپو پوینت باید سطح {TRANSFER_MIN_LEVEL_SENDER} باشی"}
+        
+        if self.data.get("profile_locked", False):
+            return {"success": False, "reason": "پروفایل شما قفل است. ابتدا آن را باز کن"}
+        
+        now = datetime.now().timestamp()
+        last_transfer = self.data.get("last_transfer_time", 0)
+        if last_transfer > 0 and (now - last_transfer) < TRANSFER_COOLDOWN:
+            remaining = TRANSFER_COOLDOWN - (now - last_transfer)
+            return {"success": False, "reason": f"بین انتقال‌ها باید {TRANSFER_COOLDOWN} ثانیه صبر کنی. {int(remaining)} ثانیه مونده"}
+        
+        return {"success": True}
+
+    def transfer_points(self, target_user_id, amount):
+        """انتقال هاپو پوینت به کاربر دیگر (با تمام محدودیت‌ها)"""
+        can = self.can_transfer()
+        if not can["success"]:
+            return can
+        
+        if amount < TRANSFER_MIN_AMOUNT:
+            return {"success": False, "reason": f"حداقل مبلغ انتقال {TRANSFER_MIN_AMOUNT} هاپو پوینت است"}
+        
+        if amount > TRANSFER_MAX_AMOUNT:
+            return {"success": False, "reason": f"حداکثر مبلغ انتقال {TRANSFER_MAX_AMOUNT:,} هاپو پوینت است"}
+        
+        if self.data["hop_point"] < amount:
+            return {"success": False, "reason": f"موجودی کافی نیست. شما {int(self.data['hop_point']):,} هاپو پوینت داری"}
+        
+        target_game = HopDogGame(int(target_user_id))
+        target_data = target_game.data
+        
+        if target_data["level"] < TRANSFER_MIN_LEVEL_RECEIVER:
+            return {"success": False, "reason": f"کاربر مقصد باید حداقل سطح {TRANSFER_MIN_LEVEL_RECEIVER} داشته باشد"}
+        
+        if target_data.get("profile_locked", False):
+            return {"success": False, "reason": "پروفایل کاربر مقصد قفل است"}
+        
+        self.data["hop_point"] -= amount
+        target_game.data["hop_point"] += amount
+        self.data["last_transfer_time"] = datetime.now().timestamp()
+        
+        self.save_data()
+        target_game.save_data()
+        
+        return {
+            "success": True, 
+            "amount": amount, 
+            "target_name": target_data["player_name"],
+            "target_id": target_user_id
+        }
