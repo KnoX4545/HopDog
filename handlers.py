@@ -1,4 +1,4 @@
-# handlers.py - هندلرهای پیام و کالبک (نسخه نهایی کامل با انتقال اصلاح شده)
+# handlers.py - هندلرهای پیام و کالبک (نسخه نهایی با اصلاح هاپو)
 
 import os
 import json
@@ -93,11 +93,11 @@ def get_hapo_menu_keyboard(game):
     
     hapo_level = game.data["hapo_level"]
     if isinstance(hapo_level, str):
-        hapo_level = int(hapo_level)
+        hapo_level = int(hapo_level) if hapo_level.isdigit() else 1
     
     hapo_rank = game.data["hapo_rank"]
     if isinstance(hapo_rank, str):
-        hapo_rank = int(hapo_rank)
+        hapo_rank = int(hapo_rank) if hapo_rank.isdigit() else 0
     
     if is_max:
         keyboard[0].append(InlineKeyboardButton("🏆 نهایی", callback_data="hapo_max"))
@@ -112,7 +112,10 @@ def get_hapo_menu_keyboard(game):
     
     hop_point = game.data["hop_point"]
     if isinstance(hop_point, str):
-        hop_point = int(hop_point)
+        try:
+            hop_point = int(float(hop_point))
+        except:
+            hop_point = 0
     if hop_point >= 750:
         keyboard.append([InlineKeyboardButton("✏️ تغییر اسم هاپو", callback_data="hapo_rename")])
     
@@ -132,18 +135,28 @@ def get_hapo_menu_text(game):
     
     hapo_rank = game.data["hapo_rank"]
     if isinstance(hapo_rank, str):
-        hapo_rank = int(hapo_rank)
+        hapo_rank = int(hapo_rank) if hapo_rank.isdigit() else 0
     
     hapo_level = game.data["hapo_level"]
     if isinstance(hapo_level, str):
-        hapo_level = int(hapo_level)
+        hapo_level = int(hapo_level) if hapo_level.isdigit() else 1
     
     hapo_food = game.data["hapo_food"]
     if isinstance(hapo_food, str):
+        try:
+            hapo_food = int(float(hapo_food))
+        except:
+            hapo_food = 0
+    elif isinstance(hapo_food, float):
         hapo_food = int(hapo_food)
     
     hapo_harvest = game.data["hapo_harvest"]
     if isinstance(hapo_harvest, str):
+        try:
+            hapo_harvest = int(float(hapo_harvest))
+        except:
+            hapo_harvest = 0
+    elif isinstance(hapo_harvest, float):
         hapo_harvest = int(hapo_harvest)
     
     msg = f"🐶 {game.data['hapo_name']}\n"
@@ -151,7 +164,7 @@ def get_hapo_menu_text(game):
     msg += f"🍖 شکم : {status['text']} ({hapo_food}/{max_food})\n"
     msg += f"🌟 مقام : {RANK_NAMES[hapo_rank]}\n"
     msg += f"⭐️ سطح : {hapo_level}/5\n"
-    msg += f"💰 هاپو پوینت های تولید شده : {hapo_harvest} 🪙\n"
+    msg += f"💰 هاپو پوینت های تولید شده : {format_number(hapo_harvest)} 🪙\n"
     msg += f"💫 تولید هاپو پوینت در ثانیه : {prod:.2f} 🪙\n"
     msg += f"📦 ظرفیت : {format_number(capacity)}\n"
     
@@ -353,23 +366,29 @@ async def my_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     hapo_rank = game.data.get("hapo_rank", 0)
     if isinstance(hapo_rank, str):
-        hapo_rank = int(hapo_rank)
+        hapo_rank = int(hapo_rank) if hapo_rank.isdigit() else 0
     
     hapo_level = game.data.get("hapo_level", 1)
     if isinstance(hapo_level, str):
-        hapo_level = int(hapo_level)
+        hapo_level = int(hapo_level) if hapo_level.isdigit() else 1
     
     hop_point = game.data["hop_point"]
     if isinstance(hop_point, str):
-        hop_point = int(hop_point)
+        try:
+            hop_point = int(float(hop_point))
+        except:
+            hop_point = 0
     
     hop_count = game.data["hop_count"]
     if isinstance(hop_count, str):
-        hop_count = int(hop_count)
+        try:
+            hop_count = int(float(hop_count))
+        except:
+            hop_count = 0
     
     level = game.data["level"]
     if isinstance(level, str):
-        level = int(level)
+        level = int(level) if level.isdigit() else 1
     
     msg = f"╮──「 🐶 پروفایل هاپویی 🐶 」\n\n"
     msg += f"┐─ 👤 کاربر : {full_name}\n"
@@ -446,23 +465,29 @@ async def show_user_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     hapo_rank = target_data.get("hapo_rank", 0)
     if isinstance(hapo_rank, str):
-        hapo_rank = int(hapo_rank)
+        hapo_rank = int(hapo_rank) if hapo_rank.isdigit() else 0
     
     hapo_level = target_data.get("hapo_level", 1)
     if isinstance(hapo_level, str):
-        hapo_level = int(hapo_level)
+        hapo_level = int(hapo_level) if hapo_level.isdigit() else 1
     
     hop_point = target_data["hop_point"]
     if isinstance(hop_point, str):
-        hop_point = int(hop_point)
+        try:
+            hop_point = int(float(hop_point))
+        except:
+            hop_point = 0
     
     hop_count = target_data["hop_count"]
     if isinstance(hop_count, str):
-        hop_count = int(hop_count)
+        try:
+            hop_count = int(float(hop_count))
+        except:
+            hop_count = 0
     
     level = target_data["level"]
     if isinstance(level, str):
-        level = int(level)
+        level = int(level) if level.isdigit() else 1
     
     msg = f"╮──「 🐶 پروفایل هاپویی 🐶 」\n\n"
     msg += f"┐─ 👤 کاربر : {target_full_name}\n"
@@ -517,7 +542,10 @@ async def do_hop(update: Update, game):
     
     hop_point = game.data["hop_point"]
     if isinstance(hop_point, str):
-        hop_point = int(hop_point)
+        try:
+            hop_point = int(float(hop_point))
+        except:
+            hop_point = 0
     
     msg = f"🐾 {result['earned']} هاپو پوینت گرفتی ✨\n"
     msg += f"💰 هاپو پوینت‌هات : {format_number(hop_point)}"
@@ -535,12 +563,18 @@ async def show_hapo_menu(update: Update, game):
         return
     
     if not game.data["hapo_owned"]:
-        if game.data["level"] < 3:
+        level = game.data["level"]
+        if isinstance(level, str):
+            level = int(level) if level.isdigit() else 1
+        if level < 3:
             await update.message.reply_text("🐕 هاپو از سطح 3 باز میشود")
             return
         hop_point = game.data["hop_point"]
         if isinstance(hop_point, str):
-            hop_point = int(hop_point)
+            try:
+                hop_point = int(float(hop_point))
+            except:
+                hop_point = 0
         if hop_point < 300:
             await update.message.reply_text("🐕 برای خرید هاپو به 300 هاپو پوینت نیاز داری")
             return
@@ -548,9 +582,13 @@ async def show_hapo_menu(update: Update, game):
         await update.message.reply_text("🐕 آیا میخوای هاپو بخری؟", reply_markup=InlineKeyboardMarkup(keyboard))
         return
     
-    msg = get_hapo_menu_text(game)
-    keyboard = get_hapo_menu_keyboard(game)
-    await update.message.reply_text(msg, reply_markup=keyboard)
+    try:
+        msg = get_hapo_menu_text(game)
+        keyboard = get_hapo_menu_keyboard(game)
+        await update.message.reply_text(msg, reply_markup=keyboard)
+    except Exception as e:
+        logging.error(f"Error in show_hapo_menu: {e}")
+        await update.message.reply_text("🐕 هاپو\n\n❌ خطا در نمایش منوی هاپو. لطفاً دوباره تلاش کنید.")
 
 
 async def show_claw_menu(update: Update, game):
@@ -558,13 +596,17 @@ async def show_claw_menu(update: Update, game):
         await update.message.reply_text("⛓️ شما در زندان هستید و نمی‌توانید این کار را انجام دهید.")
         return
     
-    if game.data["level"] < 2:
+    level = game.data["level"]
+    if isinstance(level, str):
+        level = int(level) if level.isdigit() else 1
+    
+    if level < 2:
         await update.message.reply_text("🔒 پنجه از سطح 2 باز میشود")
         return
     
     claw_level = game.data["claw_level"]
     if isinstance(claw_level, str):
-        claw_level = int(claw_level)
+        claw_level = int(claw_level) if claw_level.isdigit() else 0
     
     if claw_level == 0:
         cost = game.get_claw_cost(1)
@@ -1470,7 +1512,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if context.user_data.get("waiting_for_hapo_name"):
         hop_point = game.data["hop_point"]
         if isinstance(hop_point, str):
-            hop_point = int(hop_point)
+            try:
+                hop_point = int(float(hop_point))
+            except:
+                hop_point = 0
         if hop_point < 750:
             await update.message.reply_text("❌ پوینت کافی نیست")
             context.user_data["waiting_for_hapo_name"] = False
@@ -1691,7 +1736,10 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         hop_point = game.data["hop_point"]
         if isinstance(hop_point, str):
-            hop_point = int(hop_point)
+            try:
+                hop_point = int(float(hop_point))
+            except:
+                hop_point = 0
         if hop_point < 750:
             await query.edit_message_text("❌ پوینت کافی نیست")
             return
@@ -1703,9 +1751,12 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text(f"✅ اسم هاپو از «{old_name}» به «{new_name}» تغییر یافت")
         context.user_data["new_hapo_name"] = None
         await asyncio.sleep(2)
-        msg = get_hapo_menu_text(game)
-        keyboard = get_hapo_menu_keyboard(game)
-        await query.edit_message_text(msg, reply_markup=keyboard)
+        try:
+            msg = get_hapo_menu_text(game)
+            keyboard = get_hapo_menu_keyboard(game)
+            await query.edit_message_text(msg, reply_markup=keyboard)
+        except Exception as e:
+            await query.edit_message_text("❌ خطا در نمایش منوی هاپو")
         return
     
     if data == "cancel_hapo_name":
@@ -1724,50 +1775,71 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if data == "hapo_harvest":
         hapo_harvest = game.data["hapo_harvest"]
         if isinstance(hapo_harvest, str):
-            hapo_harvest = int(hapo_harvest)
+            try:
+                hapo_harvest = int(float(hapo_harvest))
+            except:
+                hapo_harvest = 0
         if hapo_harvest > 0:
             hop_point = game.data["hop_point"]
             if isinstance(hop_point, str):
-                hop_point = int(hop_point)
+                try:
+                    hop_point = int(float(hop_point))
+                except:
+                    hop_point = 0
             game.data["hop_point"] = str(hop_point + hapo_harvest)
             game.data["hapo_harvest"] = "0"
             game.save_data()
             await query.edit_message_text(f"✅ {format_number(hapo_harvest)} هاپو پوینت برداشت شد")
             await asyncio.sleep(2)
-            msg = get_hapo_menu_text(game)
-            keyboard = get_hapo_menu_keyboard(game)
-            await query.edit_message_text(msg, reply_markup=keyboard)
+            try:
+                msg = get_hapo_menu_text(game)
+                keyboard = get_hapo_menu_keyboard(game)
+                await query.edit_message_text(msg, reply_markup=keyboard)
+            except:
+                await query.edit_message_text("❌ خطا در نمایش منوی هاپو")
         else:
             await query.edit_message_text("❌ هیچ هاپو پوینتی برای برداشت نیست")
             await asyncio.sleep(2)
-            msg = get_hapo_menu_text(game)
-            keyboard = get_hapo_menu_keyboard(game)
-            await query.edit_message_text(msg, reply_markup=keyboard)
+            try:
+                msg = get_hapo_menu_text(game)
+                keyboard = get_hapo_menu_keyboard(game)
+                await query.edit_message_text(msg, reply_markup=keyboard)
+            except:
+                await query.edit_message_text("❌ خطا در نمایش منوی هاپو")
         return
     
     if data == "hapo_level_up":
         price = game.get_hapo_upgrade_price()
         hop_point = game.data["hop_point"]
         if isinstance(hop_point, str):
-            hop_point = int(hop_point)
+            try:
+                hop_point = int(float(hop_point))
+            except:
+                hop_point = 0
         if hop_point < price:
             await query.edit_message_text(f"❌ به {format_number(price)} هاپو پوینت نیاز داری")
             return
         game.data["hop_point"] = str(hop_point - price)
         hapo_level = game.data["hapo_level"]
         if isinstance(hapo_level, str):
-            hapo_level = int(hapo_level)
+            hapo_level = int(hapo_level) if hapo_level.isdigit() else 1
         game.data["hapo_level"] = str(hapo_level + 1)
         hapo_food = game.data["hapo_food"]
         if isinstance(hapo_food, str):
-            hapo_food = int(hapo_food)
+            try:
+                hapo_food = int(float(hapo_food))
+            except:
+                hapo_food = 0
         game.data["hapo_food"] = str(min(game.get_hapo_max_food(), hapo_food + 2))
         game.save_data()
         await query.edit_message_text(f"✅ سطح هاپو به {game.data['hapo_level']} ارتقا یافت")
         await asyncio.sleep(2)
-        msg = get_hapo_menu_text(game)
-        keyboard = get_hapo_menu_keyboard(game)
-        await query.edit_message_text(msg, reply_markup=keyboard)
+        try:
+            msg = get_hapo_menu_text(game)
+            keyboard = get_hapo_menu_keyboard(game)
+            await query.edit_message_text(msg, reply_markup=keyboard)
+        except:
+            await query.edit_message_text("❌ خطا در نمایش منوی هاپو")
         return
     
     if data == "hapo_rank_up_confirm":
@@ -1778,13 +1850,16 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         price = game.get_hapo_rank_up_price()
         hop_point = game.data["hop_point"]
         if isinstance(hop_point, str):
-            hop_point = int(hop_point)
+            try:
+                hop_point = int(float(hop_point))
+            except:
+                hop_point = 0
         if hop_point < price:
             await query.edit_message_text(f"❌ به {format_number(price)} هاپو پوینت نیاز داری")
             return
         hapo_rank = game.data["hapo_rank"]
         if isinstance(hapo_rank, str):
-            hapo_rank = int(hapo_rank)
+            hapo_rank = int(hapo_rank) if hapo_rank.isdigit() else 0
         msg = f"⚠️ آیا از ارتقا مقام هاپو مطمئنی؟\n\n🌟 مقام فعلی: {RANK_NAMES[hapo_rank]}\n🌟 مقام جدید: {RANK_NAMES[hapo_rank + 1]}\n💰 هزینه: {format_number(price)} هاپو پوینت\n\n❗️ با ارتقا مقام:\n┘─ سطح هاپو به 1 ریست میشود\n┘─ تولیدی هاپو صفر میشود\n┘─ ظرفیت هاپو افزایش می‌یابد"
         await query.edit_message_text(msg, reply_markup=get_confirm_keyboard("hapo_rank_up_yes", "hapo_rank_up_no"))
         return
@@ -1794,9 +1869,12 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if result["success"]:
             await query.edit_message_text(f"✅ مقام هاپو به {result['new_rank_name']} ارتقا یافت!\n\n🌟 سطح هاپو به 1 ریست شد\n💰 تولیدی هاپو صفر شد\n📦 ظرفیت هاپو افزایش یافت")
             await asyncio.sleep(2)
-            msg = get_hapo_menu_text(game)
-            keyboard = get_hapo_menu_keyboard(game)
-            await query.edit_message_text(msg, reply_markup=keyboard)
+            try:
+                msg = get_hapo_menu_text(game)
+                keyboard = get_hapo_menu_keyboard(game)
+                await query.edit_message_text(msg, reply_markup=keyboard)
+            except:
+                await query.edit_message_text("❌ خطا در نمایش منوی هاپو")
         else:
             await query.edit_message_text(f"❌ {result['reason']}")
         return
@@ -1804,15 +1882,21 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if data == "hapo_rank_up_no":
         await query.edit_message_text("❌ ارتقا مقام لغو شد.")
         await asyncio.sleep(1)
-        msg = get_hapo_menu_text(game)
-        keyboard = get_hapo_menu_keyboard(game)
-        await query.edit_message_text(msg, reply_markup=keyboard)
+        try:
+            msg = get_hapo_menu_text(game)
+            keyboard = get_hapo_menu_keyboard(game)
+            await query.edit_message_text(msg, reply_markup=keyboard)
+        except:
+            await query.edit_message_text("❌ خطا در نمایش منوی هاپو")
         return
     
     if data == "hapo_rename":
         hop_point = game.data["hop_point"]
         if isinstance(hop_point, str):
-            hop_point = int(hop_point)
+            try:
+                hop_point = int(float(hop_point))
+            except:
+                hop_point = 0
         if hop_point < 750:
             await query.edit_message_text("❌ به 750 هاپو پوینت نیاز داری")
             return
@@ -1847,7 +1931,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await asyncio.sleep(1)
             claw_level = game.data["claw_level"]
             if isinstance(claw_level, str):
-                claw_level = int(claw_level)
+                claw_level = int(claw_level) if claw_level.isdigit() else 0
             claw_data = game.get_claw_data(claw_level)
             next_level = claw_level + 1
             next_data = game.get_claw_data(next_level)
@@ -2046,23 +2130,29 @@ async def my_profile_from_callback(query, game):
     
     hapo_rank = game.data.get("hapo_rank", 0)
     if isinstance(hapo_rank, str):
-        hapo_rank = int(hapo_rank)
+        hapo_rank = int(hapo_rank) if hapo_rank.isdigit() else 0
     
     hapo_level = game.data.get("hapo_level", 1)
     if isinstance(hapo_level, str):
-        hapo_level = int(hapo_level)
+        hapo_level = int(hapo_level) if hapo_level.isdigit() else 1
     
     hop_point = game.data["hop_point"]
     if isinstance(hop_point, str):
-        hop_point = int(hop_point)
+        try:
+            hop_point = int(float(hop_point))
+        except:
+            hop_point = 0
     
     hop_count = game.data["hop_count"]
     if isinstance(hop_count, str):
-        hop_count = int(hop_count)
+        try:
+            hop_count = int(float(hop_count))
+        except:
+            hop_count = 0
     
     level = game.data["level"]
     if isinstance(level, str):
-        level = int(level)
+        level = int(level) if level.isdigit() else 1
     
     msg = f"╮──「 🐶 پروفایل هاپویی 🐶 」\n\n"
     msg += f"┐─ 👤 کاربر : {full_name}\n"
