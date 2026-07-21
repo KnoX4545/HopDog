@@ -20,7 +20,6 @@ class HopDogGame:
     # ============================================================
 
     def _to_int(self, value):
-        """تبدیل مطمئن به int"""
         if value is None:
             return 0
         if isinstance(value, (int, float)):
@@ -33,7 +32,6 @@ class HopDogGame:
         return 0
 
     def _to_float(self, value):
-        """تبدیل مطمئن به float"""
         if value is None:
             return 0.0
         if isinstance(value, (int, float)):
@@ -46,13 +44,11 @@ class HopDogGame:
         return 0.0
 
     def _to_str(self, value):
-        """تبدیل به string"""
         if value is None:
             return "0"
         return str(value)
 
     def _to_bool(self, value):
-        """تبدیل مطمئن به bool"""
         if value is None:
             return False
         if isinstance(value, bool):
@@ -69,7 +65,6 @@ class HopDogGame:
         try:
             data = get_user_data(self.user_id)
             if data:
-                # تبدیل JSON فیلدها
                 if "current_hunt_animal" in data and data["current_hunt_animal"]:
                     try:
                         data["current_hunt_animal"] = json.loads(data["current_hunt_animal"])
@@ -97,7 +92,6 @@ class HopDogGame:
                 else:
                     data["fridge_items"] = []
                 
-                # فیلدهای پیش‌فرض
                 defaults = {
                     "bank_card_number": "",
                     "jail_admin_id": None,
@@ -121,7 +115,6 @@ class HopDogGame:
                     if key not in data:
                         data[key] = default
                 
-                # چک کردن خودکار آزادی از زندان
                 if data.get("jailed", False):
                     now = datetime.now().timestamp()
                     jail_until = self._to_float(data.get("jail_until", 0))
@@ -255,22 +248,18 @@ class HopDogGame:
     # ============================================================
 
     def get_hapo_total_level(self):
-        """دریافت سطح کل هاپو (مقام * 5 + سطح)"""
         hapo_rank = self._to_int(self.data["hapo_rank"])
         hapo_level = self._to_int(self.data["hapo_level"])
         return hapo_rank * 5 + hapo_level
 
     def get_hapo_max_level_for_rank(self, rank):
-        """دریافت حداکثر سطح برای هر مقام"""
         return (rank + 1) * 5
 
     def get_hapo_max_food(self):
-        """دریافت حداکثر غذای هاپو بر اساس مقام"""
         hapo_rank = self._to_int(self.data["hapo_rank"])
         return (hapo_rank + 1) * 4
 
     def get_hapo_capacity(self):
-        """دریافت ظرفیت هاپو بر اساس سطح کل"""
         total = self.get_hapo_total_level()
         if total in HAPO_CAPACITY:
             return HAPO_CAPACITY[total]
@@ -281,7 +270,6 @@ class HopDogGame:
         return HAPO_CAPACITY[keys[-1]]
 
     def get_hapo_production(self):
-        """دریافت تولید هاپو بر اساس سطح کل"""
         total = self.get_hapo_total_level()
         if total in HAPO_PRODUCTION:
             return HAPO_PRODUCTION[total]
@@ -292,7 +280,6 @@ class HopDogGame:
         return HAPO_PRODUCTION[keys[-1]]
 
     def get_hapo_upgrade_price(self):
-        """دریافت هزینه ارتقا سطح هاپو"""
         total = self.get_hapo_total_level()
         if total >= 25:
             return float('inf')
@@ -305,7 +292,6 @@ class HopDogGame:
         return HAPO_LEVEL_PRICES[keys[-1]]
 
     def get_hapo_rank_up_price(self):
-        """دریافت هزینه ارتقا مقام هاپو"""
         current_rank = self._to_int(self.data["hapo_rank"])
         if current_rank >= 4:
             return float('inf')
@@ -372,7 +358,6 @@ class HopDogGame:
         return {"success": True, "name": self.data["hapo_name"]}
 
     def can_rank_up(self):
-        """بررسی امکان ارتقا مقام"""
         hapo_level = self._to_int(self.data["hapo_level"])
         hapo_rank = self._to_int(self.data["hapo_rank"])
         
@@ -386,7 +371,7 @@ class HopDogGame:
         return {"success": True}
 
     def confirm_rank_up(self):
-        """تأیید و اجرای ارتقا مقام"""
+        """تأیید و اجرای ارتقا مقام - هاپو سیر میشه"""
         hapo_rank = self._to_int(self.data["hapo_rank"])
         
         if hapo_rank >= 4:
@@ -401,7 +386,10 @@ class HopDogGame:
         self.data["hop_point"] = self._to_str(hop_point - price)
         self.data["hapo_rank"] = self._to_str(hapo_rank + 1)
         self.data["hapo_level"] = "1"
+        
+        # ======== اصلاح: هاپو سیر میشه ========
         self.data["hapo_food"] = self._to_str(self.get_hapo_max_food())
+        
         self.data["hapo_harvest"] = "0"
         self.data["hapo_last_update"] = self._to_str(datetime.now().timestamp())
         self.save_data()
@@ -417,7 +405,6 @@ class HopDogGame:
         }
 
     def can_upgrade_level(self):
-        """بررسی امکان ارتقا سطح"""
         hapo_rank = self._to_int(self.data["hapo_rank"])
         hapo_level = self._to_int(self.data["hapo_level"])
         total = self.get_hapo_total_level()
@@ -432,7 +419,6 @@ class HopDogGame:
         return {"success": True}
 
     def upgrade_hapo_level(self):
-        """ارتقا سطح هاپو (1 سطح)"""
         total = self.get_hapo_total_level()
         hapo_rank = self._to_int(self.data["hapo_rank"])
         hapo_level = self._to_int(self.data["hapo_level"])
