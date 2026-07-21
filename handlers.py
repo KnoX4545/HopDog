@@ -1707,7 +1707,7 @@ async def meow_vote_timer(vote_key, context):
         else:
             try:
                 await context.bot.edit_message_text(
-                    f"😺 گربه ی بی ادب!\n\n❌ رای‌گیری به پایان رسید. کاربر آزاد است.",
+                    f" گربه ی بی ادب!\n\n❌ رای‌گیری به پایان رسید. کاربر آزاد است.",
                     chat_id=chat_id,
                     message_id=msg_id
                 )
@@ -2971,7 +2971,8 @@ async def get_user_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
         msg += f"\n\n🏦 بانک:\n  💰 موجودی: {format_number(bank_balance)}\n  💳 شماره کارت: {user_data.get('bank_card_number', 'نامشخص')}"
     
     if fridge_owned:
-        msg += f"\n\n❄️ یخچال:\n  ⭐ سطح: {fridge_level}\n  📦 ظرفیت: {FRIDGE_CAPACITY.get(fridge_level, 1)}"
+    from config import FRIDGE_CAPACITY
+    msg += f"\n\n❄️ یخچال:\n  ⭐ سطح: {fridge_level}\n  📦 ظرفیت: {FRIDGE_CAPACITY.get(fridge_level, 1)}"
     
     msg += f"\n\n🐶 هاپوی خیابونی نجات داده: {street_rescued}"
     msg += f"\n\n📅 آخرین بروزرسانی: {user_data.get('last_updated', 'نامشخص')}"
