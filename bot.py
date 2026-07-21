@@ -60,6 +60,7 @@ async def handle_admin_login(update: Update, context: ContextTypes.DEFAULT_TYPE)
 # ================================================================
 
 def main():
+    # drop_pending_updates=True برای جلوگیری از Conflict
     app = Application.builder().token(TOKEN).build()
     
     # ============================================================
@@ -96,19 +97,16 @@ def main():
     # ============================================================
     # هندلرهای پیام (همه پیام‌های متنی در گروه و پیوی)
     # ============================================================
-    # مهم: این هندلر برای همه پیام‌های متنی در گروه هست
     app.add_handler(MessageHandler(
         filters.TEXT & filters.ChatType.GROUP,
         handle_message
     ))
     
-    # هندلر برای پیوی
     app.add_handler(MessageHandler(
         filters.TEXT & filters.ChatType.PRIVATE,
         handle_message
     ))
     
-    # کالبک و خوش‌آمدگویی
     app.add_handler(CallbackQueryHandler(handle_callback))
     app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, group_welcome))
     
