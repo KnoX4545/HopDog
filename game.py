@@ -1,4 +1,4 @@
-# game.py - کلاس اصلی بازی (نسخه نهایی با تبدیل در کد)
+# game.py - کلاس اصلی بازی (نسخه نهایی با یخچال و قاچاق)
 
 import random
 import json
@@ -77,6 +77,7 @@ class HopDogGame:
                     data["jail_voted"] = []
             else:
                 data["jail_voted"] = []
+            
             # فیلدهای جدید - اطمینان از وجود
             if "bank_card_number" not in data:
                 data["bank_card_number"] = ""
@@ -92,6 +93,29 @@ class HopDogGame:
                 data["profile_locked"] = False
             if "street_hapo_rescued" not in data:
                 data["street_hapo_rescued"] = "0"
+            
+            # فیلدهای یخچال
+            if "fridge_owned" not in data:
+                data["fridge_owned"] = False
+            if "fridge_level" not in data:
+                data["fridge_level"] = "1"
+            if "fridge_items" not in data:
+                data["fridge_items"] = "[]"
+            
+            # فیلدهای قاچاق
+            if "smuggling" not in data:
+                data["smuggling"] = False
+            if "smuggle_count" not in data:
+                data["smuggle_count"] = "0"
+            if "smuggle_start" not in data:
+                data["smuggle_start"] = "0"
+            if "smuggle_duration" not in data:
+                data["smuggle_duration"] = "0"
+            if "smuggle_success_chance" not in data:
+                data["smuggle_success_chance"] = "0"
+            if "smuggle_used_hapo" not in data:
+                data["smuggle_used_hapo"] = "0"
+            
             # چک کردن خودکار آزادی
             if data.get("jailed", False):
                 now = datetime.now().timestamp()
@@ -149,6 +173,17 @@ class HopDogGame:
             "jail_voted": [],
             "jail_admin_id": None,
             "street_hapo_rescued": "0",
+            # فیلدهای یخچال
+            "fridge_owned": False,
+            "fridge_level": "1",
+            "fridge_items": "[]",
+            # فیلدهای قاچاق
+            "smuggling": False,
+            "smuggle_count": "0",
+            "smuggle_start": "0",
+            "smuggle_duration": "0",
+            "smuggle_success_chance": "0",
+            "smuggle_used_hapo": "0",
             "last_updated": datetime.now().isoformat()
         }
         self.save_data()
@@ -872,6 +907,417 @@ class HopDogGame:
 
     def get_meow_votes(self):
         return self.data.get("jail_voted", [])
+
+    # ============================================================
+    # متدهای یخچال هاپویی
+    # ============================================================
+
+    def get_fridge_capacity(self):
+        """دریافت ظرفیت یخچال بر اساس سطح"""
+        level = self._to_int(self.data.get("fridge_level", 1))
+        return FRIDGE_CAPACITY.get(level, 1)
+
+    def get_fridge_upgrade_cost(self):
+        """دریافت هزینه ارتقا یخچال به سطح بعدی"""
+        level = self._to_int(self.data.get("fridge_level", 1))
+        next_level = level + 1
+        if next_level > FRIDGE_MAX_LEVEL:
+            return None
+        return FRIDGE_UPGRADE_COSTS.get(next_level, None)
+
+    def get_fridge_items(self):
+        """دریافت لیست حیوانات داخل یخچال"""
+        items = self.data.get("fridge_items", [])
+        if isinstance(items, str):
+            try:
+                items = json.loads(items)
+            except:
+                items = []
+        return items
+
+    def save_fridge_items(self, items):
+        """ذخیره لیست حیوانات داخل یخچال"""
+        self.data["fridge_items"] = json.dumps(items)
+        self.save_data()
+
+    def buy_fridge(self):
+        """خرید یخچال هاپویی"""
+        if self._to_int(self.data["level"]) < FRIDGE_REQUIRED_LEVEL:
+            return {"success": False, "reason": f"یخچال هاپویی از سطح {FRIDGE_REQUIRED_LEVEL} باز میشود"}
+        
+        if self.data.get("fridge_owned", False):
+            return {"success": False, "reason": "شما قبلاً یخچال هاپویی دارید"}
+        
+        hop_point = self._to_int(self.data.get("hop_point", 0))
+        if hop_point < FRIDGE_PURCHASE_COST:
+            return {"success": False, "reason": f"برای خرید یخچال به {FRIDGE_PURCHASE_COST:,} هاپو پوینت نیاز داری"}
+        
+        self.data["hop_point"] = self._to_str(hop_point - FRIDGE_PURCHASE_COST)
+        self.data["fridge_owned"] = True
+        self.data["fridge_level"] = "1"
+        self.data["fridge_items"] = "[]"
+        self.save_data()
+        
+        return {"success": True}
+
+    def upgrade_fridge(self):
+        """ارتقا سطح یخچال"""
+        if not self.data.get("fridge_owned", False):
+            return {"success": False, "reason": "شما یخچال هاپویی ندارید"}
+        
+        current_level = self._to_int(self.data.get("fridge_level", 1))
+        if current_level >= FRIDGE_MAX_LEVEL:
+            return {"success": False, "reason": "یخچال شما در بالاترین سطح است"}
+        
+        cost = FRIDGE_UPGRADE_COSTS.get(current_level + 1)
+        if cost is None:
+            return {"success": False, "reason": "خطا در محاسبه هزینه"}
+        
+        hop_point = self._to_int(self.data.get("hop_point", 0))
+        if hop_point < cost:
+            return {"success": False, "reason": f"برای ارتقا به {cost:,} هاپو پوینت نیاز داری"}
+        
+        self.data["hop_point"] = self._to_str(hop_point - cost)
+        self.data["fridge_level"] = self._to_str(current_level + 1)
+        self.save_data()
+        
+        return {"success": True, "new_level": current_level + 1}
+
+    def add_to_fridge(self, animal):
+        """افزودن حیوان به یخچال"""
+        if not self.data.get("fridge_owned", False):
+            return {"success": False, "reason": "شما یخچال هاپویی ندارید"}
+        
+        if not animal:
+            return {"success": False, "reason": "هیچ حیوانی برای ذخیره وجود ندارد"}
+        
+        items = self.get_fridge_items()
+        
+        # چک کردن ظرفیت
+        capacity = self.get_fridge_capacity()
+        if len(items) >= capacity:
+            return {"success": False, "reason": f"یخچال پر است! ظرفیت: {capacity}"}
+        
+        # چک کردن تکراری نبودن
+        animal_name = animal.get("name")
+        for item in items:
+            if item.get("name") == animal_name and not item.get("cooked", False):
+                return {"success": False, "reason": f"شما قبلاً یک {animal_name} در یخچال دارید"}
+        
+        # اضافه کردن به یخچال
+        animal_copy = animal.copy()
+        animal_copy["cooked"] = False
+        animal_copy["cooking"] = False
+        items.append(animal_copy)
+        self.save_fridge_items(items)
+        
+        return {"success": True, "item": animal_copy}
+
+    def remove_from_fridge(self, index):
+        """حذف حیوان از یخچال (برای فروش یا پخت)"""
+        items = self.get_fridge_items()
+        if index < 0 or index >= len(items):
+            return {"success": False, "reason": "حیوان مورد نظر یافت نشد"}
+        
+        removed = items.pop(index)
+        self.save_fridge_items(items)
+        return {"success": True, "item": removed}
+
+    def cook_item(self, index):
+        """پختن حیوان داخل یخچال"""
+        from datetime import datetime
+        
+        items = self.get_fridge_items()
+        if index < 0 or index >= len(items):
+            return {"success": False, "reason": "حیوان مورد نظر یافت نشد"}
+        
+        item = items[index]
+        if item.get("cooked", False):
+            return {"success": False, "reason": "این حیوان قبلاً پخته شده است"}
+        
+        if item.get("cooking", False):
+            return {"success": False, "reason": "این حیوان در حال پخت است"}
+        
+        # محاسبه زمان پخت بر اساس وزن
+        weight = item.get("weight", 1.0)
+        cook_time = int(weight * 100)  # هر 0.01 کیلو = 1 ثانیه
+        
+        # علامت گذاری به عنوان در حال پخت
+        item["cooking"] = True
+        item["cook_time"] = cook_time
+        item["cook_start"] = datetime.now().timestamp()
+        self.save_fridge_items(items)
+        
+        return {
+            "success": True,
+            "cook_time": cook_time,
+            "item": item
+        }
+
+    def check_cooking_status(self):
+        """بررسی وضعیت پخت حیوانات"""
+        from datetime import datetime
+        
+        items = self.get_fridge_items()
+        now = datetime.now().timestamp()
+        changed = False
+        
+        for item in items:
+            if item.get("cooking", False):
+                cook_start = item.get("cook_start", 0)
+                cook_time = item.get("cook_time", 0)
+                elapsed = now - cook_start
+                
+                if elapsed >= cook_time:
+                    # پخت کامل شد
+                    item["cooked"] = True
+                    item["cooking"] = False
+                    # اعمال ضریب‌ها
+                    item["original_value"] = item.get("value", 0)
+                    item["original_nutrition"] = item.get("nutrition", 1)
+                    item["value"] = int(item["value"] * FRIDGE_COOK_MULTIPLIER_SELL)
+                    item["nutrition"] = item["nutrition"] * FRIDGE_COOK_MULTIPLIER_FOOD
+                    changed = True
+        
+        if changed:
+            self.save_fridge_items(items)
+        
+        return items
+
+    def get_fridge_item_cook_progress(self, index):
+        """دریافت پیشرفت پخت یک حیوان"""
+        from datetime import datetime
+        
+        items = self.get_fridge_items()
+        if index < 0 or index >= len(items):
+            return None
+        
+        item = items[index]
+        if not item.get("cooking", False):
+            return None
+        
+        now = datetime.now().timestamp()
+        cook_start = item.get("cook_start", 0)
+        cook_time = item.get("cook_time", 0)
+        elapsed = now - cook_start
+        
+        progress = min(100, int((elapsed / cook_time) * 100))
+        remaining = max(0, int(cook_time - elapsed))
+        
+        return {
+            "progress": progress,
+            "remaining": remaining,
+            "total": cook_time
+        }
+
+    def sell_from_fridge(self, index):
+        """فروش حیوان از یخچال"""
+        if not self.data.get("fridge_owned", False):
+            return {"success": False, "reason": "شما یخچال هاپویی ندارید"}
+        
+        items = self.get_fridge_items()
+        if index < 0 or index >= len(items):
+            return {"success": False, "reason": "حیوان مورد نظر یافت نشد"}
+        
+        item = items[index]
+        if item.get("cooking", False):
+            return {"success": False, "reason": "این حیوان در حال پخت است"}
+        
+        # محاسبه ارزش
+        value = item.get("value", 0)
+        
+        # اضافه کردن به هاپو پوینت
+        hop_point = self._to_int(self.data.get("hop_point", 0))
+        self.data["hop_point"] = self._to_str(hop_point + value)
+        
+        # حذف از یخچال
+        removed = items.pop(index)
+        self.save_fridge_items(items)
+        
+        return {
+            "success": True,
+            "value": value,
+            "item": removed
+        }
+
+    def feed_hapo_from_fridge(self, index):
+        """غذا دادن به هاپو از یخچال"""
+        if not self.data.get("fridge_owned", False):
+            return {"success": False, "reason": "شما یخچال هاپویی ندارید"}
+        
+        if not self.data.get("hapo_owned", False):
+            return {"success": False, "reason": "شما هاپو ندارید"}
+        
+        items = self.get_fridge_items()
+        if index < 0 or index >= len(items):
+            return {"success": False, "reason": "حیوان مورد نظر یافت نشد"}
+        
+        item = items[index]
+        if item.get("cooking", False):
+            return {"success": False, "reason": "این حیوان در حال پخت است"}
+        
+        # محاسبه ارزش غذایی
+        nutrition = item.get("nutrition", 1)
+        
+        # غذا دادن به هاپو
+        max_food = self.get_hapo_max_food()
+        hapo_food = self._to_int(self.data.get("hapo_food", 0))
+        
+        if hapo_food >= max_food:
+            return {"success": False, "reason": "هاپو سیر است"}
+        
+        new_food = min(max_food, hapo_food + nutrition)
+        actual = new_food - hapo_food
+        self.data["hapo_food"] = self._to_str(new_food)
+        
+        # حذف از یخچال
+        removed = items.pop(index)
+        self.save_fridge_items(items)
+        self.save_data()
+        
+        return {
+            "success": True,
+            "fed": actual,
+            "item": removed
+        }
+
+    # ============================================================
+    # متدهای قاچاق هاپویی
+    # ============================================================
+
+    def start_smuggle(self, count):
+        """شروع قاچاق هاپویی"""
+        from datetime import datetime
+        import random
+        
+        # بررسی سطح
+        level = self._to_int(self.data.get("level", 1))
+        if level < SMUGGLE_REQUIRED_LEVEL:
+            return {"success": False, "reason": f"قاچاق هاپویی از سطح {SMUGGLE_REQUIRED_LEVEL} باز میشود"}
+        
+        # بررسی تعداد هاپوهای خیابونی
+        street_hapo = self._to_int(self.data.get("street_hapo_rescued", 0))
+        if street_hapo < SMUGGLE_MIN_HAPO:
+            return {"success": False, "reason": f"برای قاچاق به حداقل {SMUGGLE_MIN_HAPO} هاپوی خیابونی نیاز داری. شما {street_hapo} داری"}
+        
+        # بررسی تعداد انتخاب شده
+        if count < SMUGGLE_MIN_HAPO or count > SMUGGLE_MAX_HAPO:
+            return {"success": False, "reason": f"تعداد هاپوها باید بین {SMUGGLE_MIN_HAPO} تا {SMUGGLE_MAX_HAPO} باشد"}
+        
+        if count > street_hapo:
+            return {"success": False, "reason": f"شما فقط {street_hapo} هاپوی خیابونی داری"}
+        
+        # بررسی اینکه در حال قاچاق نیست
+        if self.data.get("smuggling", False):
+            return {"success": False, "reason": "شما در حال حاضر در حال قاچاق هستید"}
+        
+        # محاسبه زمان
+        cook_time = count * SMUGGLE_TIME_PER_HAPO
+        
+        # محاسبه شانس موفقیت
+        success_chance = SMUGGLE_SUCCESS_CHANCE - (count - SMUGGLE_MIN_HAPO) * 0.02
+        success_chance = max(0.30, success_chance)  # حداقل 30%
+        
+        # شروع قاچاق
+        now = datetime.now().timestamp()
+        self.data["smuggling"] = True
+        self.data["smuggle_count"] = count
+        self.data["smuggle_start"] = now
+        self.data["smuggle_duration"] = cook_time
+        self.data["smuggle_success_chance"] = success_chance
+        self.data["smuggle_used_hapo"] = count
+        
+        # کم کردن هاپوهای خیابونی
+        self.data["street_hapo_rescued"] = self._to_str(street_hapo - count)
+        self.save_data()
+        
+        return {
+            "success": True,
+            "count": count,
+            "duration": cook_time,
+            "success_chance": int(success_chance * 100)
+        }
+
+    def check_smuggle_status(self):
+        """بررسی وضعیت قاچاق"""
+        from datetime import datetime
+        import random
+        
+        if not self.data.get("smuggling", False):
+            return None
+        
+        now = datetime.now().timestamp()
+        start = self.data.get("smuggle_start", 0)
+        duration = self.data.get("smuggle_duration", 0)
+        elapsed = now - start
+        
+        if elapsed < duration:
+            # هنوز در حال قاچاق
+            remaining = int(duration - elapsed)
+            return {
+                "status": "in_progress",
+                "remaining": remaining,
+                "progress": int((elapsed / duration) * 100),
+                "count": self.data.get("smuggle_count", 0)
+            }
+        
+        # قاچاق کامل شد
+        success_chance = self.data.get("smuggle_success_chance", 0.60)
+        count = self.data.get("smuggle_count", 0)
+        
+        # پاک کردن وضعیت قاچاق
+        self.data["smuggling"] = False
+        self.data["smuggle_count"] = 0
+        self.data["smuggle_start"] = 0
+        self.data["smuggle_duration"] = 0
+        self.data["smuggle_success_chance"] = 0
+        
+        # تصمیم گیری موفقیت یا شکست
+        if random.random() < success_chance:
+            # موفقیت
+            reward_per_hapo = random.randint(SMUGGLE_REWARD_MIN, SMUGGLE_REWARD_MAX)
+            total_reward = reward_per_hapo * count
+            
+            hop_point = self._to_int(self.data.get("hop_point", 0))
+            self.data["hop_point"] = self._to_str(hop_point + total_reward)
+            self.save_data()
+            
+            return {
+                "status": "success",
+                "count": count,
+                "reward": total_reward,
+                "per_hapo": reward_per_hapo
+            }
+        else:
+            # شکست - زندان
+            self.jail_user(JAIL_REASON_SMUGGLE, SMUGGLE_JAIL_DURATION, SMUGGLE_JAIL_FINE)
+            self.save_data()
+            
+            return {
+                "status": "failed",
+                "count": count,
+                "jail_duration": SMUGGLE_JAIL_DURATION // 60,
+                "jail_fine": SMUGGLE_JAIL_FINE
+            }
+
+    def get_smuggle_info(self):
+        """دریافت اطلاعات قاچاق"""
+        from datetime import datetime
+        
+        if not self.data.get("smuggling", False):
+            return None
+        
+        now = datetime.now().timestamp()
+        start = self.data.get("smuggle_start", 0)
+        duration = self.data.get("smuggle_duration", 0)
+        elapsed = now - start
+        remaining = int(duration - elapsed)
+        
+        return {
+            "count": self.data.get("smuggle_count", 0),
+            "remaining": remaining,
+            "progress": int((elapsed / duration) * 100) if duration > 0 else 0
+        }
 
 
 # ================================================================
