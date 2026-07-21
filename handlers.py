@@ -1,4 +1,4 @@
-# handlers.py - هندلرهای پیام و کالبک (نسخه نهایی کامل با یخچال، قاچاق و لیدربرد)
+# handlers.py - هندلرهای پیام و کالبک (نسخه نهایی با دیباگ کامل)
 
 import os
 import json
@@ -57,6 +57,13 @@ SPAM_TRACKER = {}
 MEOW_VOTES = {}
 TRANSFER_STATE = {}
 street_hapo_instance = None
+
+# تنظیم لاگ
+logging.basicConfig(
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    level=logging.INFO
+)
+logger = logging.getLogger(__name__)
 
 
 def get_game(user_id, username=""):
@@ -2908,10 +2915,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         is_private = update.message.chat.type == "private"
         is_group = update.message.chat.type in ["group", "supergroup"]
         
-        # ============================================================
-        # لاگ برای دیباگ - مهم!
-        # ============================================================
-        logging.info(f"📩 پیام از {user_id} در {update.message.chat.type}: '{text}'")
+        # ======== لاگ قوی ========
+        logger.info(f"📩 پیام از {user_id} در {update.message.chat.type}: '{text}'")
         
         if is_group:
             try:
@@ -3040,12 +3045,13 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
         
         # ============================================================
-        # گروه - بخش اصلی اصلاح شده
+        # گروه
         # ============================================================
         if is_group:
-            # تمیز کردن متن برای تشخیص بهتر
             text_clean = text_lower.strip()
-            logging.info(f"📩 گروه - دستور: '{text_clean}' از {user_id}")
+            
+            # ======== لاگ ========
+            logger.info(f"📩 گروه - پردازش: '{text_clean}' از {user_id}")
             
             # زندان
             if text_clean in ["زندان هاپویی", "زندان"]:
@@ -3072,9 +3078,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await transfer_points_command(update, context)
                 return
             
-            # هاپ هاپ - با تشخیص startswith برای فاصله‌های اضافی
+            # هاپ هاپ - با startswith
             hop_keywords = ["هاپ هاپ", "هاپ", "hop", "hop hop", "واق", "واق واق", "هاپ هوپ", "هوپ", "hap", "hap hap"]
-            if text_clean in hop_keywords or any(text_clean.startswith(kw) for kw in hop_keywords):
+            if any(text_clean == kw or text_clean.startswith(kw) for kw in hop_keywords):
+                logger.info(f"✅ شناسایی شد: هاپ هاپ از {user_id}")
                 await do_hop(update, game)
                 return
             
@@ -3119,13 +3126,13 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await show_smuggle_menu(update, game)
                 return
             
-            # اگر هیچ دستوری نبود، لاگ کن
-            logging.info(f"❌ گروه - دستور ناشناخته: '{text}' از {user_id}")
+            # اگه هیچ دستوری نبود
+            logger.info(f"❌ دستور ناشناخته در گروه: '{text_clean}' از {user_id}")
             return
         
     except Exception as e:
-        logging.error(f"Error in handle_message: {e}")
-        logging.error(traceback.format_exc())
+        logger.error(f"Error in handle_message: {e}")
+        logger.error(traceback.format_exc())
         try:
             await update.message.reply_text("❌ *خطایی رخ داد! لطفاً دوباره تلاش کنید.*", parse_mode="Markdown")
         except:
@@ -3133,7 +3140,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 # ================================================================
-# هندلر Callback - ادامه در فایل بعدی
+# هندلر Callback - ادامه
 # ================================================================
 
 async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -3231,7 +3238,6 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await show_leaderboard_main(update, context)
             return
         
-        # لیدربرد هاپوها
         if data == "lb_hapo_point":
             await show_leaderboard_result(update, context, "point", group=False, page=0)
             return
@@ -3245,7 +3251,6 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await show_leaderboard_result(update, context, "hunt", group=False, page=0)
             return
         
-        # لیدربرد گروه‌ها
         if data == "lb_group_hop":
             await show_leaderboard_result(update, context, "hop", group=True, page=0)
             return
@@ -3308,7 +3313,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if data == "street_hapo_ignore":
             return
         
-        # ======== انتقال هاپویی ========
+        # ======== انتقال ========
         if data.startswith("transfer_confirm_"):
             await handle_transfer_confirm(update, context)
             return
@@ -3316,7 +3321,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await handle_transfer_cancel(update, context)
             return
         
-        # ======== یخچال هاپویی ========
+        # ======== یخچال ========
         if data == "buy_fridge":
             await handle_fridge_buy(update, context, query)
             return
@@ -3347,7 +3352,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await handle_hunt_to_fridge(update, context, query, animal_name)
             return
         
-        # ======== قاچاق هاپویی ========
+        # ======== قاچاق ========
         if data.startswith("smuggle_count_"):
             count = data.replace("smuggle_count_", "")
             await handle_smuggle_start(update, context, query, count)
@@ -3773,8 +3778,8 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
         
     except Exception as e:
-        logging.error(f"Error in handle_callback: {e}")
-        logging.error(traceback.format_exc())
+        logger.error(f"Error in handle_callback: {e}")
+        logger.error(traceback.format_exc())
         try:
             await query.edit_message_text("❌ *خطایی رخ داد! لطفاً دوباره تلاش کنید.*", parse_mode="Markdown")
         except:
@@ -3823,13 +3828,11 @@ async def my_profile_from_callback(query, game):
     if isinstance(level, str):
         level = int(level) if level.isdigit() else 1
     
-    # دریافت رتبه‌ها
     point_rank = await get_user_rank(user_id, "point")
     hop_rank = await get_user_rank(user_id, "hop")
     street_rank = await get_user_rank(user_id, "street")
     hunt_rank = await get_user_rank(user_id, "hunt")
     
-    # تعداد شکار
     total_hunts = game.data.get("total_hunts", 0)
     if isinstance(total_hunts, str):
         try:
@@ -3890,5 +3893,3 @@ async def my_profile_from_callback(query, game):
         keyboard.append([InlineKeyboardButton("🔒 قفل کردن پروفایل", callback_data="profile_lock")])
     
     await query.edit_message_text(msg, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
-
-
