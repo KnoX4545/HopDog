@@ -1,4 +1,4 @@
-# handlers.py - هندلرهای پیام و کالبک (نسخه نهایی کامل)
+# handlers.py - هندلرهای پیام و کالبک (نسخه نهایی کامل با انتقال اصلاح شده)
 
 import os
 import json
@@ -91,7 +91,6 @@ def get_hapo_menu_keyboard(game):
     total = game.get_hapo_total_level()
     is_max = total >= 25
     
-    # ✅ تبدیل به عدد
     hapo_level = game.data["hapo_level"]
     if isinstance(hapo_level, str):
         hapo_level = int(hapo_level)
@@ -131,7 +130,6 @@ def get_hapo_menu_text(game):
     price = game.get_hapo_upgrade_price()
     is_max = total >= 25
     
-    # ✅ تبدیل به عدد
     hapo_rank = game.data["hapo_rank"]
     if isinstance(hapo_rank, str):
         hapo_rank = int(hapo_rank)
@@ -349,12 +347,10 @@ async def my_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     is_hidden = game.data.get("profile_hidden", False)
     is_locked = game.data.get("profile_locked", False)
     
-    # ✅ تبدیل به عدد
     street_rescued = game.data.get("street_hapo_rescued", 0)
     if isinstance(street_rescued, str):
         street_rescued = int(street_rescued) if street_rescued.isdigit() else 0
     
-    # ✅ تبدیل به عدد برای هاپو
     hapo_rank = game.data.get("hapo_rank", 0)
     if isinstance(hapo_rank, str):
         hapo_rank = int(hapo_rank)
@@ -444,7 +440,6 @@ async def show_user_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     required = target_game.get_required_for_level(target_data["level"])
     
-    # ✅ تبدیل به عدد
     street_rescued = target_data.get("street_hapo_rescued", 0)
     if isinstance(street_rescued, str):
         street_rescued = int(street_rescued) if street_rescued.isdigit() else 0
@@ -646,14 +641,25 @@ async def show_bank_menu(update: Update, game):
         await update.message.reply_text("⛓️ شما در زندان هستید و نمی‌توانید این کار را انجام دهید.")
         return
     
-    if game.data["level"] < 4:
+    level = game.data.get("level", 1)
+    if isinstance(level, str):
+        try:
+            level = int(level)
+        except:
+            level = 1
+    
+    if level < 4:
         await update.message.reply_text("🏦 بانک هاپویی از سطح 4 باز میشود")
         return
     
-    if not game.data["bank_opened"]:
-        hop_point = game.data["hop_point"]
+    if not game.data.get("bank_opened", False):
+        hop_point = game.data.get("hop_point", 0)
         if isinstance(hop_point, str):
-            hop_point = int(hop_point)
+            try:
+                hop_point = int(float(hop_point))
+            except:
+                hop_point = 0
+        
         if hop_point < BANK_PURCHASE_COST:
             await update.message.reply_text(f"🏦 برای خرید بانک به {format_number(BANK_PURCHASE_COST)} هاپو پوینت نیاز داری")
             return
@@ -661,17 +667,22 @@ async def show_bank_menu(update: Update, game):
         await update.message.reply_text(f"🏦 آیا میخوای بانک هاپویی رو بخری؟\n💰 هزینه: {format_number(BANK_PURCHASE_COST)} هاپو پوینت", reply_markup=InlineKeyboardMarkup(keyboard))
         return
     
-    game.apply_bank_interest()
-    msg = get_bank_menu_text(game, False)
-    keyboard = get_bank_keyboard(False)
-    await update.message.reply_text(msg, reply_markup=keyboard)
+    try:
+        game.apply_bank_interest()
+        msg = get_bank_menu_text(game, False)
+        keyboard = get_bank_keyboard(False)
+        await update.message.reply_text(msg, reply_markup=keyboard)
+    except Exception as e:
+        logging.error(f"Error in show_bank_menu: {e}")
+        await update.message.reply_text("🏦 بانک هاپویی\n\n❌ خطا در نمایش بانک. لطفاً دوباره تلاش کنید.")
 
 
 # ================================================================
-# انتقال هاپویی
+# انتقال هاپویی - نسخه اصلاح شده کامل
 # ================================================================
 
 async def transfer_points_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """دستور انتقال هاپو پوینت به کاربر دیگر"""
     user_id = update.effective_user.id
     username = update.effective_user.username
     full_name = update.effective_user.full_name or f"کاربر{user_id}"
@@ -681,7 +692,14 @@ async def transfer_points_command(update: Update, context: ContextTypes.DEFAULT_
         await update.message.reply_text("⛓️ شما در زندان هستید و نمی‌توانید این کار را انجام دهید.")
         return
     
-    if game.data["level"] < TRANSFER_MIN_LEVEL_SENDER:
+    level = game.data.get("level", 1)
+    if isinstance(level, str):
+        try:
+            level = int(level)
+        except:
+            level = 1
+    
+    if level < TRANSFER_MIN_LEVEL_SENDER:
         await update.message.reply_text(f"❌ برای انتقال هاپو پوینت باید سطح {TRANSFER_MIN_LEVEL_SENDER} باشی.")
         return
     
@@ -693,6 +711,7 @@ async def transfer_points_command(update: Update, context: ContextTypes.DEFAULT_
         await update.message.reply_text("⏳ شما در حال حاضر در حال انتقال هستید. لطفاً صبر کنید.")
         return
     
+    # چک کردن ریپلای
     if not update.message.reply_to_message:
         await update.message.reply_text(
             "❌ لطفاً روی پیام یک کاربر ریپلای کن و «انتقال هاپویی» رو بزن.\n\n"
@@ -709,7 +728,14 @@ async def transfer_points_command(update: Update, context: ContextTypes.DEFAULT_
         return
     
     target_game = get_game(target_user_id)
-    if target_game.data["level"] < TRANSFER_MIN_LEVEL_RECEIVER:
+    target_level = target_game.data.get("level", 1)
+    if isinstance(target_level, str):
+        try:
+            target_level = int(target_level)
+        except:
+            target_level = 1
+    
+    if target_level < TRANSFER_MIN_LEVEL_RECEIVER:
         await update.message.reply_text(f"❌ کاربر مقصد باید حداقل سطح {TRANSFER_MIN_LEVEL_RECEIVER} داشته باشد.")
         return
     
@@ -717,48 +743,29 @@ async def transfer_points_command(update: Update, context: ContextTypes.DEFAULT_
         await update.message.reply_text("❌ پروفایل کاربر مقصد قفل است.")
         return
     
-    parts = update.message.text.split()
-    if len(parts) < 2:
-        await update.message.reply_text(
-            "💰 مبلغ مورد نظر را به عدد وارد کن:\n"
-            f"(حداقل: {format_number(TRANSFER_MIN_AMOUNT)} - حداکثر: {format_number(TRANSFER_MAX_AMOUNT)})"
-        )
-        context.user_data["waiting_for_transfer_amount"] = True
-        TRANSFER_STATE[user_id] = {
-            "target_id": target_user_id,
-            "target_name": target_full_name
-        }
-        return
+    # ذخیره اطلاعات در context.user_data
+    context.user_data["transfer_target_id"] = target_user_id
+    context.user_data["transfer_target_name"] = target_full_name
+    context.user_data["waiting_for_transfer_amount"] = True
     
-    try:
-        amount = int(parts[-1].replace(",", ""))
-    except ValueError:
-        await update.message.reply_text("❌ لطفاً یک عدد معتبر برای مبلغ وارد کن.")
-        return
-    
-    keyboard = get_confirm_keyboard(
-        f"transfer_confirm_{target_user_id}_{amount}",
-        f"transfer_cancel_{target_user_id}_{amount}"
-    )
+    hop_point = game.data.get("hop_point", 0)
+    if isinstance(hop_point, str):
+        try:
+            hop_point = int(float(hop_point))
+        except:
+            hop_point = 0
     
     await update.message.reply_text(
-        f"⚠️ آیا از انتقال {format_number(amount)} 🪙 به {target_full_name} مطمئنی؟\n\n"
-        f"💰 مبلغ: {format_number(amount)} 🪙\n"
-        f"👤 گیرنده: {target_full_name}\n"
-        f"📊 موجودی شما پس از انتقال: {format_number(game.data['hop_point'] - amount)} 🪙\n\n"
-        f"❗️ محدودیت‌ها:\n"
-        f"┘─ حداقل: {format_number(TRANSFER_MIN_AMOUNT)} 🪙\n"
-        f"┘─ حداکثر: {format_number(TRANSFER_MAX_AMOUNT):,} 🪙\n"
-        f"┘─ فاصله بین انتقال‌ها: {TRANSFER_COOLDOWN} ثانیه",
-        reply_markup=keyboard
+        f"💰 مبلغ مورد نظر برای انتقال به {target_full_name} رو وارد کن:\n\n"
+        f"📊 موجودی شما: {format_number(hop_point)} 🪙\n"
+        f"🔻 حداقل: {format_number(TRANSFER_MIN_AMOUNT)} 🪙\n"
+        f"🔺 حداکثر: {format_number(TRANSFER_MAX_AMOUNT):,} 🪙\n\n"
+        f"💡 فقط عدد مبلغ رو تایپ کن و ارسال کن."
     )
-    
-    context.user_data["transfer_amount"] = amount
-    context.user_data["transfer_target"] = target_user_id
-    context.user_data["transfer_target_name"] = target_full_name
 
 
 async def process_transfer_amount(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """پردازش مبلغ وارد شده برای انتقال"""
     user_id = update.effective_user.id
     username = update.effective_user.username
     full_name = update.effective_user.full_name or f"کاربر{user_id}"
@@ -772,21 +779,23 @@ async def process_transfer_amount(update: Update, context: ContextTypes.DEFAULT_
         context.user_data["waiting_for_transfer_amount"] = False
         return
     
+    # دریافت مبلغ
     try:
         amount = int(update.message.text.strip().replace(",", ""))
     except ValueError:
         await update.message.reply_text("❌ لطفاً یک عدد معتبر برای مبلغ وارد کن.")
         return
     
-    transfer_info = TRANSFER_STATE.get(user_id)
-    if not transfer_info:
+    # دریافت اطلاعات هدف
+    target_id = context.user_data.get("transfer_target_id")
+    target_name = context.user_data.get("transfer_target_name")
+    
+    if not target_id:
         await update.message.reply_text("❌ خطا در انتقال. لطفاً دوباره تلاش کن.")
         context.user_data["waiting_for_transfer_amount"] = False
         return
     
-    target_id = transfer_info["target_id"]
-    target_name = transfer_info["target_name"]
-    
+    # اعتبارسنجی مبلغ
     if amount < TRANSFER_MIN_AMOUNT:
         await update.message.reply_text(f"❌ حداقل مبلغ انتقال {format_number(TRANSFER_MIN_AMOUNT)} هاپو پوینت است.")
         context.user_data["waiting_for_transfer_amount"] = False
@@ -797,14 +806,20 @@ async def process_transfer_amount(update: Update, context: ContextTypes.DEFAULT_
         context.user_data["waiting_for_transfer_amount"] = False
         return
     
-    hop_point = game.data["hop_point"]
+    # چک کردن موجودی
+    hop_point = game.data.get("hop_point", 0)
     if isinstance(hop_point, str):
-        hop_point = int(hop_point)
+        try:
+            hop_point = int(float(hop_point))
+        except:
+            hop_point = 0
+    
     if hop_point < amount:
         await update.message.reply_text(f"❌ موجودی کافی نیست. شما {format_number(hop_point)} هاپو پوینت داری.")
         context.user_data["waiting_for_transfer_amount"] = False
         return
     
+    # نمایش تاییدیه
     keyboard = get_confirm_keyboard(
         f"transfer_confirm_{target_id}_{amount}",
         f"transfer_cancel_{target_id}_{amount}"
@@ -823,8 +838,66 @@ async def process_transfer_amount(update: Update, context: ContextTypes.DEFAULT_
     )
     
     context.user_data["transfer_amount"] = amount
-    context.user_data["transfer_target"] = target_id
-    context.user_data["transfer_target_name"] = target_name
+    context.user_data["waiting_for_transfer_amount"] = False
+
+
+async def handle_transfer_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE, query, target_id, amount):
+    """تایید نهایی انتقال"""
+    user_id = update.effective_user.id
+    username = update.effective_user.username
+    full_name = update.effective_user.full_name or f"کاربر{user_id}"
+    game = get_game(user_id, username or full_name)
+    
+    try:
+        target_id = int(target_id)
+        amount = int(amount)
+    except:
+        await query.edit_message_text("❌ خطا در اطلاعات انتقال.")
+        return
+    
+    # چک کردن دوباره شرایط
+    if game.is_jailed():
+        await query.edit_message_text("⛓️ شما در زندان هستید و نمی‌توانید این کار را انجام دهید.")
+        return
+    
+    # انجام انتقال
+    result = game.transfer_points(target_id, amount)
+    
+    if result["success"]:
+        target_game = get_game(target_id)
+        target_name = target_game.data.get("player_name", f"کاربر{target_id}")
+        
+        await query.edit_message_text(
+            f"✅ انتقال موفقیت‌آمیز بود!\n\n"
+            f"💰 {format_number(amount)} 🪙 به {target_name} انتقال یافت.\n"
+            f"📊 موجودی شما: {format_number(game.data.get('hop_point', 0))} 🪙"
+        )
+        
+        # اطلاع به گیرنده
+        try:
+            await context.bot.send_message(
+                target_id,
+                f"💰 {full_name} مبلغ {format_number(amount)} 🪙 به شما انتقال داد!\n"
+                f"📊 موجودی شما: {format_number(target_game.data.get('hop_point', 0))} 🪙"
+            )
+        except:
+            pass
+    else:
+        await query.edit_message_text(f"❌ {result['reason']}")
+    
+    # پاک کردن اطلاعات
+    context.user_data["transfer_amount"] = None
+    context.user_data["transfer_target_id"] = None
+    context.user_data["transfer_target_name"] = None
+    context.user_data["waiting_for_transfer_amount"] = False
+
+
+async def handle_transfer_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE, query):
+    """لغو انتقال"""
+    await query.edit_message_text("❌ انتقال لغو شد.")
+    context.user_data["transfer_amount"] = None
+    context.user_data["transfer_target_id"] = None
+    context.user_data["transfer_target_name"] = None
     context.user_data["waiting_for_transfer_amount"] = False
 
 
@@ -1013,6 +1086,10 @@ async def reset_user_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE,
         target_game = get_game(int(target_user_id))
         player_name = target_game.data.get("player_name", f"کاربر{target_user_id}")
         target_game.reset_data()
+        
+        # پاک کردن کش
+        if int(target_user_id) in user_games:
+            del user_games[int(target_user_id)]
         
         await update.callback_query.edit_message_text(
             f"✅ کاربر `{player_name}` با موفقیت ریست شد!\n\n🆔 آیدی: `{target_user_id}`\n👤 نام: {target_game.data['player_name']}\n\n📊 همه اطلاعات به حالت اولیه برگشت.",
@@ -1544,39 +1621,13 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if data.startswith("transfer_confirm_"):
         parts = data.replace("transfer_confirm_", "").split("_")
         if len(parts) >= 2:
-            target_id = int(parts[0])
-            amount = int(parts[1])
-            
-            result = game.transfer_points(target_id, amount)
-            target_game = get_game(target_id)
-            target_name = target_game.data.get("player_name", f"کاربر{target_id}")
-            
-            if result["success"]:
-                await query.edit_message_text(
-                    f"✅ انتقال موفقیت‌آمیز بود!\n\n💰 {format_number(amount)} 🪙 به {target_name} انتقال یافت.\n📊 موجودی شما: {format_number(game.data['hop_point'])} 🪙"
-                )
-                try:
-                    await context.bot.send_message(
-                        target_id,
-                        f"💰 {full_name} مبلغ {format_number(amount)} 🪙 به شما انتقال داد!\n📊 موجودی شما: {format_number(target_game.data['hop_point'])} 🪙"
-                    )
-                except:
-                    pass
-            else:
-                await query.edit_message_text(f"❌ {result['reason']}")
-        
-        context.user_data["transfer_amount"] = None
-        context.user_data["transfer_target"] = None
-        context.user_data["transfer_target_name"] = None
-        context.user_data["waiting_for_transfer_amount"] = False
+            target_id = parts[0]
+            amount = parts[1]
+            await handle_transfer_confirm(update, context, query, target_id, amount)
         return
     
     if data.startswith("transfer_cancel_"):
-        await query.edit_message_text("❌ انتقال لغو شد.")
-        context.user_data["transfer_amount"] = None
-        context.user_data["transfer_target"] = None
-        context.user_data["transfer_target_name"] = None
-        context.user_data["waiting_for_transfer_amount"] = False
+        await handle_transfer_cancel(update, context, query)
         return
     
     # ======== هاپو ========
@@ -1937,7 +1988,6 @@ async def my_profile_from_callback(query, game):
     is_hidden = game.data.get("profile_hidden", False)
     is_locked = game.data.get("profile_locked", False)
     
-    # ✅ تبدیل به عدد
     street_rescued = game.data.get("street_hapo_rescued", 0)
     if isinstance(street_rescued, str):
         street_rescued = int(street_rescued) if street_rescued.isdigit() else 0
