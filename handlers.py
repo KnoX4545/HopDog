@@ -678,7 +678,7 @@ async def show_bank_menu(update: Update, game):
 
 
 # ================================================================
-# انتقال هاپویی - نسخه اصلاح شده کامل
+# انتقال هاپویی - نسخه اصلاح شده نهایی
 # ================================================================
 
 async def transfer_points_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -744,7 +744,7 @@ async def transfer_points_command(update: Update, context: ContextTypes.DEFAULT_
         return
     
     # ذخیره اطلاعات در context.user_data
-    context.user_data["transfer_target_id"] = target_user_id
+    context.user_data["transfer_target_id"] = str(target_user_id)
     context.user_data["transfer_target_name"] = target_full_name
     context.user_data["waiting_for_transfer_amount"] = True
     
@@ -759,7 +759,7 @@ async def transfer_points_command(update: Update, context: ContextTypes.DEFAULT_
         f"💰 مبلغ مورد نظر برای انتقال به {target_full_name} رو وارد کن:\n\n"
         f"📊 موجودی شما: {format_number(hop_point)} 🪙\n"
         f"🔻 حداقل: {format_number(TRANSFER_MIN_AMOUNT)} 🪙\n"
-        f"🔺 حداکثر: {format_number(TRANSFER_MAX_AMOUNT):,} 🪙\n\n"
+        f"🔺 حداکثر: {format_number(TRANSFER_MAX_AMOUNT)} 🪙\n\n"
         f"💡 فقط عدد مبلغ رو تایپ کن و ارسال کن."
     )
 
@@ -771,6 +771,7 @@ async def process_transfer_amount(update: Update, context: ContextTypes.DEFAULT_
     full_name = update.effective_user.full_name or f"کاربر{user_id}"
     game = get_game(user_id, username or full_name)
     
+    # بررسی اینکه کاربر در حالت انتظار انتقال هست یا نه
     if not context.user_data.get("waiting_for_transfer_amount"):
         return
     
@@ -780,8 +781,9 @@ async def process_transfer_amount(update: Update, context: ContextTypes.DEFAULT_
         return
     
     # دریافت مبلغ
+    text = update.message.text.strip().replace(",", "")
     try:
-        amount = int(update.message.text.strip().replace(",", ""))
+        amount = int(text)
     except ValueError:
         await update.message.reply_text("❌ لطفاً یک عدد معتبر برای مبلغ وارد کن.")
         return
@@ -790,8 +792,15 @@ async def process_transfer_amount(update: Update, context: ContextTypes.DEFAULT_
     target_id = context.user_data.get("transfer_target_id")
     target_name = context.user_data.get("transfer_target_name")
     
-    if not target_id:
+    if not target_id or not target_name:
         await update.message.reply_text("❌ خطا در انتقال. لطفاً دوباره تلاش کن.")
+        context.user_data["waiting_for_transfer_amount"] = False
+        return
+    
+    try:
+        target_id = int(target_id)
+    except:
+        await update.message.reply_text("❌ خطا در شناسه کاربر مقصد.")
         context.user_data["waiting_for_transfer_amount"] = False
         return
     
@@ -802,7 +811,7 @@ async def process_transfer_amount(update: Update, context: ContextTypes.DEFAULT_
         return
     
     if amount > TRANSFER_MAX_AMOUNT:
-        await update.message.reply_text(f"❌ حداکثر مبلغ انتقال {format_number(TRANSFER_MAX_AMOUNT):,} هاپو پوینت است.")
+        await update.message.reply_text(f"❌ حداکثر مبلغ انتقال {format_number(TRANSFER_MAX_AMOUNT)} هاپو پوینت است.")
         context.user_data["waiting_for_transfer_amount"] = False
         return
     
@@ -819,11 +828,16 @@ async def process_transfer_amount(update: Update, context: ContextTypes.DEFAULT_
         context.user_data["waiting_for_transfer_amount"] = False
         return
     
-    # نمایش تاییدیه
-    keyboard = get_confirm_keyboard(
-        f"transfer_confirm_{target_id}_{amount}",
-        f"transfer_cancel_{target_id}_{amount}"
-    )
+    # ذخیره مبلغ برای تایید
+    context.user_data["transfer_amount"] = amount
+    
+    # نمایش تاییدیه با دکمه
+    keyboard = InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("✅ بله", callback_data=f"transfer_confirm_{target_id}_{amount}"),
+            InlineKeyboardButton("❌ نه", callback_data=f"transfer_cancel_{target_id}_{amount}")
+        ]
+    ])
     
     await update.message.reply_text(
         f"⚠️ آیا از انتقال {format_number(amount)} 🪙 به {target_name} مطمئنی؟\n\n"
@@ -832,32 +846,55 @@ async def process_transfer_amount(update: Update, context: ContextTypes.DEFAULT_
         f"📊 موجودی شما پس از انتقال: {format_number(hop_point - amount)} 🪙\n\n"
         f"❗️ محدودیت‌ها:\n"
         f"┘─ حداقل: {format_number(TRANSFER_MIN_AMOUNT)} 🪙\n"
-        f"┘─ حداکثر: {format_number(TRANSFER_MAX_AMOUNT):,} 🪙\n"
+        f"┘─ حداکثر: {format_number(TRANSFER_MAX_AMOUNT)} 🪙\n"
         f"┘─ فاصله بین انتقال‌ها: {TRANSFER_COOLDOWN} ثانیه",
         reply_markup=keyboard
     )
     
-    context.user_data["transfer_amount"] = amount
+    # پاک کردن حالت انتظار
     context.user_data["waiting_for_transfer_amount"] = False
 
 
-async def handle_transfer_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE, query, target_id, amount):
+async def handle_transfer_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """تایید نهایی انتقال"""
+    query = update.callback_query
+    await query.answer()
+    
     user_id = update.effective_user.id
     username = update.effective_user.username
     full_name = update.effective_user.full_name or f"کاربر{user_id}"
     game = get_game(user_id, username or full_name)
     
+    # استخراج اطلاعات از callback_data
+    data = query.data
+    parts = data.replace("transfer_confirm_", "").split("_")
+    
+    if len(parts) < 2:
+        await query.edit_message_text("❌ خطا در اطلاعات انتقال.")
+        return
+    
     try:
-        target_id = int(target_id)
-        amount = int(amount)
-    except:
+        target_id = int(parts[0])
+        amount = int(parts[1])
+    except ValueError:
         await query.edit_message_text("❌ خطا در اطلاعات انتقال.")
         return
     
     # چک کردن دوباره شرایط
     if game.is_jailed():
         await query.edit_message_text("⛓️ شما در زندان هستید و نمی‌توانید این کار را انجام دهید.")
+        return
+    
+    # چک کردن موجودی دوباره
+    hop_point = game.data.get("hop_point", 0)
+    if isinstance(hop_point, str):
+        try:
+            hop_point = int(float(hop_point))
+        except:
+            hop_point = 0
+    
+    if hop_point < amount:
+        await query.edit_message_text(f"❌ موجودی کافی نیست. شما {format_number(hop_point)} هاپو پوینت داری.")
         return
     
     # انجام انتقال
@@ -867,21 +904,36 @@ async def handle_transfer_confirm(update: Update, context: ContextTypes.DEFAULT_
         target_game = get_game(target_id)
         target_name = target_game.data.get("player_name", f"کاربر{target_id}")
         
+        # محاسبه موجودی جدید
+        new_balance = game.data.get("hop_point", 0)
+        if isinstance(new_balance, str):
+            try:
+                new_balance = int(float(new_balance))
+            except:
+                new_balance = 0
+        
         await query.edit_message_text(
             f"✅ انتقال موفقیت‌آمیز بود!\n\n"
             f"💰 {format_number(amount)} 🪙 به {target_name} انتقال یافت.\n"
-            f"📊 موجودی شما: {format_number(game.data.get('hop_point', 0))} 🪙"
+            f"📊 موجودی شما: {format_number(new_balance)} 🪙"
         )
         
         # اطلاع به گیرنده
         try:
+            target_new_balance = target_game.data.get("hop_point", 0)
+            if isinstance(target_new_balance, str):
+                try:
+                    target_new_balance = int(float(target_new_balance))
+                except:
+                    target_new_balance = 0
+            
             await context.bot.send_message(
                 target_id,
                 f"💰 {full_name} مبلغ {format_number(amount)} 🪙 به شما انتقال داد!\n"
-                f"📊 موجودی شما: {format_number(target_game.data.get('hop_point', 0))} 🪙"
+                f"📊 موجودی شما: {format_number(target_new_balance)} 🪙"
             )
-        except:
-            pass
+        except Exception as e:
+            logging.error(f"Error sending transfer notification: {e}")
     else:
         await query.edit_message_text(f"❌ {result['reason']}")
     
@@ -892,9 +944,13 @@ async def handle_transfer_confirm(update: Update, context: ContextTypes.DEFAULT_
     context.user_data["waiting_for_transfer_amount"] = False
 
 
-async def handle_transfer_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE, query):
+async def handle_transfer_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """لغو انتقال"""
+    query = update.callback_query
+    await query.answer()
+    
     await query.edit_message_text("❌ انتقال لغو شد.")
+    
     context.user_data["transfer_amount"] = None
     context.user_data["transfer_target_id"] = None
     context.user_data["transfer_target_name"] = None
@@ -1619,15 +1675,11 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     # ======== انتقال هاپویی ========
     if data.startswith("transfer_confirm_"):
-        parts = data.replace("transfer_confirm_", "").split("_")
-        if len(parts) >= 2:
-            target_id = parts[0]
-            amount = parts[1]
-            await handle_transfer_confirm(update, context, query, target_id, amount)
+        await handle_transfer_confirm(update, context)
         return
     
     if data.startswith("transfer_cancel_"):
-        await handle_transfer_cancel(update, context, query)
+        await handle_transfer_cancel(update, context)
         return
     
     # ======== هاپو ========
