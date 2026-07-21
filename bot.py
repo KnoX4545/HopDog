@@ -28,8 +28,8 @@ logger = logging.getLogger(__name__)
 # ================================================================
 
 def main():
-    # drop_pending_updates=True برای جلوگیری از Conflict
-    app = Application.builder().token(TOKEN).drop_pending_updates(True).build()
+    # ایجاد اپلیکیشن بدون drop_pending_updates
+    app = Application.builder().token(TOKEN).build()
     
     # ======== دستورات عمومی ========
     app.add_handler(CommandHandler("start", start))
@@ -95,14 +95,12 @@ def main():
             listen="0.0.0.0",
             port=WEBHOOK_PORT,
             webhook_url=f"{WEBHOOK_URL}/webhook",
-            drop_pending_updates=True,
             allowed_updates=Update.ALL_TYPES
         )
     else:
         # استفاده از Polling
         logger.info("🔄 استفاده از Polling")
         app.run_polling(
-            drop_pending_updates=True,
             allowed_updates=Update.ALL_TYPES
         )
 
