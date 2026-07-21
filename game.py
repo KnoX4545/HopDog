@@ -387,7 +387,7 @@ class HopDogGame:
         self.data["hapo_rank"] = self._to_str(hapo_rank + 1)
         self.data["hapo_level"] = "1"
         
-        # ======== اصلاح: هاپو سیر میشه ========
+        # هاپو سیر میشه
         self.data["hapo_food"] = self._to_str(self.get_hapo_max_food())
         
         self.data["hapo_harvest"] = "0"
