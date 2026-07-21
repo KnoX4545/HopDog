@@ -1,4 +1,4 @@
-# game.py - کلاس اصلی بازی (نسخه نهایی با یخچال، قاچاق و لیدربرد)
+# game.py - کلاس اصلی بازی (نسخه اصلاح شده با رفع مشکلات زندان و تبدیل داده)
 
 import random
 import json
@@ -51,89 +51,103 @@ class HopDogGame:
             return "0"
         return str(value)
 
+    def _to_bool(self, value):
+        """تبدیل مطمئن به bool"""
+        if value is None:
+            return False
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, str):
+            return value.lower() in ["true", "1", "yes"]
+        return bool(value)
+
     # ============================================================
     # متدهای اصلی
     # ============================================================
 
     def load_data(self):
-        data = get_user_data(self.user_id)
-        if data:
-            if "current_hunt_animal" in data and data["current_hunt_animal"]:
-                try:
-                    data["current_hunt_animal"] = json.loads(data["current_hunt_animal"])
-                except:
-                    data["current_hunt_animal"] = None
-            if "bank_transactions" in data and data["bank_transactions"]:
-                try:
-                    data["bank_transactions"] = json.loads(data["bank_transactions"])
-                except:
+        try:
+            data = get_user_data(self.user_id)
+            if data:
+                # تبدیل JSON فیلدها
+                if "current_hunt_animal" in data and data["current_hunt_animal"]:
+                    try:
+                        data["current_hunt_animal"] = json.loads(data["current_hunt_animal"])
+                    except:
+                        data["current_hunt_animal"] = None
+                if "bank_transactions" in data and data["bank_transactions"]:
+                    try:
+                        data["bank_transactions"] = json.loads(data["bank_transactions"])
+                    except:
+                        data["bank_transactions"] = []
+                else:
                     data["bank_transactions"] = []
-            else:
-                data["bank_transactions"] = []
-            if "jail_voted" in data and data["jail_voted"]:
-                try:
-                    data["jail_voted"] = json.loads(data["jail_voted"])
-                except:
+                if "jail_voted" in data and data["jail_voted"]:
+                    try:
+                        data["jail_voted"] = json.loads(data["jail_voted"])
+                    except:
+                        data["jail_voted"] = []
+                else:
                     data["jail_voted"] = []
-            else:
-                data["jail_voted"] = []
-            
-            # فیلدهای جدید - اطمینان از وجود
-            if "bank_card_number" not in data:
-                data["bank_card_number"] = ""
-            if "jail_admin_id" not in data:
-                data["jail_admin_id"] = None
-            if "hunt_time" not in data:
-                data["hunt_time"] = "0"
-            if "is_transferring" not in data:
-                data["is_transferring"] = False
-            if "profile_hidden" not in data:
-                data["profile_hidden"] = False
-            if "profile_locked" not in data:
-                data["profile_locked"] = False
-            if "street_hapo_rescued" not in data:
-                data["street_hapo_rescued"] = "0"
-            
-            # فیلدهای یخچال
-            if "fridge_owned" not in data:
-                data["fridge_owned"] = False
-            if "fridge_level" not in data:
-                data["fridge_level"] = "1"
-            if "fridge_items" not in data:
-                data["fridge_items"] = "[]"
-            
-            # فیلدهای قاچاق
-            if "smuggling" not in data:
-                data["smuggling"] = False
-            if "smuggle_count" not in data:
-                data["smuggle_count"] = "0"
-            if "smuggle_start" not in data:
-                data["smuggle_start"] = "0"
-            if "smuggle_duration" not in data:
-                data["smuggle_duration"] = "0"
-            if "smuggle_success_chance" not in data:
-                data["smuggle_success_chance"] = "0"
-            if "smuggle_used_hapo" not in data:
-                data["smuggle_used_hapo"] = "0"
-            
-            # فیلدهای لیدربرد
-            if "total_hunts" not in data:
-                data["total_hunts"] = "0"
-            
-            # چک کردن خودکار آزادی
-            if data.get("jailed", False):
-                now = datetime.now().timestamp()
-                jail_until = self._to_float(data.get("jail_until", 0))
-                if now >= jail_until:
-                    data["jailed"] = False
-                    data["jail_reason"] = ""
-                    data["jail_until"] = "0"
-                    data["jail_fine"] = "0"
-                    data["jail_arrest_time"] = "0"
+                if "fridge_items" in data and data["fridge_items"]:
+                    try:
+                        data["fridge_items"] = json.loads(data["fridge_items"])
+                    except:
+                        data["fridge_items"] = []
+                else:
+                    data["fridge_items"] = []
+                
+                # فیلدهای پیش‌فرض
+                if "bank_card_number" not in data:
+                    data["bank_card_number"] = ""
+                if "jail_admin_id" not in data:
                     data["jail_admin_id"] = None
-                    save_user_data(self.user_id, data)
-            return data
-        return None
+                if "hunt_time" not in data:
+                    data["hunt_time"] = "0"
+                if "is_transferring" not in data:
+                    data["is_transferring"] = False
+                if "profile_hidden" not in data:
+                    data["profile_hidden"] = False
+                if "profile_locked" not in data:
+                    data["profile_locked"] = False
+                if "street_hapo_rescued" not in data:
+                    data["street_hapo_rescued"] = "0"
+                if "fridge_owned" not in data:
+                    data["fridge_owned"] = False
+                if "fridge_level" not in data:
+                    data["fridge_level"] = "1"
+                if "smuggling" not in data:
+                    data["smuggling"] = False
+                if "smuggle_count" not in data:
+                    data["smuggle_count"] = "0"
+                if "smuggle_start" not in data:
+                    data["smuggle_start"] = "0"
+                if "smuggle_duration" not in data:
+                    data["smuggle_duration"] = "0"
+                if "smuggle_success_chance" not in data:
+                    data["smuggle_success_chance"] = "0"
+                if "smuggle_used_hapo" not in data:
+                    data["smuggle_used_hapo"] = "0"
+                if "total_hunts" not in data:
+                    data["total_hunts"] = "0"
+                
+                # چک کردن خودکار آزادی - مهم!
+                if data.get("jailed", False):
+                    now = datetime.now().timestamp()
+                    jail_until = self._to_float(data.get("jail_until", 0))
+                    if now >= jail_until and jail_until > 0:
+                        data["jailed"] = False
+                        data["jail_reason"] = ""
+                        data["jail_until"] = "0"
+                        data["jail_fine"] = "0"
+                        data["jail_arrest_time"] = "0"
+                        data["jail_admin_id"] = None
+                        save_user_data(self.user_id, data)
+                return data
+            return None
+        except Exception as e:
+            print(f"Error loading data: {e}")
+            return None
 
     def save_data(self):
         return save_user_data(self.user_id, self.data)
@@ -177,18 +191,15 @@ class HopDogGame:
             "jail_voted": [],
             "jail_admin_id": None,
             "street_hapo_rescued": "0",
-            # فیلدهای یخچال
             "fridge_owned": False,
             "fridge_level": "1",
             "fridge_items": "[]",
-            # فیلدهای قاچاق
             "smuggling": False,
             "smuggle_count": "0",
             "smuggle_start": "0",
             "smuggle_duration": "0",
             "smuggle_success_chance": "0",
             "smuggle_used_hapo": "0",
-            # فیلدهای لیدربرد
             "total_hunts": "0",
             "last_updated": datetime.now().isoformat()
         }
@@ -821,15 +832,19 @@ class HopDogGame:
             target_game.save_data()
 
     # ============================================================
-    # متدهای زندان
+    # متدهای زندان - اصلاح شده
     # ============================================================
 
     def is_jailed(self):
+        """بررسی وضعیت زندان - اصلاح شده با لاگ داخلی"""
         if not self.data.get("jailed", False):
             return False
+        
         now = datetime.now().timestamp()
         jail_until = self._to_float(self.data.get("jail_until", 0))
-        if now >= jail_until:
+        
+        # اگر زمان زندان تمام شده، آزاد کن
+        if now >= jail_until and jail_until > 0:
             self.data["jailed"] = False
             self.data["jail_reason"] = ""
             self.data["jail_until"] = "0"
@@ -838,17 +853,21 @@ class HopDogGame:
             self.data["jail_admin_id"] = None
             self.save_data()
             return False
+        
         return True
 
     def get_jail_remaining(self):
+        """دریافت زمان باقی‌مانده از زندان"""
         if not self.data.get("jailed", False):
             return 0
+        
         now = datetime.now().timestamp()
         jail_until = self._to_float(self.data.get("jail_until", 0))
         remaining = jail_until - now
         return max(0, int(remaining))
 
     def jail_user(self, reason, duration, fine):
+        """زندانی کردن کاربر (بدون ادمین)"""
         now = datetime.now().timestamp()
         self.data["jailed"] = True
         self.data["jail_reason"] = reason
@@ -860,6 +879,7 @@ class HopDogGame:
         return {"success": True}
 
     def jail_user_with_admin(self, reason, duration, fine, admin_id):
+        """زندانی کردن کاربر با ادمین"""
         now = datetime.now().timestamp()
         self.data["jailed"] = True
         self.data["jail_reason"] = reason
@@ -871,11 +891,13 @@ class HopDogGame:
         return {"success": True}
 
     def pay_jail_fine(self):
+        """پرداخت جریمه زندان"""
         if not self.data.get("jailed", False):
             return {"success": False, "reason": "شما در زندان نیستید"}
         
         fine = self._to_int(self.data.get("jail_fine", 0))
         hop_point = self._to_int(self.data["hop_point"])
+        
         if hop_point < fine:
             return {"success": False, "reason": f"پوینت کافی نیست. نیاز به {fine:,} هاپو پوینت"}
         
@@ -890,6 +912,7 @@ class HopDogGame:
         return {"success": True}
 
     def get_jail_info(self):
+        """دریافت اطلاعات کامل زندان"""
         if not self.data.get("jailed", False):
             return None
         
@@ -908,15 +931,17 @@ class HopDogGame:
         }
 
     def add_meow_vote(self, voter_id):
+        """افزودن رای به زندان میو"""
         votes = self.data.get("jail_voted", [])
-        if voter_id not in votes:
-            votes.append(voter_id)
+        if str(voter_id) not in votes:
+            votes.append(str(voter_id))
             self.data["jail_voted"] = votes
             self.save_data()
             return True
         return False
 
     def get_meow_votes(self):
+        """دریافت لیست رای‌دهندگان"""
         return self.data.get("jail_voted", [])
 
     # ============================================================
