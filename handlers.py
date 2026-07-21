@@ -116,8 +116,7 @@ RULES_PAGE2 = """🐶 *قوانین هاپویی* 📚 *(2 / 2)*
 ❤️ در صورت همکاری و گزارش مشکلات , باگ ها , متخلفین , پیشنهادات , انتقادات و .. از سمت مدیریت هدیه دریافت میکنید.
 
 ©️ *کپی برداری از هاپویی کاملا ممنوع بوده و پیگرد قانونی دارد.*
-‏┘─ ᴄᴏᴘʏʀɪɢʜᴛ | ᴀʟʟ ʀɪɢʜᴛ
-ʀᴇꜱᴇʀᴠᴇᴅ | 2026 HopDoG
+‏┘─ ᴄᴏᴘʏʀɪɢʜᴛ | ᴀʟʟ ʀɪɢʜᴛ ʀᴇꜱᴇʀᴠᴇᴅ | 2026 HopDoG
 2024-2026 Dillimore Script Team
 
 📚 در صورت رعایت نکردن قوانین ربات با شما برخورد خواهد شد و مسئولیت این موضوع با شماست.
@@ -2909,6 +2908,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         is_private = update.message.chat.type == "private"
         is_group = update.message.chat.type in ["group", "supergroup"]
         
+        # ============================================================
+        # لاگ برای دیباگ - مهم!
+        # ============================================================
+        logging.info(f"📩 پیام از {user_id} در {update.message.chat.type}: '{text}'")
+        
         if is_group:
             try:
                 chat_id = update.message.chat.id
@@ -3036,67 +3040,87 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
         
         # ============================================================
-        # گروه
+        # گروه - بخش اصلی اصلاح شده
         # ============================================================
         if is_group:
-            if text_lower in ["زندان هاپویی", "زندان"]:
+            # تمیز کردن متن برای تشخیص بهتر
+            text_clean = text_lower.strip()
+            logging.info(f"📩 گروه - دستور: '{text_clean}' از {user_id}")
+            
+            # زندان
+            if text_clean in ["زندان هاپویی", "زندان"]:
                 await show_jail(update, context)
                 return
             
-            if text_lower in ["میو", "معو", "میاو", "میو میو", "mio", "mio mio", "meo", "meo meo", "meow", "meow meow"]:
+            # میو
+            if text_clean in ["میو", "معو", "میاو", "میو میو", "mio", "mio mio", "meo", "meo meo", "meow", "meow meow"]:
                 await handle_meow(update, context)
                 return
             
-            if text_lower in ["هاپوهام", "هاپو هام"]:
+            # پروفایل خود
+            if text_clean in ["هاپوهام", "هاپو هام"]:
                 await my_profile(update, context)
                 return
             
-            if text_lower in ["هاپوهاش", "هاپو هاش"]:
+            # پروفایل دیگران
+            if text_clean in ["هاپوهاش", "هاپو هاش"]:
                 await show_user_profile(update, context)
                 return
             
-            if text_lower in ["انتقال هاپویی", "انتقالهاپویی"]:
+            # انتقال
+            if text_clean in ["انتقال هاپویی", "انتقالهاپویی"]:
                 await transfer_points_command(update, context)
                 return
             
-            if text_lower in ["هاپ هاپ", "هاپ", "hop", "hop hop", "واق", "واق واق", "هاپ هوپ", "هوپ", "hap", "hap hap"]:
+            # هاپ هاپ - با تشخیص startswith برای فاصله‌های اضافی
+            hop_keywords = ["هاپ هاپ", "هاپ", "hop", "hop hop", "واق", "واق واق", "هاپ هوپ", "هوپ", "hap", "hap hap"]
+            if text_clean in hop_keywords or any(text_clean.startswith(kw) for kw in hop_keywords):
                 await do_hop(update, game)
                 return
             
-            if text_lower in ["آکادمی هاپویی", "اکادمی هاپویی", "اکادمی", "آکادمی"]:
+            # آکادمی
+            if text_clean in ["آکادمی هاپویی", "اکادمی هاپویی", "اکادمی", "آکادمی"]:
                 await show_academy_main(update)
                 return
             
-            if text_lower in ["لیدربرد هاپویی", "لیدربرد", "leaderboard"]:
+            # لیدربرد
+            if text_clean in ["لیدربرد هاپویی", "لیدربرد", "leaderboard"]:
                 await show_leaderboard_main(update, context)
                 return
             
-            hapo_name_lower = game.data.get("hapo_name", "").lower()
-            if text_lower in ["هاپو", "hapo"] or (hapo_name_lower and text_lower == hapo_name_lower):
+            # هاپو
+            hapo_name_lower = game.data.get("hapo_name", "").lower().strip()
+            if text_clean in ["هاپو", "hapo"] or (hapo_name_lower and text_clean == hapo_name_lower):
                 await show_hapo_menu(update, game)
                 return
             
-            if text_lower in ["پنجه", "claw"]:
+            # پنجه
+            if text_clean in ["پنجه", "claw"]:
                 await show_claw_menu(update, game)
                 return
             
-            if text_lower in ["شکار", "hunt"]:
+            # شکار
+            if text_clean in ["شکار", "hunt"]:
                 await do_hunt(update, game)
                 return
             
-            if text_lower in ["بانک هاپویی", "هاپو بانک", "بانک"]:
+            # بانک
+            if text_clean in ["بانک هاپویی", "هاپو بانک", "بانک"]:
                 await show_bank_menu(update, game)
                 return
             
-            if text_lower in ["یخچال هاپویی", "یخچال"]:
+            # یخچال
+            if text_clean in ["یخچال هاپویی", "یخچال"]:
                 await show_fridge_menu(update, game)
                 return
             
-            if text_lower in ["قاچاق هاپویی", "قاچاق"]:
+            # قاچاق
+            if text_clean in ["قاچاق هاپویی", "قاچاق"]:
                 await show_smuggle_menu(update, game)
                 return
             
-            # اگر هیچکدوم نبود، هیچی نگو
+            # اگر هیچ دستوری نبود، لاگ کن
+            logging.info(f"❌ گروه - دستور ناشناخته: '{text}' از {user_id}")
             return
         
     except Exception as e:
@@ -3109,7 +3133,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 # ================================================================
-# هندلر Callback
+# هندلر Callback - ادامه در فایل بعدی
 # ================================================================
 
 async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
