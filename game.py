@@ -1,4 +1,4 @@
-# game.py - کلاس اصلی بازی (نسخه نهایی با یخچال و قاچاق)
+# game.py - کلاس اصلی بازی (نسخه نهایی با یخچال، قاچاق و لیدربرد)
 
 import random
 import json
@@ -116,6 +116,10 @@ class HopDogGame:
             if "smuggle_used_hapo" not in data:
                 data["smuggle_used_hapo"] = "0"
             
+            # فیلدهای لیدربرد
+            if "total_hunts" not in data:
+                data["total_hunts"] = "0"
+            
             # چک کردن خودکار آزادی
             if data.get("jailed", False):
                 now = datetime.now().timestamp()
@@ -184,6 +188,8 @@ class HopDogGame:
             "smuggle_duration": "0",
             "smuggle_success_chance": "0",
             "smuggle_used_hapo": "0",
+            # فیلدهای لیدربرد
+            "total_hunts": "0",
             "last_updated": datetime.now().isoformat()
         }
         self.save_data()
@@ -493,6 +499,11 @@ class HopDogGame:
         self.data["hunt_active"] = False
         self.data["current_hunt_animal"] = animal
         self.data["hunt_time"] = self._to_str(datetime.now().timestamp())
+        
+        # افزایش تعداد شکار برای لیدربرد
+        total_hunts = self._to_int(self.data.get("total_hunts", 0))
+        self.data["total_hunts"] = self._to_str(total_hunts + 1)
+        
         self.save_data()
         return {"success": True, "animal": animal}
 
@@ -1182,7 +1193,7 @@ class HopDogGame:
         }
 
     # ============================================================
-    # متدهای قاچاق هاپویی - اصلاح شده
+    # متدهای قاچاق هاپویی
     # ============================================================
 
     def start_smuggle(self, count):
