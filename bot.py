@@ -33,7 +33,7 @@ def main():
     # ============================================================
     logger.info("📝 ثبت MessageHandler برای گروه...")
     app.add_handler(MessageHandler(
-        filters.TEXT & filters.ChatType.GROUP,
+        filters.TEXT & filters.ChatType.GROUPS,
         handle_message
     ))
     logger.info("✅ هندلر گروه ثبت شد")
