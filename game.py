@@ -280,15 +280,26 @@ class HopDogGame:
         return HAPO_PRODUCTION[keys[-1]]
 
     def get_hapo_upgrade_price(self):
+        """دریافت هزینه ارتقا سطح هاپو - مستقل از مقام"""
         total = self.get_hapo_total_level()
-        if total >= 25:
+        
+        # اگر سطح کل >= 20 (یا 25 برای مقام نهایی)
+        if total >= 20:
             return float('inf')
-        if total + 1 in HAPO_LEVEL_PRICES:
-            return HAPO_LEVEL_PRICES[total + 1]
+        
+        # سطح کل + 1 = سطح بعدی (مثلاً سطح 2 → 3 یعنی total+1 = 3)
+        # قیمت فقط به شماره سطح بستگی داره، نه مقام
+        next_level = total + 1
+        
+        if next_level in HAPO_LEVEL_PRICES:
+            return HAPO_LEVEL_PRICES[next_level]
+        
+        # اگر نبود، از نزدیک‌ترین مقدار استفاده کن
         keys = sorted(HAPO_LEVEL_PRICES.keys())
         for k in keys:
-            if k >= total + 1:
+            if k >= next_level:
                 return HAPO_LEVEL_PRICES[k]
+        
         return HAPO_LEVEL_PRICES[keys[-1]]
 
     def get_hapo_rank_up_price(self):
@@ -409,7 +420,7 @@ class HopDogGame:
         hapo_level = self._to_int(self.data["hapo_level"])
         total = self.get_hapo_total_level()
         
-        if total >= 25:
+        if total >= 20:
             return {"success": False, "reason": "هاپو در بالاترین سطح است"}
         
         max_level = self.get_hapo_max_level_for_rank(hapo_rank)
@@ -423,7 +434,7 @@ class HopDogGame:
         hapo_rank = self._to_int(self.data["hapo_rank"])
         hapo_level = self._to_int(self.data["hapo_level"])
         
-        if total >= 25:
+        if total >= 20:
             return {"success": False, "reason": "هاپو در بالاترین سطح است"}
         
         max_level = self.get_hapo_max_level_for_rank(hapo_rank)
