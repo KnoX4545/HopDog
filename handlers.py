@@ -24,7 +24,8 @@ from config import (
     SMUGGLE_MIN_HAPO, SMUGGLE_MAX_HAPO, SMUGGLE_REQUIRED_LEVEL,
     SMUGGLE_REWARD_MIN, SMUGGLE_REWARD_MAX, FRIDGE_REQUIRED_LEVEL,
     FRIDGE_PURCHASE_COST, FRIDGE_MAX_LEVEL, FRIDGE_CAPACITY,
-    FRIDGE_UPGRADE_COSTS, FRIDGE_COOK_MULTIPLIER_SELL, FRIDGE_COOK_MULTIPLIER_FOOD
+    FRIDGE_UPGRADE_COSTS, FRIDGE_COOK_MULTIPLIER_SELL, FRIDGE_COOK_MULTIPLIER_FOOD,
+    SMUGGLE_TIME_PER_HAPO
 )
 from game import HopDogGame, StreetHapo
 from database import (
@@ -624,7 +625,11 @@ async def show_claw_menu(update: Update, game):
         msg = f"🦞 شما پنجه ندارید\n\n💰 هزینه خرید: {format_number(cost)} هاپو پوینت\n⏳ زمان استراحت: 60:00\n🍀 شانس شکار:\n  ⚪ معمولی: 95%\n  🔵 کمیاب: 5%"
         
         try:
-            await update.message.reply_photo(photo=CLAW_IMAGES[1], caption=msg, reply_markup=InlineKeyboardMarkup(keyboard))
+            await update.message.reply_photo(
+                photo=CLAW_IMAGES[1], 
+                caption=msg, 
+                reply_markup=InlineKeyboardMarkup(keyboard)
+            )
         except:
             await update.message.reply_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
         return
@@ -633,7 +638,9 @@ async def show_claw_menu(update: Update, game):
     next_level = claw_level + 1
     next_data = game.get_claw_data(next_level)
     
+    # ساخت متن بدون فاصله‌های اضافی
     msg = f"🦞 پنجه شما\n⭐ سطح: {claw_level}\n⏳ زمان استراحت: {claw_data['cooldown']:02d}:00\n🍀 شانس شکار:\n  ⚪ معمولی: {claw_data['common']}%\n  🔵 کمیاب: {claw_data['uncommon']}%"
+    
     if claw_data['epic'] > 0:
         msg += f"\n  🟣 حماسی: {claw_data['epic']}%"
     if claw_data['legendary'] > 0:
@@ -644,7 +651,11 @@ async def show_claw_menu(update: Update, game):
         keyboard.append([InlineKeyboardButton(f"⬆️ سطح {next_level} ({format_number(next_data['cost'])})", callback_data="upgrade_claw")])
     
     try:
-        await update.message.reply_photo(photo=CLAW_IMAGES[claw_level], caption=msg, reply_markup=InlineKeyboardMarkup(keyboard) if keyboard else None)
+        await update.message.reply_photo(
+            photo=CLAW_IMAGES[claw_level], 
+            caption=msg, 
+            reply_markup=InlineKeyboardMarkup(keyboard) if keyboard else None
+        )
     except:
         await update.message.reply_text(msg, reply_markup=InlineKeyboardMarkup(keyboard) if keyboard else None)
 
@@ -689,6 +700,50 @@ async def do_hunt(update: Update, game):
         keyboard.append([InlineKeyboardButton("❄️ بندازش تو یخچال", callback_data=f"hunt_fridge_{animal['name']}")])
     
     await hunt_msg.edit_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
+    
+    # ======== تایمر خودکار برای فرار حیوان ========
+    user_id = update.effective_user.id
+    asyncio.create_task(hunt_animal_timer(update, context, user_id, hunt_msg))
+
+
+async def hunt_animal_timer(update: Update, context: ContextTypes.DEFAULT_TYPE, user_id, hunt_msg):
+    """تایمر 60 ثانیه برای فرار حیوان شکار شده"""
+    await asyncio.sleep(HUNT_DECISION_TIMER)
+    
+    try:
+        game = get_game(user_id)
+        animal = game.data.get("current_hunt_animal")
+        
+        # اگر حیوانی وجود نداره یا قبلاً تصمیم گرفته شده
+        if not animal:
+            return
+        
+        # چک کردن اینکه آیا حیوان هنوز وجود داره
+        hunt_time = game.data.get("hunt_time", 0)
+        if isinstance(hunt_time, str):
+            try:
+                hunt_time = float(hunt_time)
+            except:
+                hunt_time = 0
+        
+        now = datetime.now().timestamp()
+        if (now - hunt_time) >= HUNT_DECISION_TIMER:
+            # حیوان فرار کرد
+            animal_name = animal.get("name", "حیوان")
+            game.data["current_hunt_animal"] = None
+            game.data["hunt_time"] = "0"
+            game.save_data()
+            
+            try:
+                # ادیت کردن پیام شکار
+                await hunt_msg.edit_text(
+                    f"🦌 {animal_name} فرار کرد! وقتت تموم شد.\n\n"
+                    f"💡 دفعه دیگه سریعتر تصمیم بگیر!"
+                )
+            except:
+                pass
+    except Exception as e:
+        logging.error(f"Error in hunt_animal_timer: {e}")
 
 
 # ================================================================
@@ -1008,7 +1063,7 @@ async def handle_transfer_cancel(update: Update, context: ContextTypes.DEFAULT_T
 
 
 # ================================================================
-# یخچال هاپویی - نسخه اصلاح شده
+# یخچال هاپویی
 # ================================================================
 
 async def show_fridge_menu(update: Update, game):
@@ -1439,10 +1494,16 @@ async def show_smuggle_menu(update: Update, game):
             minutes = (remaining % 3600) // 60
             progress = status.get("progress", 0)
             
+            # محاسبه زمان به ساعت و دقیقه
+            if hours > 0:
+                time_text = f"{hours} ساعت و {minutes} دقیقه"
+            else:
+                time_text = f"{minutes} دقیقه"
+            
             await update.message.reply_text(
                 f"🥷 قاچاق هاپویی در حال انجام...\n\n"
                 f"📦 تعداد هاپوها: {status.get('count', 0)}\n"
-                f"⏳ زمان باقی‌مانده: {hours} ساعت و {minutes} دقیقه\n"
+                f"⏳ زمان باقی‌مانده: {time_text}\n"
                 f"📊 پیشرفت: {progress}%\n\n"
                 f"💡 وقتی قاچاق تموم شد بهت پیام میدم!"
             )
@@ -1489,12 +1550,18 @@ async def show_smuggle_menu(update: Update, game):
     
     keyboard.append([InlineKeyboardButton("◀️ برگشت", callback_data="smuggle_back")])
     
+    # محاسبه زمان برای هر تعداد
+    time_per_hapo = SMUGGLE_TIME_PER_HAPO // 60  # تبدیل به دقیقه
+    min_time = SMUGGLE_MIN_HAPO * time_per_hapo
+    max_time = SMUGGLE_MAX_HAPO * time_per_hapo
+    
     await update.message.reply_text(
         f"🥷 قاچاق هاپویی\n\n"
         f"🐶 هاپوهای خیابونی موجود: {street_hapo}\n"
         f"📦 تعداد هاپوها برای قاچاق رو انتخاب کن:\n"
         f"(حداقل {SMUGGLE_MIN_HAPO} - حداکثر {SMUGGLE_MAX_HAPO})\n\n"
-        f"⏳ هر هاپو = 1 ساعت زمان قاچاق\n"
+        f"⏳ هر هاپو = {time_per_hapo} دقیقه زمان قاچاق\n"
+        f"⏳ {SMUGGLE_MIN_HAPO} هاپو = {min_time} دقیقه | {SMUGGLE_MAX_HAPO} هاپو = {max_time} دقیقه\n"
         f"💰 هر هاپو = {format_number(SMUGGLE_REWARD_MIN)} تا {format_number(SMUGGLE_REWARD_MAX)} 🪙\n"
         f"🚨 شانس موفقیت با افزایش تعداد کاهش می‌یابد",
         reply_markup=InlineKeyboardMarkup(keyboard)
@@ -1514,12 +1581,19 @@ async def handle_smuggle_start(update: Update, context: ContextTypes.DEFAULT_TYP
     if result["success"]:
         duration = result.get("duration", 0)
         hours = duration // 3600
+        minutes = (duration % 3600) // 60
         success_chance = result.get("success_chance", 0)
+        
+        # نمایش زمان به صورت مناسب
+        if hours > 0:
+            time_text = f"{hours} ساعت و {minutes} دقیقه"
+        else:
+            time_text = f"{minutes} دقیقه"
         
         await query.edit_message_text(
             f"🥷 قاچاق هاپویی شروع شد!\n\n"
             f"📦 تعداد هاپوها: {count}\n"
-            f"⏳ زمان تقریبی: {hours} ساعت\n"
+            f"⏳ زمان تقریبی: {time_text}\n"
             f"🍀 شانس موفقیت: {success_chance}%\n\n"
             f"💡 وقتی قاچاق تموم شد بهت پیام میدم!"
         )
@@ -1540,7 +1614,7 @@ async def smuggle_timer(update: Update, context: ContextTypes.DEFAULT_TYPE, user
                 return
             if status.get("status") != "in_progress":
                 break
-            await asyncio.sleep(60)
+            await asyncio.sleep(60)  # هر 1 دقیقه چک کن
         
         if status.get("status") == "success":
             reward = status.get("reward", 0)
@@ -2932,6 +3006,23 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     
     if data == "hunt_sell":
+        # چک کردن اینکه حیوان فرار نکرده باشه
+        hunt_time = game.data.get("hunt_time", 0)
+        if isinstance(hunt_time, str):
+            try:
+                hunt_time = float(hunt_time)
+            except:
+                hunt_time = 0
+        
+        if hunt_time > 0:
+            now = datetime.now().timestamp()
+            if (now - hunt_time) > HUNT_DECISION_TIMER:
+                game.data["current_hunt_animal"] = None
+                game.data["hunt_time"] = "0"
+                game.save_data()
+                await query.edit_message_text("🦌 حیوان فرار کرد! وقتت تموم شد.")
+                return
+        
         result = game.sell_animal()
         if result["success"]:
             await query.message.reply_text(f"💰 حیوان فروخته شد!\n✅ {format_number(result['value'])} هاپو پوینت دریافت کردی")
@@ -2940,6 +3031,23 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     
     if data == "hunt_feed":
+        # چک کردن اینکه حیوان فرار نکرده باشه
+        hunt_time = game.data.get("hunt_time", 0)
+        if isinstance(hunt_time, str):
+            try:
+                hunt_time = float(hunt_time)
+            except:
+                hunt_time = 0
+        
+        if hunt_time > 0:
+            now = datetime.now().timestamp()
+            if (now - hunt_time) > HUNT_DECISION_TIMER:
+                game.data["current_hunt_animal"] = None
+                game.data["hunt_time"] = "0"
+                game.save_data()
+                await query.edit_message_text("🦌 حیوان فرار کرد! وقتت تموم شد.")
+                return
+        
         result = game.feed_hapo()
         if result["success"]:
             await query.message.reply_text(f"🍖 {result['fed']} غذا به هاپو داده شد\n✅ هاپو سیر شد!")
