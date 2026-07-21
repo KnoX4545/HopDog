@@ -1,4 +1,4 @@
-# database.py - نسخه نهایی با ستون‌های یخچال، قاچاق و لیدربرد
+# database.py - نسخه اصلاح شده با رفع مشکلات تبدیل داده
 
 import json
 import logging
@@ -8,6 +8,9 @@ from config import SUPABASE_URL, SUPABASE_KEY
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
+# ================================================================
+# توابع اصلی کاربر
+# ================================================================
 
 def get_user_data(user_id):
     try:
@@ -15,82 +18,61 @@ def get_user_data(user_id):
         if response.data and len(response.data) > 0:
             data = response.data[0]
             
-            # تبدیل JSON فیلدها
-            if "current_hunt_animal" in data and data["current_hunt_animal"]:
-                try:
-                    data["current_hunt_animal"] = json.loads(data["current_hunt_animal"])
-                except:
-                    data["current_hunt_animal"] = None
-                    
-            if "bank_transactions" in data and data["bank_transactions"]:
-                try:
-                    data["bank_transactions"] = json.loads(data["bank_transactions"])
-                except:
-                    data["bank_transactions"] = []
-            else:
-                data["bank_transactions"] = []
-                
-            if "jail_voted" in data and data["jail_voted"]:
-                try:
-                    data["jail_voted"] = json.loads(data["jail_voted"])
-                except:
-                    data["jail_voted"] = []
-            else:
-                data["jail_voted"] = []
+            # تبدیل JSON فیلدها با try/except
+            json_fields = [
+                "current_hunt_animal", 
+                "bank_transactions", 
+                "jail_voted", 
+                "fridge_items"
+            ]
             
-            if "fridge_items" in data and data["fridge_items"]:
-                try:
-                    data["fridge_items"] = json.loads(data["fridge_items"])
-                except:
-                    data["fridge_items"] = []
-            else:
-                data["fridge_items"] = []
+            for field in json_fields:
+                if field in data and data[field]:
+                    try:
+                        if isinstance(data[field], str):
+                            data[field] = json.loads(data[field])
+                        # اگر قبلاً دیکشنری یا لیست بود، همان را نگه دار
+                    except:
+                        if field in ["bank_transactions", "jail_voted", "fridge_items"]:
+                            data[field] = []
+                        else:
+                            data[field] = None
+                elif field in ["bank_transactions", "jail_voted", "fridge_items"]:
+                    data[field] = []
             
             # فیلدهای پیش‌فرض
-            if "bank_card_number" not in data:
-                data["bank_card_number"] = ""
-            if "jail_admin_id" not in data:
-                data["jail_admin_id"] = None
-            if "hunt_time" not in data:
-                data["hunt_time"] = "0"
-            if "is_transferring" not in data:
-                data["is_transferring"] = False
-            if "profile_hidden" not in data:
-                data["profile_hidden"] = False
-            if "profile_locked" not in data:
-                data["profile_locked"] = False
-            if "street_hapo_rescued" not in data:
-                data["street_hapo_rescued"] = "0"
+            defaults = {
+                "bank_card_number": "",
+                "jail_admin_id": None,
+                "hunt_time": "0",
+                "is_transferring": False,
+                "profile_hidden": False,
+                "profile_locked": False,
+                "street_hapo_rescued": "0",
+                "fridge_owned": False,
+                "fridge_level": "1",
+                "smuggling": False,
+                "smuggle_count": "0",
+                "smuggle_start": "0",
+                "smuggle_duration": "0",
+                "smuggle_success_chance": "0",
+                "smuggle_used_hapo": "0",
+                "total_hunts": "0"
+            }
             
-            # فیلدهای یخچال
-            if "fridge_owned" not in data:
-                data["fridge_owned"] = False
-            if "fridge_level" not in data:
-                data["fridge_level"] = "1"
+            for key, default in defaults.items():
+                if key not in data:
+                    data[key] = default
             
-            # فیلدهای قاچاق
-            if "smuggling" not in data:
-                data["smuggling"] = False
-            if "smuggle_count" not in data:
-                data["smuggle_count"] = "0"
-            if "smuggle_start" not in data:
-                data["smuggle_start"] = "0"
-            if "smuggle_duration" not in data:
-                data["smuggle_duration"] = "0"
-            if "smuggle_success_chance" not in data:
-                data["smuggle_success_chance"] = "0"
-            if "smuggle_used_hapo" not in data:
-                data["smuggle_used_hapo"] = "0"
-            
-            # فیلدهای لیدربرد
-            if "total_hunts" not in data:
-                data["total_hunts"] = "0"
-            
-            # چک کردن خودکار آزادی
+            # چک کردن خودکار آزادی از زندان
             if data.get("jailed", False):
                 now = datetime.now().timestamp()
-                jail_until = float(data.get("jail_until", 0))
-                if now >= jail_until:
+                try:
+                    jail_until = float(data.get("jail_until", 0))
+                except:
+                    jail_until = 0
+                
+                if now >= jail_until and jail_until > 0:
                     data["jailed"] = False
                     data["jail_reason"] = ""
                     data["jail_until"] = "0"
@@ -98,10 +80,11 @@ def get_user_data(user_id):
                     data["jail_arrest_time"] = "0"
                     data["jail_admin_id"] = None
                     save_user_data(user_id, data)
+            
             return data
         return None
     except Exception as e:
-        logging.error(f"Error loading data: {e}")
+        logging.error(f"Error loading data for {user_id}: {e}")
         return None
 
 
@@ -115,26 +98,25 @@ def save_user_data(user_id, data):
         if "last_updated" in data_to_save:
             del data_to_save["last_updated"]
         
-        # تبدیل JSON فیلدها
-        if "current_hunt_animal" in data_to_save and data_to_save["current_hunt_animal"]:
-            data_to_save["current_hunt_animal"] = json.dumps(data_to_save["current_hunt_animal"])
-        else:
-            data_to_save["current_hunt_animal"] = None
-            
-        if "bank_transactions" in data_to_save and data_to_save["bank_transactions"]:
-            data_to_save["bank_transactions"] = json.dumps(data_to_save["bank_transactions"])
-        else:
-            data_to_save["bank_transactions"] = "[]"
-            
-        if "jail_voted" in data_to_save and data_to_save["jail_voted"]:
-            data_to_save["jail_voted"] = json.dumps(data_to_save["jail_voted"])
-        else:
-            data_to_save["jail_voted"] = "[]"
-        
-        if "fridge_items" in data_to_save and data_to_save["fridge_items"]:
-            data_to_save["fridge_items"] = json.dumps(data_to_save["fridge_items"])
-        else:
-            data_to_save["fridge_items"] = "[]"
+        # تبدیل JSON فیلدها به string
+        json_fields = ["current_hunt_animal", "bank_transactions", "jail_voted", "fridge_items"]
+        for field in json_fields:
+            if field in data_to_save:
+                if data_to_save[field] is None:
+                    if field == "current_hunt_animal":
+                        data_to_save[field] = None
+                    else:
+                        data_to_save[field] = "[]"
+                elif isinstance(data_to_save[field], (dict, list)):
+                    data_to_save[field] = json.dumps(data_to_save[field])
+                elif isinstance(data_to_save[field], str):
+                    # اگر قبلاً string بود، همان را نگه دار
+                    pass
+                else:
+                    if field == "current_hunt_animal":
+                        data_to_save[field] = None
+                    else:
+                        data_to_save[field] = "[]"
         
         # ======== تبدیل همه اعداد به String ========
         string_fields = [
@@ -146,12 +128,13 @@ def save_user_data(user_id, data):
             "jail_until", "jail_fine", "jail_arrest_time",
             "fridge_level", "smuggle_count", "smuggle_start", 
             "smuggle_duration", "smuggle_success_chance", "smuggle_used_hapo",
-            "total_hunts"
+            "total_hunts", "last_transfer_time"
         ]
         
         for field in string_fields:
             if field in data_to_save and data_to_save[field] is not None:
-                data_to_save[field] = str(data_to_save[field])
+                if not isinstance(data_to_save[field], str):
+                    data_to_save[field] = str(data_to_save[field])
         
         # ======== تبدیل boolean ها ========
         bool_fields = [
@@ -163,7 +146,7 @@ def save_user_data(user_id, data):
         for field in bool_fields:
             if field in data_to_save:
                 if isinstance(data_to_save[field], bool):
-                    data_to_save[field] = data_to_save[field]
+                    pass
                 elif isinstance(data_to_save[field], str):
                     data_to_save[field] = data_to_save[field].lower() == "true"
                 else:
