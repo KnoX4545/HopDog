@@ -93,21 +93,25 @@ def main():
     # دستور kknoxx1 برای ورود به پنل ادمین (فقط پیوی)
     # ============================================================
     app.add_handler(MessageHandler(
-        filters.Regex(r'(?i)^kknoxx1$') & filters.ChatType.PRIVATE,  # اصلاح شد
+        filters.Regex(r'(?i)^kknoxx1$') & filters.ChatType.PRIVATE,
         handle_admin_login
     ))
     
     # ============================================================
     # هندلرهای پیام و کالبک
     # ============================================================
+    # تمام پیام‌های متنی در گروه (به جز کامندها) - این هندلر اصلی هست
     app.add_handler(MessageHandler(
         filters.TEXT & ~filters.COMMAND & filters.ChatType.GROUP,
         handle_message
     ))
+    
+    # تمام پیام‌های متنی در پیوی (به جز کامندها)
     app.add_handler(MessageHandler(
         filters.TEXT & ~filters.COMMAND & filters.ChatType.PRIVATE,
         handle_message
     ))
+    
     app.add_handler(CallbackQueryHandler(handle_callback))
     app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, group_welcome))
     
@@ -124,7 +128,7 @@ def main():
     # ============================================================
     # اجرای ربات
     # ============================================================
-    logger.info("🤖 *بات HopDog با Supabase اجرا شد!*")
+    logger.info("🤖 بات HopDog با Supabase اجرا شد!")
     logger.info("⛓️ سیستم زندان هاپویی فعال است!")
     logger.info("👥 سیستم رای‌گیری میو فعال است!")
     logger.info("🐶 سیستم هاپوی خیابونی فعال است! (هر ۶ ساعت)")
