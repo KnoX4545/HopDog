@@ -1,4 +1,4 @@
-# database.py - نسخه نهایی با TEXT و فیلدهای جدید
+# database.py - نسخه نهایی با ستون‌های یخچال و قاچاق
 
 import json
 import logging
@@ -84,13 +84,25 @@ def get_user_data(user_id):
             
             # تبدیل String به عدد برای استفاده در کد
             if "hop_point" in data and isinstance(data["hop_point"], str):
-                data["hop_point"] = int(float(data["hop_point"]))
+                try:
+                    data["hop_point"] = int(float(data["hop_point"]))
+                except:
+                    data["hop_point"] = 0
             if "level" in data and isinstance(data["level"], str):
-                data["level"] = int(data["level"])
+                try:
+                    data["level"] = int(data["level"])
+                except:
+                    data["level"] = 1
             if "hop_count" in data and isinstance(data["hop_count"], str):
-                data["hop_count"] = int(float(data["hop_count"]))
+                try:
+                    data["hop_count"] = int(float(data["hop_count"]))
+                except:
+                    data["hop_count"] = 0
             if "last_hop_time" in data and isinstance(data["last_hop_time"], str):
-                data["last_hop_time"] = float(data["last_hop_time"])
+                try:
+                    data["last_hop_time"] = float(data["last_hop_time"])
+                except:
+                    data["last_hop_time"] = 0
             
             # چک کردن زندان
             if data.get("jailed", False):
