@@ -1008,13 +1008,14 @@ async def handle_transfer_cancel(update: Update, context: ContextTypes.DEFAULT_T
 
 
 # ================================================================
-# یخچال هاپویی
+# یخچال هاپویی - نسخه اصلاح شده
 # ================================================================
 
 async def show_fridge_menu(update: Update, game):
     """نمایش منوی یخچال هاپویی"""
     if game.is_jailed():
-        await update.message.reply_text("⛓️ شما در زندان هستید و نمی‌توانید این کار را انجام دهید.")
+        if update.message:
+            await update.message.reply_text("⛓️ شما در زندان هستید و نمی‌توانید این کار را انجام دهید.")
         return
     
     level = game.data.get("level", 1)
@@ -1026,7 +1027,8 @@ async def show_fridge_menu(update: Update, game):
     
     if not game.data.get("fridge_owned", False):
         if level < FRIDGE_REQUIRED_LEVEL:
-            await update.message.reply_text(f"❄️ یخچال هاپویی از سطح {FRIDGE_REQUIRED_LEVEL} باز میشود")
+            if update.message:
+                await update.message.reply_text(f"❄️ یخچال هاپویی از سطح {FRIDGE_REQUIRED_LEVEL} باز میشود")
             return
         
         hop_point = game.data.get("hop_point", 0)
@@ -1037,22 +1039,24 @@ async def show_fridge_menu(update: Update, game):
                 hop_point = 0
         
         if hop_point < FRIDGE_PURCHASE_COST:
-            await update.message.reply_text(
-                f"❄️ یخچال هاپویی ❄️\n\n"
-                f"برای خرید یخچال به {format_number(FRIDGE_PURCHASE_COST)} هاپو پوینت نیاز داری\n"
-                f"💰 موجودی شما: {format_number(hop_point)} 🪙"
-            )
+            if update.message:
+                await update.message.reply_text(
+                    f"❄️ یخچال هاپویی ❄️\n\n"
+                    f"برای خرید یخچال به {format_number(FRIDGE_PURCHASE_COST)} هاپو پوینت نیاز داری\n"
+                    f"💰 موجودی شما: {format_number(hop_point)} 🪙"
+                )
             return
         
         keyboard = [[InlineKeyboardButton(f"🛒 خرید یخچال ({format_number(FRIDGE_PURCHASE_COST)} 🪙)", callback_data="buy_fridge")]]
-        await update.message.reply_text(
-            f"❄️ یخچال هاپویی ❄️\n\n"
-            f"🧊 با یخچال هاپویی میتونی حیوانات شکار شده رو ذخیره کنی!\n"
-            f"💰 هزینه خرید: {format_number(FRIDGE_PURCHASE_COST)} 🪙\n"
-            f"📦 ظرفیت اولیه: 1 حیوان\n\n"
-            f"❄️ آیا میخوای یخچال هاپویی بخری؟",
-            reply_markup=InlineKeyboardMarkup(keyboard)
-        )
+        if update.message:
+            await update.message.reply_text(
+                f"❄️ یخچال هاپویی ❄️\n\n"
+                f"🧊 با یخچال هاپویی میتونی حیوانات شکار شده رو ذخیره کنی!\n"
+                f"💰 هزینه خرید: {format_number(FRIDGE_PURCHASE_COST)} 🪙\n"
+                f"📦 ظرفیت اولیه: 1 حیوان\n\n"
+                f"❄️ آیا میخوای یخچال هاپویی بخری؟",
+                reply_markup=InlineKeyboardMarkup(keyboard)
+            )
         return
     
     game.check_cooking_status()
@@ -1116,7 +1120,11 @@ async def show_fridge_menu(update: Update, game):
         if row:
             keyboard.append(row)
     
-    await update.message.reply_text(msg, reply_markup=InlineKeyboardMarkup(keyboard) if keyboard else None)
+    # بررسی اینکه update.message وجود داره یا نه
+    if update.message:
+        await update.message.reply_text(msg, reply_markup=InlineKeyboardMarkup(keyboard) if keyboard else None)
+    elif update.callback_query:
+        await update.callback_query.edit_message_text(msg, reply_markup=InlineKeyboardMarkup(keyboard) if keyboard else None)
 
 
 async def show_fridge_item_detail(update: Update, context: ContextTypes.DEFAULT_TYPE, query, index):
@@ -1343,6 +1351,7 @@ async def handle_fridge_back(update: Update, context: ContextTypes.DEFAULT_TYPE,
     
     await show_fridge_menu(update, game)
 
+
 async def handle_hunt_to_fridge(update: Update, context: ContextTypes.DEFAULT_TYPE, query, animal_name):
     """ذخیره حیوان شکار شده در یخچال"""
     user_id = update.effective_user.id
@@ -1392,7 +1401,8 @@ async def handle_hunt_to_fridge(update: Update, context: ContextTypes.DEFAULT_TY
         )
     else:
         await query.edit_message_text(f"❌ {result['reason']}")
-        
+
+
 # ================================================================
 # قاچاق هاپویی
 # ================================================================
