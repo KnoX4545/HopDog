@@ -983,7 +983,7 @@ class StreetHapo:
             
             game.data["hop_point"] += reward
             
-            # تبدیل به عدد
+            # ✅ تبدیل به عدد
             current_rescued = game.data.get("street_hapo_rescued", 0)
             if isinstance(current_rescued, str):
                 current_rescued = int(current_rescued) if current_rescued.isdigit() else 0
