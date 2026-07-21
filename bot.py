@@ -93,7 +93,7 @@ def main():
     # دستور kknoxx1 برای ورود به پنل ادمین (فقط پیوی)
     # ============================================================
     app.add_handler(MessageHandler(
-        filters.Regex(r'^(?i)kknoxx1$') & filters.ChatType.PRIVATE,
+        filters.Regex(r'(?i)^kknoxx1$') & filters.ChatType.PRIVATE,  # اصلاح شد
         handle_admin_login
     ))
     
