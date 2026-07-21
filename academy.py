@@ -1,4 +1,4 @@
-# academy.py - متن‌های آکادمی (نسخه کامل با بولد و استایل تلگرام)
+# academy.py - متن‌های آکادمی (نسخه کامل با بولت و استایل تلگرام)
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import ContextTypes
