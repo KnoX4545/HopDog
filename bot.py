@@ -34,7 +34,6 @@ async def handle_admin_login(update: Update, context: ContextTypes.DEFAULT_TYPE)
     user_id = update.effective_user.id
     game = get_game(user_id)
     
-    # اگر در حالت انتظار رمز هستیم
     if context.user_data.get("waiting_for_admin"):
         password = update.message.text.strip()
         if password == ADMIN_PASSWORD:
@@ -47,13 +46,11 @@ async def handle_admin_login(update: Update, context: ContextTypes.DEFAULT_TYPE)
         context.user_data["waiting_for_admin"] = False
         return
     
-    # اگر قبلاً ادمین هست
     if game.data.get("is_admin", False):
         await update.message.reply_text("✅ *شما قبلاً ادمین هستید!*", parse_mode="Markdown")
         await admin_help(update, context)
         return
     
-    # درخواست رمز
     await update.message.reply_text("🔑 *لطفاً رمز ادمین را وارد کنید:*", parse_mode="Markdown")
     context.user_data["waiting_for_admin"] = True
 
@@ -63,7 +60,6 @@ async def handle_admin_login(update: Update, context: ContextTypes.DEFAULT_TYPE)
 # ================================================================
 
 def main():
-    # ایجاد اپلیکیشن
     app = Application.builder().token(TOKEN).build()
     
     # ============================================================
@@ -74,7 +70,7 @@ def main():
     app.add_handler(CommandHandler("rules", show_rules))
     
     # ============================================================
-    # دستورات ادمین (فقط پیوی و فقط با اسلش)
+    # دستورات ادمین (فقط پیوی)
     # ============================================================
     app.add_handler(CommandHandler("setlevel", set_user_level, filters.ChatType.PRIVATE))
     app.add_handler(CommandHandler("addlevel", add_user_level, filters.ChatType.PRIVATE))
@@ -90,7 +86,7 @@ def main():
     app.add_handler(CommandHandler("ahelp", admin_help, filters.ChatType.PRIVATE))
     
     # ============================================================
-    # دستور kknoxx1 برای ورود به پنل ادمین (فقط پیوی)
+    # ورود ادمین با kknoxx1 (فقط پیوی)
     # ============================================================
     app.add_handler(MessageHandler(
         filters.Regex(r'(?i)^kknoxx1$') & filters.ChatType.PRIVATE,
@@ -98,35 +94,36 @@ def main():
     ))
     
     # ============================================================
-    # هندلرهای پیام و کالبک
+    # هندلرهای پیام (همه پیام‌های متنی در گروه و پیوی)
     # ============================================================
-    # تمام پیام‌های متنی در گروه (به جز کامندها) - این هندلر اصلی هست
+    # مهم: این هندلر برای همه پیام‌های متنی در گروه هست
     app.add_handler(MessageHandler(
-        filters.TEXT & ~filters.COMMAND & filters.ChatType.GROUP,
+        filters.TEXT & filters.ChatType.GROUP,
         handle_message
     ))
     
-    # تمام پیام‌های متنی در پیوی (به جز کامندها)
+    # هندلر برای پیوی
     app.add_handler(MessageHandler(
-        filters.TEXT & ~filters.COMMAND & filters.ChatType.PRIVATE,
+        filters.TEXT & filters.ChatType.PRIVATE,
         handle_message
     ))
     
+    # کالبک و خوش‌آمدگویی
     app.add_handler(CallbackQueryHandler(handle_callback))
     app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, group_welcome))
     
     # ============================================================
-    # هاپوی خیابونی (JobQueue - هر ۶ ساعت)
+    # هاپوی خیابونی
     # ============================================================
     job_queue = app.job_queue
     if job_queue:
         job_queue.run_repeating(send_street_hapo_notification, interval=STREET_HAPO_INTERVAL, first=10)
         logger.info("✅ هاپوی خیابونی: هر ۶ ساعت یکبار فعال شد")
     else:
-        logger.warning("⚠️ JobQueue در دسترس نیست! هاپوی خیابونی فعال نخواهد شد.")
+        logger.warning("⚠️ JobQueue در دسترس نیست!")
     
     # ============================================================
-    # اجرای ربات
+    # اجرا
     # ============================================================
     logger.info("🤖 بات HopDog با Supabase اجرا شد!")
     logger.info("⛓️ سیستم زندان هاپویی فعال است!")
@@ -136,9 +133,6 @@ def main():
     logger.info("🥷 سیستم قاچاق هاپویی فعال است!")
     logger.info("🏆 سیستم لیدربرد هاپویی فعال است!")
     
-    # ============================================================
-    # انتخاب روش اجرا
-    # ============================================================
     if USE_WEBHOOK and WEBHOOK_URL:
         logger.info(f"🌐 استفاده از Webhook: {WEBHOOK_URL}")
         app.run_webhook(
