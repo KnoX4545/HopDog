@@ -84,14 +84,25 @@ def get_confirm_keyboard(callback_data_yes, callback_data_no):
 
 
 def get_hapo_menu_keyboard(game):
-    keyboard = [[InlineKeyboardButton("💰 برداشت", callback_data="hapo_harvest")]]
+    keyboard = [
+        [InlineKeyboardButton("💰 برداشت", callback_data="hapo_harvest")],
+    ]
     
     total = game.get_hapo_total_level()
     is_max = total >= 25
     
+    # ✅ تبدیل به عدد
+    hapo_level = game.data["hapo_level"]
+    if isinstance(hapo_level, str):
+        hapo_level = int(hapo_level)
+    
+    hapo_rank = game.data["hapo_rank"]
+    if isinstance(hapo_rank, str):
+        hapo_rank = int(hapo_rank)
+    
     if is_max:
         keyboard[0].append(InlineKeyboardButton("🏆 نهایی", callback_data="hapo_max"))
-    elif game.data["hapo_level"] >= 5 and game.data["hapo_rank"] < 4:
+    elif hapo_level >= 5 and hapo_rank < 4:
         price = game.get_hapo_rank_up_price()
         if price != float('inf'):
             keyboard.append([InlineKeyboardButton(f"🌟 ارتقا مقام ({format_number(price)})", callback_data="hapo_rank_up_confirm")])
@@ -100,13 +111,17 @@ def get_hapo_menu_keyboard(game):
         if price != float('inf'):
             keyboard.append([InlineKeyboardButton(f"⬆️ ارتقا سطح ({format_number(price)})", callback_data="hapo_level_up")])
     
-    if game.data["hop_point"] >= 750:
+    hop_point = game.data["hop_point"]
+    if isinstance(hop_point, str):
+        hop_point = int(hop_point)
+    if hop_point >= 750:
         keyboard.append([InlineKeyboardButton("✏️ تغییر اسم هاپو", callback_data="hapo_rename")])
     
     return InlineKeyboardMarkup(keyboard)
 
 
 def get_hapo_menu_text(game):
+    """متن منوی هاپو با فرمت جدید"""
     game.update_hapo_production()
     total = game.get_hapo_total_level()
     max_food = game.get_hapo_max_food()
@@ -116,17 +131,34 @@ def get_hapo_menu_text(game):
     price = game.get_hapo_upgrade_price()
     is_max = total >= 25
     
+    # ✅ تبدیل به عدد
+    hapo_rank = game.data["hapo_rank"]
+    if isinstance(hapo_rank, str):
+        hapo_rank = int(hapo_rank)
+    
+    hapo_level = game.data["hapo_level"]
+    if isinstance(hapo_level, str):
+        hapo_level = int(hapo_level)
+    
+    hapo_food = game.data["hapo_food"]
+    if isinstance(hapo_food, str):
+        hapo_food = int(hapo_food)
+    
+    hapo_harvest = game.data["hapo_harvest"]
+    if isinstance(hapo_harvest, str):
+        hapo_harvest = int(hapo_harvest)
+    
     msg = f"🐶 {game.data['hapo_name']}\n"
     msg += f"💕 نام : {game.data['hapo_name']}\n"
-    msg += f"🍖 شکم : {status['text']} ({int(game.data['hapo_food'])}/{max_food})\n"
-    msg += f"🌟 مقام : {RANK_NAMES[game.data['hapo_rank']]}\n"
-    msg += f"⭐️ سطح : {game.data['hapo_level']}/5\n"
-    msg += f"💰 هاپو پوینت های تولید شده : {int(game.data['hapo_harvest'])} 🪙\n"
+    msg += f"🍖 شکم : {status['text']} ({hapo_food}/{max_food})\n"
+    msg += f"🌟 مقام : {RANK_NAMES[hapo_rank]}\n"
+    msg += f"⭐️ سطح : {hapo_level}/5\n"
+    msg += f"💰 هاپو پوینت های تولید شده : {hapo_harvest} 🪙\n"
     msg += f"💫 تولید هاپو پوینت در ثانیه : {prod:.2f} 🪙\n"
     msg += f"📦 ظرفیت : {format_number(capacity)}\n"
     
     if not is_max:
-        if game.data["hapo_level"] >= 5 and game.data["hapo_rank"] < 4:
+        if hapo_level >= 5 and hapo_rank < 4:
             rank_price = game.get_hapo_rank_up_price()
             msg += f"💰 هزینه ارتقا مقام : {format_number(rank_price)} 🪙"
         else:
@@ -317,9 +349,31 @@ async def my_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     is_hidden = game.data.get("profile_hidden", False)
     is_locked = game.data.get("profile_locked", False)
     
+    # ✅ تبدیل به عدد
     street_rescued = game.data.get("street_hapo_rescued", 0)
     if isinstance(street_rescued, str):
         street_rescued = int(street_rescued) if street_rescued.isdigit() else 0
+    
+    # ✅ تبدیل به عدد برای هاپو
+    hapo_rank = game.data.get("hapo_rank", 0)
+    if isinstance(hapo_rank, str):
+        hapo_rank = int(hapo_rank)
+    
+    hapo_level = game.data.get("hapo_level", 1)
+    if isinstance(hapo_level, str):
+        hapo_level = int(hapo_level)
+    
+    hop_point = game.data["hop_point"]
+    if isinstance(hop_point, str):
+        hop_point = int(hop_point)
+    
+    hop_count = game.data["hop_count"]
+    if isinstance(hop_count, str):
+        hop_count = int(hop_count)
+    
+    level = game.data["level"]
+    if isinstance(level, str):
+        level = int(level)
     
     msg = f"╮──「 🐶 پروفایل هاپویی 🐶 」\n\n"
     msg += f"┐─ 👤 کاربر : {full_name}\n"
@@ -328,8 +382,8 @@ async def my_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         msg += f"‏┘─ 🪪 آیدی : 🔒 مخفی\n\n"
     
-    msg += f"┐─ 💰 هاپ پوینت ها : {format_number(game.data['hop_point'])} 🪙\n"
-    msg += f"┐─ 🐾 هاپ هاپ ها : {game.data['hop_count']}\n"
+    msg += f"┐─ 💰 هاپ پوینت ها : {format_number(hop_point)} 🪙\n"
+    msg += f"┐─ 🐾 هاپ هاپ ها : {hop_count}\n"
     
     if street_rescued > 0:
         msg += f"┐─ 🐶 هاپوی خیابونی نجات داده: {street_rescued}\n"
@@ -338,14 +392,14 @@ async def my_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     if game.data.get("hapo_owned", False):
         msg += f"┐─ 🐕 هاپو: {game.data['hapo_name']}\n"
-        msg += f"┘─ 🌟 مقام: {RANK_NAMES[game.data['hapo_rank']]} | ⭐ سطح: {game.data['hapo_level']}/5\n\n"
+        msg += f"┘─ 🌟 مقام: {RANK_NAMES[hapo_rank]} | ⭐ سطح: {hapo_level}/5\n\n"
     else:
         msg += "\n"
     
-    if game.data["level"] < 20:
-        msg += f"╯─ ⭐️ سطح : {game.data['level']} | {game.data['hop_count']} / {required}"
+    if level < 20:
+        msg += f"╯─ ⭐️ سطح : {level} | {hop_count} / {required}"
     else:
-        msg += f"╯─ ⭐️ سطح : {game.data['level']} 🏆 نهایی"
+        msg += f"╯─ ⭐️ سطح : {level} 🏆 نهایی"
     
     keyboard = []
     if is_hidden:
@@ -390,15 +444,36 @@ async def show_user_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     required = target_game.get_required_for_level(target_data["level"])
     
+    # ✅ تبدیل به عدد
     street_rescued = target_data.get("street_hapo_rescued", 0)
     if isinstance(street_rescued, str):
         street_rescued = int(street_rescued) if street_rescued.isdigit() else 0
     
+    hapo_rank = target_data.get("hapo_rank", 0)
+    if isinstance(hapo_rank, str):
+        hapo_rank = int(hapo_rank)
+    
+    hapo_level = target_data.get("hapo_level", 1)
+    if isinstance(hapo_level, str):
+        hapo_level = int(hapo_level)
+    
+    hop_point = target_data["hop_point"]
+    if isinstance(hop_point, str):
+        hop_point = int(hop_point)
+    
+    hop_count = target_data["hop_count"]
+    if isinstance(hop_count, str):
+        hop_count = int(hop_count)
+    
+    level = target_data["level"]
+    if isinstance(level, str):
+        level = int(level)
+    
     msg = f"╮──「 🐶 پروفایل هاپویی 🐶 」\n\n"
     msg += f"┐─ 👤 کاربر : {target_full_name}\n"
     msg += f"‏┘─ 🪪 آیدی : {target_user_id}\n\n"
-    msg += f"┐─ 💰 هاپ پوینت ها : {format_number(target_data['hop_point'])} 🪙\n"
-    msg += f"┐─ 🐾 هاپ هاپ ها : {target_data['hop_count']}\n"
+    msg += f"┐─ 💰 هاپ پوینت ها : {format_number(hop_point)} 🪙\n"
+    msg += f"┐─ 🐾 هاپ هاپ ها : {hop_count}\n"
     
     if street_rescued > 0:
         msg += f"┐─ 🐶 هاپوی خیابونی نجات داده: {street_rescued}\n"
@@ -407,14 +482,14 @@ async def show_user_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     if target_data.get("hapo_owned", False):
         msg += f"┐─ 🐕 هاپو: {target_data['hapo_name']}\n"
-        msg += f"┘─ 🌟 مقام: {RANK_NAMES[target_data['hapo_rank']]} | ⭐ سطح: {target_data['hapo_level']}/5\n\n"
+        msg += f"┘─ 🌟 مقام: {RANK_NAMES[hapo_rank]} | ⭐ سطح: {hapo_level}/5\n\n"
     else:
         msg += "\n"
     
-    if target_data["level"] < 20:
-        msg += f"╯─ ⭐️ سطح : {target_data['level']} | {target_data['hop_count']} / {required}"
+    if level < 20:
+        msg += f"╯─ ⭐️ سطح : {level} | {hop_count} / {required}"
     else:
-        msg += f"╯─ ⭐️ سطح : {target_data['level']} 🏆 نهایی"
+        msg += f"╯─ ⭐️ سطح : {level} 🏆 نهایی"
     
     try:
         user_photos = await context.bot.get_user_profile_photos(target_user_id, limit=1)
@@ -445,8 +520,12 @@ async def do_hop(update: Update, game):
         await update.message.reply_text(f"⏳ هنوز هاپت نمیاد ...\nباید {mins}:{secs:02d} صبر کنی")
         return
     
+    hop_point = game.data["hop_point"]
+    if isinstance(hop_point, str):
+        hop_point = int(hop_point)
+    
     msg = f"🐾 {result['earned']} هاپو پوینت گرفتی ✨\n"
-    msg += f"💰 هاپو پوینت‌هات : {format_number(game.data['hop_point'])}"
+    msg += f"💰 هاپو پوینت‌هات : {format_number(hop_point)}"
     
     if result.get("level_up"):
         msg += f"\n\n🎉 سطح شما به {result['new_level']} ارتقا یافت!\n"
@@ -464,7 +543,10 @@ async def show_hapo_menu(update: Update, game):
         if game.data["level"] < 3:
             await update.message.reply_text("🐕 هاپو از سطح 3 باز میشود")
             return
-        if game.data["hop_point"] < 300:
+        hop_point = game.data["hop_point"]
+        if isinstance(hop_point, str):
+            hop_point = int(hop_point)
+        if hop_point < 300:
             await update.message.reply_text("🐕 برای خرید هاپو به 300 هاپو پوینت نیاز داری")
             return
         keyboard = [[InlineKeyboardButton("🐕 خرید هاپو (300 هاپو پوینت)", callback_data="buy_hapo")]]
@@ -485,7 +567,11 @@ async def show_claw_menu(update: Update, game):
         await update.message.reply_text("🔒 پنجه از سطح 2 باز میشود")
         return
     
-    if game.data["claw_level"] == 0:
+    claw_level = game.data["claw_level"]
+    if isinstance(claw_level, str):
+        claw_level = int(claw_level)
+    
+    if claw_level == 0:
         cost = game.get_claw_cost(1)
         keyboard = [[InlineKeyboardButton(f"🛒 خرید پنجه ({format_number(cost)})", callback_data="buy_claw")]]
         msg = f"🦞 شما پنجه ندارید\n\n💰 هزینه خرید: {format_number(cost)} هاپو پوینت\n⏳ زمان استراحت: 60:00\n🍀 شانس شکار:\n  ⚪ معمولی: 95%\n  🔵 کمیاب: 5%"
@@ -496,11 +582,11 @@ async def show_claw_menu(update: Update, game):
             await update.message.reply_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
         return
     
-    claw_data = game.get_claw_data(game.data["claw_level"])
-    next_level = game.data["claw_level"] + 1
+    claw_data = game.get_claw_data(claw_level)
+    next_level = claw_level + 1
     next_data = game.get_claw_data(next_level)
     
-    msg = f"🦞 پنجه شما\n⭐ سطح: {game.data['claw_level']}\n⏳ زمان استراحت: {claw_data['cooldown']:02d}:00\n🍀 شانس شکار:\n  ⚪ معمولی: {claw_data['common']}%\n  🔵 کمیاب: {claw_data['uncommon']}%"
+    msg = f"🦞 پنجه شما\n⭐ سطح: {claw_level}\n⏳ زمان استراحت: {claw_data['cooldown']:02d}:00\n🍀 شانس شکار:\n  ⚪ معمولی: {claw_data['common']}%\n  🔵 کمیاب: {claw_data['uncommon']}%"
     if claw_data['epic'] > 0:
         msg += f"\n  🟣 حماسی: {claw_data['epic']}%"
     if claw_data['legendary'] > 0:
@@ -511,7 +597,7 @@ async def show_claw_menu(update: Update, game):
         keyboard.append([InlineKeyboardButton(f"⬆️ سطح {next_level} ({format_number(next_data['cost'])})", callback_data="upgrade_claw")])
     
     try:
-        await update.message.reply_photo(photo=CLAW_IMAGES[game.data["claw_level"]], caption=msg, reply_markup=InlineKeyboardMarkup(keyboard) if keyboard else None)
+        await update.message.reply_photo(photo=CLAW_IMAGES[claw_level], caption=msg, reply_markup=InlineKeyboardMarkup(keyboard) if keyboard else None)
     except:
         await update.message.reply_text(msg, reply_markup=InlineKeyboardMarkup(keyboard) if keyboard else None)
 
@@ -565,7 +651,10 @@ async def show_bank_menu(update: Update, game):
         return
     
     if not game.data["bank_opened"]:
-        if game.data["hop_point"] < BANK_PURCHASE_COST:
+        hop_point = game.data["hop_point"]
+        if isinstance(hop_point, str):
+            hop_point = int(hop_point)
+        if hop_point < BANK_PURCHASE_COST:
             await update.message.reply_text(f"🏦 برای خرید بانک به {format_number(BANK_PURCHASE_COST)} هاپو پوینت نیاز داری")
             return
         keyboard = [[InlineKeyboardButton("🏦 خرید بانک", callback_data="buy_bank")]]
@@ -579,7 +668,7 @@ async def show_bank_menu(update: Update, game):
 
 
 # ================================================================
-# انتقال هاپویی (نسخه ساده و درست)
+# انتقال هاپویی
 # ================================================================
 
 async def transfer_points_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -647,7 +736,6 @@ async def transfer_points_command(update: Update, context: ContextTypes.DEFAULT_
         await update.message.reply_text("❌ لطفاً یک عدد معتبر برای مبلغ وارد کن.")
         return
     
-    # ======== تایید انتقال با دکمه‌های بله/نه ========
     keyboard = get_confirm_keyboard(
         f"transfer_confirm_{target_user_id}_{amount}",
         f"transfer_cancel_{target_user_id}_{amount}"
@@ -709,12 +797,14 @@ async def process_transfer_amount(update: Update, context: ContextTypes.DEFAULT_
         context.user_data["waiting_for_transfer_amount"] = False
         return
     
-    if game.data["hop_point"] < amount:
-        await update.message.reply_text(f"❌ موجودی کافی نیست. شما {format_number(game.data['hop_point'])} هاپو پوینت داری.")
+    hop_point = game.data["hop_point"]
+    if isinstance(hop_point, str):
+        hop_point = int(hop_point)
+    if hop_point < amount:
+        await update.message.reply_text(f"❌ موجودی کافی نیست. شما {format_number(hop_point)} هاپو پوینت داری.")
         context.user_data["waiting_for_transfer_amount"] = False
         return
     
-    # ======== تایید انتقال ========
     keyboard = get_confirm_keyboard(
         f"transfer_confirm_{target_id}_{amount}",
         f"transfer_cancel_{target_id}_{amount}"
@@ -724,7 +814,7 @@ async def process_transfer_amount(update: Update, context: ContextTypes.DEFAULT_
         f"⚠️ آیا از انتقال {format_number(amount)} 🪙 به {target_name} مطمئنی؟\n\n"
         f"💰 مبلغ: {format_number(amount)} 🪙\n"
         f"👤 گیرنده: {target_name}\n"
-        f"📊 موجودی شما پس از انتقال: {format_number(game.data['hop_point'] - amount)} 🪙\n\n"
+        f"📊 موجودی شما پس از انتقال: {format_number(hop_point - amount)} 🪙\n\n"
         f"❗️ محدودیت‌ها:\n"
         f"┘─ حداقل: {format_number(TRANSFER_MIN_AMOUNT)} 🪙\n"
         f"┘─ حداکثر: {format_number(TRANSFER_MAX_AMOUNT):,} 🪙\n"
@@ -1042,17 +1132,17 @@ async def handle_street_hapo_rescue(update: Update, context: ContextTypes.DEFAUL
     result = street_hapo.attempt_rescue(user_id, full_name, game)
     
     if result.get("success", False) and result.get("rescued", False):
-        rescued_count = game.data.get("street_hapo_rescued", 0)
-        if isinstance(rescued_count, str):
-            rescued_count = int(rescued_count) if rescued_count.isdigit() else 0
+        street_rescued = game.data.get("street_hapo_rescued", 0)
+        if isinstance(street_rescued, str):
+            street_rescued = int(street_rescued) if street_rescued.isdigit() else 0
         
-        msg = f"🎉 {full_name} هاپوی خیابونی رو نجات داد!\n\n💰 {result['reward']} 🪙 هاپو پوینت جایزه گرفتی!\n🐶 تعداد هاپوهای نجات داده شده: {rescued_count}\n\n🔄 تعداد تلاش‌ها: {result['attempt']}/{STREET_HAPO_MAX_ATTEMPTS}"
+        msg = f"🎉 {full_name} هاپوی خیابونی رو نجات داد!\n\n💰 {result['reward']} 🪙 هاپو پوینت جایزه گرفتی!\n🐶 تعداد هاپوهای نجات داده شده: {street_rescued}\n\n🔄 تعداد تلاش‌ها: {result['attempt']}/{STREET_HAPO_MAX_ATTEMPTS}"
         
         keyboard = [[InlineKeyboardButton("🎉 تبریک!", callback_data="street_hapo_ignore")]]
         await query.message.reply_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
         
         try:
-            await context.bot.send_message(user_id, f"🎉 شما یک هاپوی خیابونی رو نجات دادید!\n💰 {result['reward']} 🪙 به حساب شما واریز شد!\n🐶 تعداد هاپوهای نجات داده شده: {rescued_count}")
+            await context.bot.send_message(user_id, f"🎉 شما یک هاپوی خیابونی رو نجات دادید!\n💰 {result['reward']} 🪙 به حساب شما واریز شد!\n🐶 تعداد هاپوهای نجات داده شده: {street_rescued}")
         except:
             pass
         
@@ -1245,7 +1335,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     
     if context.user_data.get("waiting_for_hapo_name"):
-        if game.data["hop_point"] < 750:
+        hop_point = game.data["hop_point"]
+        if isinstance(hop_point, str):
+            hop_point = int(hop_point)
+        if hop_point < 750:
             await update.message.reply_text("❌ پوینت کافی نیست")
             context.user_data["waiting_for_hapo_name"] = False
             return
@@ -1492,12 +1585,17 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not new_name:
             await query.edit_message_text("❌ خطا در تغییر اسم")
             return
-        if game.data["hop_point"] < 750:
+        
+        hop_point = game.data["hop_point"]
+        if isinstance(hop_point, str):
+            hop_point = int(hop_point)
+        if hop_point < 750:
             await query.edit_message_text("❌ پوینت کافی نیست")
             return
+        
         old_name = game.data["hapo_name"]
         game.data["hapo_name"] = new_name
-        game.data["hop_point"] -= 750
+        game.data["hop_point"] = str(hop_point - 750)
         game.save_data()
         await query.edit_message_text(f"✅ اسم هاپو از «{old_name}» به «{new_name}» تغییر یافت")
         context.user_data["new_hapo_name"] = None
@@ -1521,12 +1619,17 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     
     if data == "hapo_harvest":
-        amount = int(game.data["hapo_harvest"])
-        if amount > 0:
-            game.data["hop_point"] += amount
-            game.data["hapo_harvest"] = 0
+        hapo_harvest = game.data["hapo_harvest"]
+        if isinstance(hapo_harvest, str):
+            hapo_harvest = int(hapo_harvest)
+        if hapo_harvest > 0:
+            hop_point = game.data["hop_point"]
+            if isinstance(hop_point, str):
+                hop_point = int(hop_point)
+            game.data["hop_point"] = str(hop_point + hapo_harvest)
+            game.data["hapo_harvest"] = "0"
             game.save_data()
-            await query.edit_message_text(f"✅ {format_number(amount)} هاپو پوینت برداشت شد")
+            await query.edit_message_text(f"✅ {format_number(hapo_harvest)} هاپو پوینت برداشت شد")
             await asyncio.sleep(2)
             msg = get_hapo_menu_text(game)
             keyboard = get_hapo_menu_keyboard(game)
@@ -1541,12 +1644,21 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     if data == "hapo_level_up":
         price = game.get_hapo_upgrade_price()
-        if game.data["hop_point"] < price:
+        hop_point = game.data["hop_point"]
+        if isinstance(hop_point, str):
+            hop_point = int(hop_point)
+        if hop_point < price:
             await query.edit_message_text(f"❌ به {format_number(price)} هاپو پوینت نیاز داری")
             return
-        game.data["hop_point"] -= price
-        game.data["hapo_level"] += 1
-        game.data["hapo_food"] = min(game.get_hapo_max_food(), int(game.data["hapo_food"] + 2))
+        game.data["hop_point"] = str(hop_point - price)
+        hapo_level = game.data["hapo_level"]
+        if isinstance(hapo_level, str):
+            hapo_level = int(hapo_level)
+        game.data["hapo_level"] = str(hapo_level + 1)
+        hapo_food = game.data["hapo_food"]
+        if isinstance(hapo_food, str):
+            hapo_food = int(hapo_food)
+        game.data["hapo_food"] = str(min(game.get_hapo_max_food(), hapo_food + 2))
         game.save_data()
         await query.edit_message_text(f"✅ سطح هاپو به {game.data['hapo_level']} ارتقا یافت")
         await asyncio.sleep(2)
@@ -1561,10 +1673,16 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.edit_message_text(f"❌ {check['reason']}")
             return
         price = game.get_hapo_rank_up_price()
-        if game.data["hop_point"] < price:
+        hop_point = game.data["hop_point"]
+        if isinstance(hop_point, str):
+            hop_point = int(hop_point)
+        if hop_point < price:
             await query.edit_message_text(f"❌ به {format_number(price)} هاپو پوینت نیاز داری")
             return
-        msg = f"⚠️ آیا از ارتقا مقام هاپو مطمئنی؟\n\n🌟 مقام فعلی: {RANK_NAMES[game.data['hapo_rank']]}\n🌟 مقام جدید: {RANK_NAMES[game.data['hapo_rank'] + 1]}\n💰 هزینه: {format_number(price)} هاپو پوینت\n\n❗️ با ارتقا مقام:\n┘─ سطح هاپو به 1 ریست میشود\n┘─ تولیدی هاپو صفر میشود\n┘─ ظرفیت هاپو افزایش می‌یابد"
+        hapo_rank = game.data["hapo_rank"]
+        if isinstance(hapo_rank, str):
+            hapo_rank = int(hapo_rank)
+        msg = f"⚠️ آیا از ارتقا مقام هاپو مطمئنی؟\n\n🌟 مقام فعلی: {RANK_NAMES[hapo_rank]}\n🌟 مقام جدید: {RANK_NAMES[hapo_rank + 1]}\n💰 هزینه: {format_number(price)} هاپو پوینت\n\n❗️ با ارتقا مقام:\n┘─ سطح هاپو به 1 ریست میشود\n┘─ تولیدی هاپو صفر میشود\n┘─ ظرفیت هاپو افزایش می‌یابد"
         await query.edit_message_text(msg, reply_markup=get_confirm_keyboard("hapo_rank_up_yes", "hapo_rank_up_no"))
         return
     
@@ -1589,7 +1707,10 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     
     if data == "hapo_rename":
-        if game.data["hop_point"] < 750:
+        hop_point = game.data["hop_point"]
+        if isinstance(hop_point, str):
+            hop_point = int(hop_point)
+        if hop_point < 750:
             await query.edit_message_text("❌ به 750 هاپو پوینت نیاز داری")
             return
         await query.edit_message_text("✏️ اسم جدید هاپو رو وارد کن:\n\n💡 فقط اسم جدید رو تایپ کن و ارسال کن.")
@@ -1621,10 +1742,13 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if result["success"]:
             await query.message.reply_text(f"✅ پنجه به سطح {result['new_level']} ارتقا یافت")
             await asyncio.sleep(1)
-            claw_data = game.get_claw_data(game.data["claw_level"])
-            next_level = game.data["claw_level"] + 1
+            claw_level = game.data["claw_level"]
+            if isinstance(claw_level, str):
+                claw_level = int(claw_level)
+            claw_data = game.get_claw_data(claw_level)
+            next_level = claw_level + 1
             next_data = game.get_claw_data(next_level)
-            msg = f"🦞 پنجه شما\n⭐ سطح: {game.data['claw_level']}\n⏳ زمان استراحت: {claw_data['cooldown']:02d}:00\n🍀 شانس شکار:\n  ⚪ معمولی: {claw_data['common']}%\n  🔵 کمیاب: {claw_data['uncommon']}%"
+            msg = f"🦞 پنجه شما\n⭐ سطح: {claw_level}\n⏳ زمان استراحت: {claw_data['cooldown']:02d}:00\n🍀 شانس شکار:\n  ⚪ معمولی: {claw_data['common']}%\n  🔵 کمیاب: {claw_data['uncommon']}%"
             if claw_data['epic'] > 0:
                 msg += f"\n  🟣 حماسی: {claw_data['epic']}%"
             if claw_data['legendary'] > 0:
@@ -1633,7 +1757,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if next_data:
                 keyboard.append([InlineKeyboardButton(f"⬆️ سطح {next_level} ({format_number(next_data['cost'])})", callback_data="upgrade_claw")])
             try:
-                await query.message.reply_photo(photo=CLAW_IMAGES[game.data["claw_level"]], caption=msg, reply_markup=InlineKeyboardMarkup(keyboard) if keyboard else None)
+                await query.message.reply_photo(photo=CLAW_IMAGES[claw_level], caption=msg, reply_markup=InlineKeyboardMarkup(keyboard) if keyboard else None)
             except:
                 await query.message.reply_text(msg, reply_markup=InlineKeyboardMarkup(keyboard) if keyboard else None)
         else:
@@ -1663,7 +1787,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     hunt_time = float(hunt_time)
                 if (now - hunt_time) > HUNT_DECISION_TIMER:
                     game.data["current_hunt_animal"] = None
-                    game.data["hunt_time"] = 0
+                    game.data["hunt_time"] = "0"
                     game.save_data()
                     await query.message.reply_text("🦌 حیوان فرار کرد! وقتت تموم شد.")
                     return
@@ -1813,9 +1937,30 @@ async def my_profile_from_callback(query, game):
     is_hidden = game.data.get("profile_hidden", False)
     is_locked = game.data.get("profile_locked", False)
     
+    # ✅ تبدیل به عدد
     street_rescued = game.data.get("street_hapo_rescued", 0)
     if isinstance(street_rescued, str):
         street_rescued = int(street_rescued) if street_rescued.isdigit() else 0
+    
+    hapo_rank = game.data.get("hapo_rank", 0)
+    if isinstance(hapo_rank, str):
+        hapo_rank = int(hapo_rank)
+    
+    hapo_level = game.data.get("hapo_level", 1)
+    if isinstance(hapo_level, str):
+        hapo_level = int(hapo_level)
+    
+    hop_point = game.data["hop_point"]
+    if isinstance(hop_point, str):
+        hop_point = int(hop_point)
+    
+    hop_count = game.data["hop_count"]
+    if isinstance(hop_count, str):
+        hop_count = int(hop_count)
+    
+    level = game.data["level"]
+    if isinstance(level, str):
+        level = int(level)
     
     msg = f"╮──「 🐶 پروفایل هاپویی 🐶 」\n\n"
     msg += f"┐─ 👤 کاربر : {full_name}\n"
@@ -1824,8 +1969,8 @@ async def my_profile_from_callback(query, game):
     else:
         msg += f"‏┘─ 🪪 آیدی : 🔒 مخفی\n\n"
     
-    msg += f"┐─ 💰 هاپ پوینت ها : {format_number(game.data['hop_point'])} 🪙\n"
-    msg += f"┐─ 🐾 هاپ هاپ ها : {game.data['hop_count']}\n"
+    msg += f"┐─ 💰 هاپ پوینت ها : {format_number(hop_point)} 🪙\n"
+    msg += f"┐─ 🐾 هاپ هاپ ها : {hop_count}\n"
     
     if street_rescued > 0:
         msg += f"┐─ 🐶 هاپوی خیابونی نجات داده: {street_rescued}\n"
@@ -1834,14 +1979,14 @@ async def my_profile_from_callback(query, game):
     
     if game.data.get("hapo_owned", False):
         msg += f"┐─ 🐕 هاپو: {game.data['hapo_name']}\n"
-        msg += f"┘─ 🌟 مقام: {RANK_NAMES[game.data['hapo_rank']]} | ⭐ سطح: {game.data['hapo_level']}/5\n\n"
+        msg += f"┘─ 🌟 مقام: {RANK_NAMES[hapo_rank]} | ⭐ سطح: {hapo_level}/5\n\n"
     else:
         msg += "\n"
     
-    if game.data["level"] < 20:
-        msg += f"╯─ ⭐️ سطح : {game.data['level']} | {game.data['hop_count']} / {required}"
+    if level < 20:
+        msg += f"╯─ ⭐️ سطح : {level} | {hop_count} / {required}"
     else:
-        msg += f"╯─ ⭐️ سطح : {game.data['level']} 🏆 نهایی"
+        msg += f"╯─ ⭐️ سطح : {level} 🏆 نهایی"
     
     keyboard = []
     if is_hidden:
@@ -1882,19 +2027,43 @@ async def get_user_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"❌ کاربری با شناسه `{parts[1]}` در دیتابیس ثبت نشده است.", parse_mode="Markdown")
         return
     
-    msg = f"📊 اطلاعات کاربر:\n\n🆔 آیدی: `{user_data['user_id']}`\n👤 نام: {user_data['player_name']}\n⭐ سطح: {user_data['level']}\n💰 هاپو پوینت: {format_number(user_data['hop_point'])}\n🐾 تعداد هاپ: {user_data['hop_count']}"
+    hop_point = user_data.get("hop_point", 0)
+    if isinstance(hop_point, str):
+        hop_point = int(hop_point) if hop_point.isdigit() else 0
     
-    if user_data.get('hapo_owned', False):
-        msg += f"\n\n🐕 هاپو:\n  📛 نام: {user_data['hapo_name']}\n  ⭐ سطح: {user_data['hapo_level']}/5\n  🌟 مقام: {RANK_NAMES[user_data['hapo_rank']]}"
+    hop_count = user_data.get("hop_count", 0)
+    if isinstance(hop_count, str):
+        hop_count = int(hop_count) if hop_count.isdigit() else 0
     
-    if user_data.get('bank_opened', False):
-        msg += f"\n\n🏦 بانک:\n  💰 موجودی: {format_number(user_data['bank_balance'])}\n  💳 شماره کارت: {user_data.get('bank_card_number', 'نامشخص')}"
+    level = user_data.get("level", 1)
+    if isinstance(level, str):
+        level = int(level) if level.isdigit() else 1
     
-    street_rescued = user_data.get('street_hapo_rescued', 0)
+    hapo_rank = user_data.get("hapo_rank", 0)
+    if isinstance(hapo_rank, str):
+        hapo_rank = int(hapo_rank) if hapo_rank.isdigit() else 0
+    
+    hapo_level = user_data.get("hapo_level", 1)
+    if isinstance(hapo_level, str):
+        hapo_level = int(hapo_level) if hapo_level.isdigit() else 1
+    
+    bank_balance = user_data.get("bank_balance", 0)
+    if isinstance(bank_balance, str):
+        bank_balance = int(bank_balance) if bank_balance.isdigit() else 0
+    
+    street_rescued = user_data.get("street_hapo_rescued", 0)
     if isinstance(street_rescued, str):
         street_rescued = int(street_rescued) if street_rescued.isdigit() else 0
-    msg += f"\n\n🐶 هاپوی خیابونی نجات داده: {street_rescued}"
     
+    msg = f"📊 اطلاعات کاربر:\n\n🆔 آیدی: `{user_data['user_id']}`\n👤 نام: {user_data['player_name']}\n⭐ سطح: {level}\n💰 هاپو پوینت: {format_number(hop_point)}\n🐾 تعداد هاپ: {hop_count}"
+    
+    if user_data.get('hapo_owned', False):
+        msg += f"\n\n🐕 هاپو:\n  📛 نام: {user_data['hapo_name']}\n  ⭐ سطح: {hapo_level}/5\n  🌟 مقام: {RANK_NAMES[hapo_rank]}"
+    
+    if user_data.get('bank_opened', False):
+        msg += f"\n\n🏦 بانک:\n  💰 موجودی: {format_number(bank_balance)}\n  💳 شماره کارت: {user_data.get('bank_card_number', 'نامشخص')}"
+    
+    msg += f"\n\n🐶 هاپوی خیابونی نجات داده: {street_rescued}"
     msg += f"\n\n📅 آخرین بروزرسانی: {user_data.get('last_updated', 'نامشخص')}"
     
     await update.message.reply_text(msg, parse_mode="Markdown")
@@ -1932,8 +2101,8 @@ async def set_user_level(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     target_game = get_game(int(user_data['user_id']))
     old_level = target_game.data["level"]
-    target_game.data["level"] = new_level
-    target_game.data["hop_count"] = 0
+    target_game.data["level"] = str(new_level)
+    target_game.data["hop_count"] = "0"
     target_game.save_data()
     
     await update.message.reply_text(f"✅ سطح کاربر `{user_data['player_name']}` از {old_level} به {new_level} تغییر یافت.", parse_mode="Markdown")
@@ -1975,10 +2144,10 @@ async def add_user_level(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     
     target_game = get_game(int(user_data['user_id']))
-    old_level = target_game.data["level"]
+    old_level = int(target_game.data["level"]) if str(target_game.data["level"]).isdigit() else 1
     new_level = min(old_level + add_amount, MAX_LEVEL)
-    target_game.data["level"] = new_level
-    target_game.data["hop_count"] = 0
+    target_game.data["level"] = str(new_level)
+    target_game.data["hop_count"] = "0"
     target_game.save_data()
     
     await update.message.reply_text(f"✅ {add_amount} سطح به کاربر `{user_data['player_name']}` اضافه شد.\nسطح جدید: {new_level}", parse_mode="Markdown")
@@ -2021,7 +2190,7 @@ async def set_user_point(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     target_game = get_game(int(user_data['user_id']))
     old_point = target_game.data["hop_point"]
-    target_game.data["hop_point"] = new_point
+    target_game.data["hop_point"] = str(new_point)
     target_game.save_data()
     
     await update.message.reply_text(f"✅ پوینت کاربر `{user_data['player_name']}` از {format_number(old_point)} به {format_number(new_point)} تغییر یافت.", parse_mode="Markdown")
@@ -2063,9 +2232,9 @@ async def add_user_point(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     
     target_game = get_game(int(user_data['user_id']))
-    old_point = target_game.data["hop_point"]
+    old_point = int(target_game.data["hop_point"]) if str(target_game.data["hop_point"]).isdigit() else 0
     new_point = old_point + add_amount
-    target_game.data["hop_point"] = new_point
+    target_game.data["hop_point"] = str(new_point)
     target_game.save_data()
     
     await update.message.reply_text(f"✅ {format_number(add_amount)} هاپو پوینت به کاربر `{user_data['player_name']}` اضافه شد.\nپوینت جدید: {format_number(new_point)}", parse_mode="Markdown")
