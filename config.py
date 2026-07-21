@@ -23,7 +23,6 @@ if not SUPABASE_URL or not SUPABASE_KEY:
 WEBHOOK_PORT = int(os.environ.get("PORT", 8443))
 WEBHOOK_URL = os.environ.get("RAILWAY_STATIC_URL", "")
 
-# اگر RAILWAY_STATIC_URL تنظیم شده باشد، از Webhook استفاده کن
 USE_WEBHOOK = bool(WEBHOOK_URL)
 
 # ================================================================
@@ -33,10 +32,10 @@ USE_WEBHOOK = bool(WEBHOOK_URL)
 LEVEL_DATA = {
     1: {"required": 0, "minPoints": 5, "maxPoints": 15, "cooldown": 300, "reward": 0, "features": ["شروع ماجراجویی"]},
     2: {"required": 5, "minPoints": 10, "maxPoints": 20, "cooldown": 300, "reward": 50, "features": ["پنجه", "شکار", "دریافت هاپو پوینت"]},
-    3: {"required": 15, "minPoints": 15, "maxPoints": 25, "cooldown": 300, "reward": 225, "features": ["هاپو"]},
+    3: {"required": 15, "minPoints": 15, "maxPoints": 25, "cooldown": 300, "reward": 225, "features": ["هاپو", "انتقال هاپویی"]},
     4: {"required": 40, "minPoints": 20, "maxPoints": 35, "cooldown": 300, "reward": 500, "features": ["بانک هاپویی"]},
-    5: {"required": 75, "minPoints": 25, "maxPoints": 40, "cooldown": 295, "reward": 1000, "features": ["ارتقا بیشتر"]},
-    6: {"required": 115, "minPoints": 35, "maxPoints": 50, "cooldown": 295, "reward": 1750, "features": ["ارتقا بیشتر"]},
+    5: {"required": 75, "minPoints": 25, "maxPoints": 40, "cooldown": 295, "reward": 1000, "features": ["یخچال هاپویی", "ارتقا بیشتر"]},
+    6: {"required": 115, "minPoints": 35, "maxPoints": 50, "cooldown": 295, "reward": 1750, "features": ["قاچاق هاپویی", "ارتقا بیشتر"]},
     7: {"required": 175, "minPoints": 50, "maxPoints": 75, "cooldown": 295, "reward": 2500, "features": ["ارتقا بیشتر"]},
     8: {"required": 250, "minPoints": 75, "maxPoints": 100, "cooldown": 295, "reward": 3450, "features": ["ارتقا بیشتر"]},
     9: {"required": 350, "minPoints": 100, "maxPoints": 125, "cooldown": 295, "reward": 4625, "features": ["ارتقا بیشتر"]},
@@ -153,10 +152,13 @@ TRANSFER_MIN_LEVEL_RECEIVER = 2
 
 JAIL_REASON_SPAM = "اسپم"
 JAIL_REASON_MEOW = "میو میو (گربه بی ادب)"
+JAIL_REASON_SMUGGLE = "قاچاق هاپویی ناموفق"
 JAIL_DURATION_SPAM = 15 * 60
 JAIL_DURATION_MEOW = 5 * 60
+JAIL_DURATION_SMUGGLE = 40 * 60
 JAIL_FINE_SPAM = 3750
 JAIL_FINE_MEOW = 1250
+JAIL_FINE_SMUGGLE = 5000
 JAIL_MAX_SPAM_COMMANDS = 5
 JAIL_SPAM_WINDOW = 10
 JAIL_VOTE_DURATION = 60
@@ -167,15 +169,15 @@ JAIL_MEOW_COOLDOWN = 60
 # تنظیمات هاپوی خیابونی
 # ================================================================
 
-STREET_HAPO_INTERVAL = 6 * 3600  # هر ۶ ساعت یکبار (به ثانیه)
-STREET_HAPO_DECISION_TIME = 60  # ۶۰ ثانیه فرصت برای نجات
-STREET_HAPO_MAX_ATTEMPTS = 3  # حداکثر ۳ تلاش
-STREET_HAPO_SUCCESS_CHANCE = 0.30  # ۳۰% شانس موفقیت
+STREET_HAPO_INTERVAL = 6 * 3600
+STREET_HAPO_DECISION_TIME = 60
+STREET_HAPO_MAX_ATTEMPTS = 3
+STREET_HAPO_SUCCESS_CHANCE = 0.30
 
-STREET_HAPO_COSTS = [50, 75, 100]  # هزینه هر تلاش (اول، دوم، سوم)
+STREET_HAPO_COSTS = [50, 75, 100]
 
-STREET_HAPO_REWARD_MIN = 500  # حداقل جایزه موفقیت
-STREET_HAPO_REWARD_MAX = 999  # حداکثر جایزه موفقیت
+STREET_HAPO_REWARD_MIN = 500
+STREET_HAPO_REWARD_MAX = 999
 
 STREET_HAPO_FAIL_MESSAGES = [
     "{name} باعث شد هاپوی خیابونی از ترس سکته کنه 💔",
@@ -186,6 +188,51 @@ STREET_HAPO_FAIL_MESSAGES = [
 ]
 
 STREET_HAPO_IMAGE_URL = "https://raw.githubusercontent.com/KnoX4545/HopDog/main/street_hapo.jpg"
+
+# ================================================================
+# تنظیمات یخچال هاپویی
+# ================================================================
+
+FRIDGE_REQUIRED_LEVEL = 5
+FRIDGE_PURCHASE_COST = 32000
+FRIDGE_MAX_LEVEL = 5
+FRIDGE_CAPACITY = {
+    1: 1,
+    2: 2,
+    3: 3,
+    4: 4,
+    5: 5
+}
+FRIDGE_UPGRADE_COSTS = {
+    1: 0,
+    2: 195000,
+    3: 415000,
+    4: 750000,
+    5: 1200000
+}
+FRIDGE_COOK_MULTIPLIER_SELL = 10
+FRIDGE_COOK_MULTIPLIER_FOOD = 2
+
+# ================================================================
+# تنظیمات قاچاق هاپویی
+# ================================================================
+
+SMUGGLE_REQUIRED_LEVEL = 6
+SMUGGLE_MIN_HAPO = 3
+SMUGGLE_MAX_HAPO = 15
+SMUGGLE_TIME_PER_HAPO = 3600  # 1 ساعت به ثانیه
+SMUGGLE_REWARD_MIN = 12500
+SMUGGLE_REWARD_MAX = 24000
+SMUGGLE_JAIL_DURATION = 40 * 60  # 40 دقیقه
+SMUGGLE_JAIL_FINE = 5000
+SMUGGLE_SUCCESS_CHANCE = 0.60  # 60% شانس موفقیت
+SMUGGLE_FAIL_CHANCE = 0.40  # 40% شانس شکست
+
+# ================================================================
+# تنظیمات هاپوی خیابونی (ادمین)
+# ================================================================
+
+STREET_HAPO_ADMIN_COMMAND = True
 
 # ================================================================
 # سایر تنظیمات
