@@ -17,6 +17,16 @@ if not SUPABASE_URL or not SUPABASE_KEY:
     raise ValueError("SUPABASE_URL and SUPABASE_KEY must be set")
 
 # ================================================================
+# تنظیمات Webhook (برای Railway)
+# ================================================================
+
+WEBHOOK_PORT = int(os.environ.get("PORT", 8443))
+WEBHOOK_URL = os.environ.get("RAILWAY_STATIC_URL", "")
+
+# اگر RAILWAY_STATIC_URL تنظیم شده باشد، از Webhook استفاده کن
+USE_WEBHOOK = bool(WEBHOOK_URL)
+
+# ================================================================
 # داده‌های ثابت
 # ================================================================
 
