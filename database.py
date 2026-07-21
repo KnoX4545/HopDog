@@ -1,4 +1,4 @@
-# database.py - نسخه نهایی با TEXT
+# database.py - نسخه نهایی با TEXT و فیلدهای جدید
 
 import json
 import logging
@@ -38,6 +38,14 @@ def get_user_data(user_id):
             else:
                 data["jail_voted"] = []
             
+            if "fridge_items" in data and data["fridge_items"]:
+                try:
+                    data["fridge_items"] = json.loads(data["fridge_items"])
+                except:
+                    data["fridge_items"] = []
+            else:
+                data["fridge_items"] = []
+            
             # فیلدهای پیش‌فرض
             if "bank_card_number" not in data:
                 data["bank_card_number"] = ""
@@ -53,6 +61,26 @@ def get_user_data(user_id):
                 data["profile_locked"] = False
             if "street_hapo_rescued" not in data:
                 data["street_hapo_rescued"] = "0"
+            
+            # فیلدهای یخچال
+            if "fridge_owned" not in data:
+                data["fridge_owned"] = False
+            if "fridge_level" not in data:
+                data["fridge_level"] = "1"
+            
+            # فیلدهای قاچاق
+            if "smuggling" not in data:
+                data["smuggling"] = False
+            if "smuggle_count" not in data:
+                data["smuggle_count"] = "0"
+            if "smuggle_start" not in data:
+                data["smuggle_start"] = "0"
+            if "smuggle_duration" not in data:
+                data["smuggle_duration"] = "0"
+            if "smuggle_success_chance" not in data:
+                data["smuggle_success_chance"] = "0"
+            if "smuggle_used_hapo" not in data:
+                data["smuggle_used_hapo"] = "0"
             
             # تبدیل String به عدد برای استفاده در کد
             if "hop_point" in data and isinstance(data["hop_point"], str):
@@ -110,20 +138,42 @@ def save_user_data(user_id, data):
         else:
             data_to_save["jail_voted"] = "[]"
         
+        if "fridge_items" in data_to_save and data_to_save["fridge_items"]:
+            data_to_save["fridge_items"] = json.dumps(data_to_save["fridge_items"])
+        else:
+            data_to_save["fridge_items"] = "[]"
+        
         # ======== تبدیل همه اعداد به String ========
-        # عددی که باید String بشن
         string_fields = [
             "hop_point", "last_hop_time", "level", "hop_count",
             "claw_level", "last_hunt_time", "hunt_time",
             "hapo_rank", "hapo_level", "hapo_food", "hapo_harvest", "hapo_last_update",
             "bank_balance", "bank_last_interest_at",
             "street_hapo_rescued",
-            "jail_until", "jail_fine", "jail_arrest_time"
+            "jail_until", "jail_fine", "jail_arrest_time",
+            "fridge_level", "smuggle_count", "smuggle_start", 
+            "smuggle_duration", "smuggle_success_chance", "smuggle_used_hapo"
         ]
         
         for field in string_fields:
             if field in data_to_save and data_to_save[field] is not None:
                 data_to_save[field] = str(data_to_save[field])
+        
+        # ======== تبدیل boolean ها ========
+        bool_fields = [
+            "is_admin", "hunt_active", "hapo_owned", "bank_opened", 
+            "has_seen_welcome", "profile_hidden", "profile_locked", 
+            "is_transferring", "jailed", "fridge_owned", "smuggling"
+        ]
+        
+        for field in bool_fields:
+            if field in data_to_save:
+                if isinstance(data_to_save[field], bool):
+                    data_to_save[field] = data_to_save[field]
+                elif isinstance(data_to_save[field], str):
+                    data_to_save[field] = data_to_save[field].lower() == "true"
+                else:
+                    data_to_save[field] = bool(data_to_save[field])
         
         # ======== اضافه کردن زمان ========
         data_to_save["last_updated"] = datetime.now().isoformat()
@@ -255,9 +305,16 @@ def get_street_hapo_status():
         response = supabase.table("settings").select("*").eq("key", "street_hapo_active").execute()
         if response.data and len(response.data) > 0:
             data = response.data[0]
+            # تبدیل data به دیکشنری اگر string باشه
+            data_value = data.get("data", {})
+            if isinstance(data_value, str):
+                try:
+                    data_value = json.loads(data_value)
+                except:
+                    data_value = {}
             return {
                 "active": data.get("value") == "true",
-                "data": data.get("data", {})
+                "data": data_value
             }
         return {"active": False, "data": {}}
     except Exception as e:
