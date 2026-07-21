@@ -256,62 +256,161 @@ def check_spam(user_id):
 
 
 # ================================================================
-# توابع لیدربرد
+# توابع لیدربرد - اصلاح شده با مرتب‌سازی عددی
 # ================================================================
 
 async def get_leaderboard_data(category, limit=250, group=False):
     try:
         if group:
             limit = LEADERBOARD_MAX_GROUPS
+            
             if category == "hop":
-                response = supabase.table("groups").select("chat_id, title, total_hops").eq("is_active", True).order("total_hops", desc=True).limit(limit).execute()
+                response = supabase.table("groups").select("chat_id, title, total_hops").eq("is_active", True).execute()
+                if response.data:
+                    data = []
+                    for item in response.data:
+                        try:
+                            val = int(float(item.get("total_hops", 0)))
+                        except:
+                            val = 0
+                        data.append({
+                            "chat_id": item.get("chat_id"),
+                            "title": item.get("title", "گروه بدون نام"),
+                            "total_hops": val
+                        })
+                    data.sort(key=lambda x: x["total_hops"], reverse=True)
+                    return data[:limit]
+                return []
+                
             elif category == "population":
-                response = supabase.table("groups").select("chat_id, title, member_count").eq("is_active", True).order("member_count", desc=True).limit(limit).execute()
+                response = supabase.table("groups").select("chat_id, title, member_count").eq("is_active", True).execute()
+                if response.data:
+                    data = []
+                    for item in response.data:
+                        try:
+                            val = int(float(item.get("member_count", 0)))
+                        except:
+                            val = 0
+                        data.append({
+                            "chat_id": item.get("chat_id"),
+                            "title": item.get("title", "گروه بدون نام"),
+                            "member_count": val
+                        })
+                    data.sort(key=lambda x: x["member_count"], reverse=True)
+                    return data[:limit]
+                return []
+                
             elif category == "wealth":
-                response = supabase.table("groups").select("chat_id, title, total_hapo_points").eq("is_active", True).order("total_hapo_points", desc=True).limit(limit).execute()
+                response = supabase.table("groups").select("chat_id, title, total_hapo_points").eq("is_active", True).execute()
+                if response.data:
+                    data = []
+                    for item in response.data:
+                        try:
+                            val = int(float(item.get("total_hapo_points", 0)))
+                        except:
+                            val = 0
+                        data.append({
+                            "chat_id": item.get("chat_id"),
+                            "title": item.get("title", "گروه بدون نام"),
+                            "total_hapo_points": val
+                        })
+                    data.sort(key=lambda x: x["total_hapo_points"], reverse=True)
+                    return data[:limit]
+                return []
+                
             elif category == "hunt":
-                response = supabase.table("groups").select("chat_id, title, total_hunts").eq("is_active", True).order("total_hunts", desc=True).limit(limit).execute()
+                response = supabase.table("groups").select("chat_id, title, total_hunts").eq("is_active", True).execute()
+                if response.data:
+                    data = []
+                    for item in response.data:
+                        try:
+                            val = int(float(item.get("total_hunts", 0)))
+                        except:
+                            val = 0
+                        data.append({
+                            "chat_id": item.get("chat_id"),
+                            "title": item.get("title", "گروه بدون نام"),
+                            "total_hunts": val
+                        })
+                    data.sort(key=lambda x: x["total_hunts"], reverse=True)
+                    return data[:limit]
+                return []
             else:
                 return []
-            
-            if response.data:
-                data = response.data
-                for item in data:
-                    if category == "hop":
-                        item["total_hops"] = int(float(item.get("total_hops", 0)))
-                    elif category == "population":
-                        item["member_count"] = int(float(item.get("member_count", 0)))
-                    elif category == "wealth":
-                        item["total_hapo_points"] = int(float(item.get("total_hapo_points", 0)))
-                    elif category == "hunt":
-                        item["total_hunts"] = int(float(item.get("total_hunts", 0)))
-                return data
-            return []
         else:
             if category == "point":
-                response = supabase.table("users").select("user_id, player_name, hop_point").order("hop_point", desc=True).limit(limit).execute()
+                response = supabase.table("users").select("user_id, player_name, hop_point").execute()
+                if response.data:
+                    data = []
+                    for item in response.data:
+                        try:
+                            val = int(float(item.get("hop_point", 0)))
+                        except:
+                            val = 0
+                        data.append({
+                            "user_id": item.get("user_id"),
+                            "player_name": item.get("player_name", f"کاربر{item.get('user_id')}"),
+                            "hop_point": val
+                        })
+                    data.sort(key=lambda x: x["hop_point"], reverse=True)
+                    return data[:limit]
+                return []
+                
             elif category == "hop":
-                response = supabase.table("users").select("user_id, player_name, hop_count").order("hop_count", desc=True).limit(limit).execute()
+                response = supabase.table("users").select("user_id, player_name, hop_count").execute()
+                if response.data:
+                    data = []
+                    for item in response.data:
+                        try:
+                            val = int(float(item.get("hop_count", 0)))
+                        except:
+                            val = 0
+                        data.append({
+                            "user_id": item.get("user_id"),
+                            "player_name": item.get("player_name", f"کاربر{item.get('user_id')}"),
+                            "hop_count": val
+                        })
+                    data.sort(key=lambda x: x["hop_count"], reverse=True)
+                    return data[:limit]
+                return []
+                
             elif category == "street":
-                response = supabase.table("users").select("user_id, player_name, street_hapo_rescued").order("street_hapo_rescued", desc=True).limit(limit).execute()
+                response = supabase.table("users").select("user_id, player_name, street_hapo_rescued").execute()
+                if response.data:
+                    data = []
+                    for item in response.data:
+                        try:
+                            val = int(float(item.get("street_hapo_rescued", 0)))
+                        except:
+                            val = 0
+                        data.append({
+                            "user_id": item.get("user_id"),
+                            "player_name": item.get("player_name", f"کاربر{item.get('user_id')}"),
+                            "street_hapo_rescued": val
+                        })
+                    data.sort(key=lambda x: x["street_hapo_rescued"], reverse=True)
+                    return data[:limit]
+                return []
+                
             elif category == "hunt":
-                response = supabase.table("users").select("user_id, player_name, total_hunts").order("total_hunts", desc=True).limit(limit).execute()
+                response = supabase.table("users").select("user_id, player_name, total_hunts").execute()
+                if response.data:
+                    data = []
+                    for item in response.data:
+                        try:
+                            val = int(float(item.get("total_hunts", 0)))
+                        except:
+                            val = 0
+                        data.append({
+                            "user_id": item.get("user_id"),
+                            "player_name": item.get("player_name", f"کاربر{item.get('user_id')}"),
+                            "total_hunts": val
+                        })
+                    data.sort(key=lambda x: x["total_hunts"], reverse=True)
+                    return data[:limit]
+                return []
             else:
                 return []
-            
-            if response.data:
-                data = response.data
-                for item in data:
-                    if category == "point":
-                        item["hop_point"] = int(float(item.get("hop_point", 0)))
-                    elif category == "hop":
-                        item["hop_count"] = int(float(item.get("hop_count", 0)))
-                    elif category == "street":
-                        item["street_hapo_rescued"] = int(float(item.get("street_hapo_rescued", 0)))
-                    elif category == "hunt":
-                        item["total_hunts"] = int(float(item.get("total_hunts", 0)))
-                return data
-            return []
     except Exception as e:
         logger.error(f"Error getting leaderboard data: {e}")
         return []
@@ -558,12 +657,13 @@ async def group_welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
         for member in update.message.new_chat_members:
             if member.id == context.bot.id:
                 try:
-                    chat_id = update.message.chat.id
+                    chat_id = str(update.message.chat.id)
                     chat_title = update.message.chat.title or "گروه بدون نام"
                     add_group(chat_id, chat_title)
                     
                     members_count = await context.bot.get_chat_member_count(chat_id)
-                    supabase.table("groups").update({"member_count": str(members_count)}).eq("chat_id", str(chat_id)).execute()
+                    supabase.table("groups").update({"member_count": str(members_count)}).eq("chat_id", chat_id).execute()
+                    logger.info(f"👥 گروه {chat_id}: اعضا={members_count}")
                     
                     if members_count < MIN_MEMBERS_TO_STAY:
                         await update.message.reply_text(
@@ -897,22 +997,28 @@ async def do_hop(update: Update, game):
         await update.message.reply_text(f"⏳ *هنوز هاپت نمیاد ...*\nباید {mins}:{secs:02d} صبر کنی", parse_mode="Markdown")
         return
     
-    # به‌روزرسانی آمار گروه
+    # ======== به‌روزرسانی آمار گروه ========
     try:
         if update.message.chat.type in ["group", "supergroup"]:
             chat_id = str(update.message.chat.id)
+            
             response = supabase.table("groups").select("total_hops, total_hapo_points").eq("chat_id", chat_id).execute()
+            
             if response.data:
                 current = response.data[0]
                 total_hops = int(float(current.get("total_hops", 0))) + 1
                 earned = result.get("earned", 0)
                 total_points = int(float(current.get("total_hapo_points", 0))) + earned
+                
                 supabase.table("groups").update({
                     "total_hops": str(total_hops),
-                    "total_hapo_points": str(total_points)
+                    "total_hapo_points": str(total_points),
+                    "last_activity": datetime.now().isoformat()
                 }).eq("chat_id", chat_id).execute()
+                
+                logger.info(f"📊 گروه {chat_id}: هاپ={total_hops}, پوینت={total_points}")
     except Exception as e:
-        logger.error(f"Error updating group stats: {e}")
+        logger.error(f"Error updating group stats in do_hop: {e}")
     
     hop_point = game._to_int(game.data["hop_point"])
     
@@ -1019,14 +1125,17 @@ async def do_hunt(update: Update, game):
             await update.message.reply_text(f"❌ *{reason}*", parse_mode="Markdown")
         return
     
-    # به‌روزرسانی آمار شکار گروه
+    # ======== به‌روزرسانی آمار شکار گروه ========
     try:
         if update.message.chat.type in ["group", "supergroup"]:
             chat_id = str(update.message.chat.id)
             response = supabase.table("groups").select("total_hunts").eq("chat_id", chat_id).execute()
             if response.data:
                 total_hunts = int(float(response.data[0].get("total_hunts", 0))) + 1
-                supabase.table("groups").update({"total_hunts": str(total_hunts)}).eq("chat_id", chat_id).execute()
+                supabase.table("groups").update({
+                    "total_hunts": str(total_hunts)
+                }).eq("chat_id", chat_id).execute()
+                logger.info(f"🏹 گروه {chat_id}: شکار={total_hunts}")
     except Exception as e:
         logger.error(f"Error updating group hunt stats: {e}")
     
@@ -1046,7 +1155,13 @@ async def do_hunt(update: Update, game):
     if game.data.get("fridge_owned", False):
         keyboard.append([InlineKeyboardButton("❄️ بندازش تو یخچال", callback_data=f"hunt_fridge_{animal['name']}")])
     
-    await hunt_msg.edit_text(msg, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
+    # ======== اصلاح: try/except برای edit_message ========
+    try:
+        await hunt_msg.edit_text(msg, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
+    except Exception as e:
+        logger.error(f"Error editing hunt message: {e}")
+        await update.message.reply_text(msg, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
+        return
     
     user_id = update.effective_user.id
     asyncio.create_task(hunt_animal_timer(update, context, user_id, hunt_msg))
@@ -1117,7 +1232,7 @@ async def show_bank_menu(update: Update, game):
 
 
 # ================================================================
-# انتقال هاپویی
+# انتقال هاپویی - اصلاح شده
 # ================================================================
 
 async def transfer_points_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1200,11 +1315,19 @@ async def process_transfer_amount(update: Update, context: ContextTypes.DEFAULT_
         context.user_data["waiting_for_transfer_amount"] = False
         return
     
-    text = update.message.text.strip().replace(",", "")
+    # ======== اصلاح: پاک کردن کاما و فاصله ========
+    text = update.message.text.strip().replace(",", "").replace(" ", "")
+    
     try:
         amount = int(text)
     except ValueError:
         await update.message.reply_text("❌ *لطفاً یک عدد معتبر برای مبلغ وارد کن.*", parse_mode="Markdown")
+        context.user_data["waiting_for_transfer_amount"] = False
+        return
+    
+    if amount <= 0:
+        await update.message.reply_text("❌ *مبلغ باید بیشتر از صفر باشد.*", parse_mode="Markdown")
+        context.user_data["waiting_for_transfer_amount"] = False
         return
     
     target_id = context.user_data.get("transfer_target_id")
