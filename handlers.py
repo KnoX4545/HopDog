@@ -23,7 +23,8 @@ from config import (
     STREET_HAPO_FAIL_MESSAGES, STREET_HAPO_MAX_ATTEMPTS, CLAW_IMAGES,
     SMUGGLE_MIN_HAPO, SMUGGLE_MAX_HAPO, SMUGGLE_REQUIRED_LEVEL,
     SMUGGLE_REWARD_MIN, SMUGGLE_REWARD_MAX, FRIDGE_REQUIRED_LEVEL,
-    FRIDGE_PURCHASE_COST, FRIDGE_MAX_LEVEL
+    FRIDGE_PURCHASE_COST, FRIDGE_MAX_LEVEL, FRIDGE_CAPACITY,
+    FRIDGE_UPGRADE_COSTS, FRIDGE_COOK_MULTIPLIER_SELL, FRIDGE_COOK_MULTIPLIER_FOOD
 )
 from game import HopDogGame, StreetHapo
 from database import (
@@ -1707,7 +1708,7 @@ async def meow_vote_timer(vote_key, context):
         else:
             try:
                 await context.bot.edit_message_text(
-                    f" گربه ی بی ادب!\n\n❌ رای‌گیری به پایان رسید. کاربر آزاد است.",
+                    f"😺 گربه ی بی ادب!\n\n❌ رای‌گیری به پایان رسید. کاربر آزاد است.",
                     chat_id=chat_id,
                     message_id=msg_id
                 )
@@ -2097,6 +2098,257 @@ async def list_groups(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg += f"\n✅ تعداد: {len(chat_ids)} گروه"
     
     await update.message.reply_text(msg, parse_mode="Markdown")
+
+
+# ================================================================
+# دستورات ادمین - مدیریت کاربران
+# ================================================================
+
+async def get_user_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.message.chat.type in ["group", "supergroup"]:
+        return
+    
+    user_id = update.effective_user.id
+    game = get_game(user_id)
+    
+    if not game.data.get("is_admin", False):
+        await update.message.reply_text("❌ شما دسترسی به این دستور ندارید. فقط ادمین‌ها میتونن استفاده کنن.")
+        return
+    
+    parts = update.message.text.split()
+    if len(parts) < 2:
+        await update.message.reply_text("❌ لطفاً شناسه کاربر را وارد کن.\n\n📌 مثال:\n🔹 با آیدی عددی: `userinfo 123456789`\n🔹 با یوزرنیم: `userinfo @username`", parse_mode="Markdown")
+        return
+    
+    user_data = get_user_by_identifier(parts[1])
+    if not user_data:
+        await update.message.reply_text(f"❌ کاربری با شناسه `{parts[1]}` در دیتابیس ثبت نشده است.", parse_mode="Markdown")
+        return
+    
+    hop_point = user_data.get("hop_point", 0)
+    if isinstance(hop_point, str):
+        hop_point = int(hop_point) if hop_point.isdigit() else 0
+    
+    hop_count = user_data.get("hop_count", 0)
+    if isinstance(hop_count, str):
+        hop_count = int(hop_count) if hop_count.isdigit() else 0
+    
+    level = user_data.get("level", 1)
+    if isinstance(level, str):
+        level = int(level) if level.isdigit() else 1
+    
+    hapo_rank = user_data.get("hapo_rank", 0)
+    if isinstance(hapo_rank, str):
+        hapo_rank = int(hapo_rank) if hapo_rank.isdigit() else 0
+    
+    hapo_level = user_data.get("hapo_level", 1)
+    if isinstance(hapo_level, str):
+        hapo_level = int(hapo_level) if hapo_level.isdigit() else 1
+    
+    bank_balance = user_data.get("bank_balance", 0)
+    if isinstance(bank_balance, str):
+        bank_balance = int(bank_balance) if bank_balance.isdigit() else 0
+    
+    street_rescued = user_data.get("street_hapo_rescued", 0)
+    if isinstance(street_rescued, str):
+        street_rescued = int(street_rescued) if street_rescued.isdigit() else 0
+    
+    fridge_owned = user_data.get("fridge_owned", False)
+    fridge_level = user_data.get("fridge_level", 1)
+    if isinstance(fridge_level, str):
+        fridge_level = int(fridge_level) if fridge_level.isdigit() else 1
+    
+    msg = f"📊 اطلاعات کاربر:\n\n🆔 آیدی: `{user_data['user_id']}`\n👤 نام: {user_data['player_name']}\n⭐ سطح: {level}\n💰 هاپو پوینت: {format_number(hop_point)}\n🐾 تعداد هاپ: {hop_count}"
+    
+    if user_data.get('hapo_owned', False):
+        msg += f"\n\n🐕 هاپو:\n  📛 نام: {user_data['hapo_name']}\n  ⭐ سطح: {hapo_level}/5\n  🌟 مقام: {RANK_NAMES[hapo_rank]}"
+    
+    if user_data.get('bank_opened', False):
+        msg += f"\n\n🏦 بانک:\n  💰 موجودی: {format_number(bank_balance)}\n  💳 شماره کارت: {user_data.get('bank_card_number', 'نامشخص')}"
+    
+    if fridge_owned:
+        msg += f"\n\n❄️ یخچال:\n  ⭐ سطح: {fridge_level}\n  📦 ظرفیت: {FRIDGE_CAPACITY.get(fridge_level, 1)}"
+    
+    msg += f"\n\n🐶 هاپوی خیابونی نجات داده: {street_rescued}"
+    msg += f"\n\n📅 آخرین بروزرسانی: {user_data.get('last_updated', 'نامشخص')}"
+    
+    await update.message.reply_text(msg, parse_mode="Markdown")
+
+
+async def set_user_level(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.message.chat.type in ["group", "supergroup"]:
+        return
+    
+    user_id = update.effective_user.id
+    game = get_game(user_id)
+    
+    if not game.data.get("is_admin", False):
+        await update.message.reply_text("❌ شما ادمین نیستید")
+        return
+    
+    parts = update.message.text.split()
+    if len(parts) != 3:
+        await update.message.reply_text("❌ فرمت: setlevel [آیدی/یوزرنیم] [عدد]\nمثال: setlevel @username 5")
+        return
+    
+    try:
+        new_level = int(parts[2])
+        if not 1 <= new_level <= MAX_LEVEL:
+            await update.message.reply_text(f"❌ سطح باید بین 1 تا {MAX_LEVEL} باشد")
+            return
+    except:
+        await update.message.reply_text("❌ لطفاً یک عدد معتبر وارد کن")
+        return
+    
+    user_data = get_user_by_identifier(parts[1])
+    if not user_data:
+        await update.message.reply_text(f"❌ کاربری با شناسه `{parts[1]}` در دیتابیس ثبت نشده است.", parse_mode="Markdown")
+        return
+    
+    target_game = get_game(int(user_data['user_id']))
+    old_level = target_game.data["level"]
+    target_game.data["level"] = str(new_level)
+    target_game.data["hop_count"] = "0"
+    target_game.save_data()
+    
+    await update.message.reply_text(f"✅ سطح کاربر `{user_data['player_name']}` از {old_level} به {new_level} تغییر یافت.", parse_mode="Markdown")
+    
+    try:
+        await context.bot.send_message(int(user_data['user_id']), f"⭐ سطح هاپویی شما به {new_level} تغییر یافت!")
+    except:
+        pass
+
+
+async def add_user_level(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.message.chat.type in ["group", "supergroup"]:
+        return
+    
+    user_id = update.effective_user.id
+    game = get_game(user_id)
+    
+    if not game.data.get("is_admin", False):
+        await update.message.reply_text("❌ شما ادمین نیستید")
+        return
+    
+    parts = update.message.text.split()
+    if len(parts) != 3:
+        await update.message.reply_text("❌ فرمت: addlevel [آیدی/یوزرنیم] [عدد]\nمثال: addlevel @username 5")
+        return
+    
+    try:
+        add_amount = int(parts[2])
+        if add_amount <= 0:
+            await update.message.reply_text("❌ مقدار باید مثبت باشد")
+            return
+    except:
+        await update.message.reply_text("❌ لطفاً یک عدد معتبر وارد کن")
+        return
+    
+    user_data = get_user_by_identifier(parts[1])
+    if not user_data:
+        await update.message.reply_text(f"❌ کاربری با شناسه `{parts[1]}` در دیتابیس ثبت نشده است.", parse_mode="Markdown")
+        return
+    
+    target_game = get_game(int(user_data['user_id']))
+    old_level = int(target_game.data["level"]) if str(target_game.data["level"]).isdigit() else 1
+    new_level = min(old_level + add_amount, MAX_LEVEL)
+    target_game.data["level"] = str(new_level)
+    target_game.data["hop_count"] = "0"
+    target_game.save_data()
+    
+    await update.message.reply_text(f"✅ {add_amount} سطح به کاربر `{user_data['player_name']}` اضافه شد.\nسطح جدید: {new_level}", parse_mode="Markdown")
+    
+    try:
+        await context.bot.send_message(int(user_data['user_id']), f"⭐ {add_amount} سطح به هاپوهای شما اضافه شد!\nسطح جدید: {new_level}")
+    except:
+        pass
+
+
+async def set_user_point(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.message.chat.type in ["group", "supergroup"]:
+        return
+    
+    user_id = update.effective_user.id
+    game = get_game(user_id)
+    
+    if not game.data.get("is_admin", False):
+        await update.message.reply_text("❌ شما ادمین نیستید")
+        return
+    
+    parts = update.message.text.split()
+    if len(parts) != 3:
+        await update.message.reply_text("❌ فرمت: setpoint [آیدی/یوزرنیم] [عدد]\nمثال: setpoint @username 1000")
+        return
+    
+    try:
+        new_point = int(parts[2])
+        if new_point < 0:
+            await update.message.reply_text("❌ پوینت نمی‌تواند منفی باشد")
+            return
+    except:
+        await update.message.reply_text("❌ لطفاً یک عدد معتبر وارد کن")
+        return
+    
+    user_data = get_user_by_identifier(parts[1])
+    if not user_data:
+        await update.message.reply_text(f"❌ کاربری با شناسه `{parts[1]}` در دیتابیس ثبت نشده است.", parse_mode="Markdown")
+        return
+    
+    target_game = get_game(int(user_data['user_id']))
+    old_point = target_game.data["hop_point"]
+    target_game.data["hop_point"] = str(new_point)
+    target_game.save_data()
+    
+    await update.message.reply_text(f"✅ پوینت کاربر `{user_data['player_name']}` از {format_number(old_point)} به {format_number(new_point)} تغییر یافت.", parse_mode="Markdown")
+    
+    try:
+        await context.bot.send_message(int(user_data['user_id']), f"💰 هاپو پوینت‌های شما به {format_number(new_point)} تغییر یافت!")
+    except:
+        pass
+
+
+async def add_user_point(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.message.chat.type in ["group", "supergroup"]:
+        return
+    
+    user_id = update.effective_user.id
+    game = get_game(user_id)
+    
+    if not game.data.get("is_admin", False):
+        await update.message.reply_text("❌ شما ادمین نیستید")
+        return
+    
+    parts = update.message.text.split()
+    if len(parts) != 3:
+        await update.message.reply_text("❌ فرمت: addpoint [آیدی/یوزرنیم] [عدد]\nمثال: addpoint @username 1000")
+        return
+    
+    try:
+        add_amount = int(parts[2])
+        if add_amount <= 0:
+            await update.message.reply_text("❌ مقدار باید مثبت باشد")
+            return
+    except:
+        await update.message.reply_text("❌ لطفاً یک عدد معتبر وارد کن")
+        return
+    
+    user_data = get_user_by_identifier(parts[1])
+    if not user_data:
+        await update.message.reply_text(f"❌ کاربری با شناسه `{parts[1]}` در دیتابیس ثبت نشده است.", parse_mode="Markdown")
+        return
+    
+    target_game = get_game(int(user_data['user_id']))
+    old_point = int(target_game.data["hop_point"]) if str(target_game.data["hop_point"]).isdigit() else 0
+    new_point = old_point + add_amount
+    target_game.data["hop_point"] = str(new_point)
+    target_game.save_data()
+    
+    await update.message.reply_text(f"✅ {format_number(add_amount)} هاپو پوینت به کاربر `{user_data['player_name']}` اضافه شد.\nپوینت جدید: {format_number(new_point)}", parse_mode="Markdown")
+    
+    try:
+        await context.bot.send_message(int(user_data['user_id']), f"💰 {format_number(add_amount)} هاپو پوینت به حساب شما اضافه شد!\nموجودی جدید: {format_number(new_point)}")
+    except:
+        pass
 
 
 # ================================================================
@@ -2902,255 +3154,3 @@ async def my_profile_from_callback(query, game):
         keyboard.append([InlineKeyboardButton("🔒 قفل کردن پروفایل", callback_data="profile_lock")])
     
     await query.edit_message_text(msg, reply_markup=InlineKeyboardMarkup(keyboard))
-
-
-# ================================================================
-# دستورات ادمین
-# ================================================================
-
-async def get_user_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.message.chat.type in ["group", "supergroup"]:
-        return
-    
-    user_id = update.effective_user.id
-    game = get_game(user_id)
-    
-    if not game.data.get("is_admin", False):
-        await update.message.reply_text("❌ شما دسترسی به این دستور ندارید. فقط ادمین‌ها میتونن استفاده کنن.")
-        return
-    
-    parts = update.message.text.split()
-    if len(parts) < 2:
-        await update.message.reply_text("❌ لطفاً شناسه کاربر را وارد کن.\n\n📌 مثال:\n🔹 با آیدی عددی: `userinfo 123456789`\n🔹 با یوزرنیم: `userinfo @username`", parse_mode="Markdown")
-        return
-    
-    user_data = get_user_by_identifier(parts[1])
-    if not user_data:
-        await update.message.reply_text(f"❌ کاربری با شناسه `{parts[1]}` در دیتابیس ثبت نشده است.", parse_mode="Markdown")
-        return
-    
-    hop_point = user_data.get("hop_point", 0)
-    if isinstance(hop_point, str):
-        hop_point = int(hop_point) if hop_point.isdigit() else 0
-    
-    hop_count = user_data.get("hop_count", 0)
-    if isinstance(hop_count, str):
-        hop_count = int(hop_count) if hop_count.isdigit() else 0
-    
-    level = user_data.get("level", 1)
-    if isinstance(level, str):
-        level = int(level) if level.isdigit() else 1
-    
-    hapo_rank = user_data.get("hapo_rank", 0)
-    if isinstance(hapo_rank, str):
-        hapo_rank = int(hapo_rank) if hapo_rank.isdigit() else 0
-    
-    hapo_level = user_data.get("hapo_level", 1)
-    if isinstance(hapo_level, str):
-        hapo_level = int(hapo_level) if hapo_level.isdigit() else 1
-    
-    bank_balance = user_data.get("bank_balance", 0)
-    if isinstance(bank_balance, str):
-        bank_balance = int(bank_balance) if bank_balance.isdigit() else 0
-    
-    street_rescued = user_data.get("street_hapo_rescued", 0)
-    if isinstance(street_rescued, str):
-        street_rescued = int(street_rescued) if street_rescued.isdigit() else 0
-    
-    fridge_owned = user_data.get("fridge_owned", False)
-    fridge_level = user_data.get("fridge_level", 1)
-    if isinstance(fridge_level, str):
-        fridge_level = int(fridge_level) if fridge_level.isdigit() else 1
-    
-    msg = f"📊 اطلاعات کاربر:\n\n🆔 آیدی: `{user_data['user_id']}`\n👤 نام: {user_data['player_name']}\n⭐ سطح: {level}\n💰 هاپو پوینت: {format_number(hop_point)}\n🐾 تعداد هاپ: {hop_count}"
-    
-    if user_data.get('hapo_owned', False):
-        msg += f"\n\n🐕 هاپو:\n  📛 نام: {user_data['hapo_name']}\n  ⭐ سطح: {hapo_level}/5\n  🌟 مقام: {RANK_NAMES[hapo_rank]}"
-    
-    if user_data.get('bank_opened', False):
-        msg += f"\n\n🏦 بانک:\n  💰 موجودی: {format_number(bank_balance)}\n  💳 شماره کارت: {user_data.get('bank_card_number', 'نامشخص')}"
-    
-    if fridge_owned:
-    from config import FRIDGE_CAPACITY
-    msg += f"\n\n❄️ یخچال:\n  ⭐ سطح: {fridge_level}\n  📦 ظرفیت: {FRIDGE_CAPACITY.get(fridge_level, 1)}"
-    
-    msg += f"\n\n🐶 هاپوی خیابونی نجات داده: {street_rescued}"
-    msg += f"\n\n📅 آخرین بروزرسانی: {user_data.get('last_updated', 'نامشخص')}"
-    
-    await update.message.reply_text(msg, parse_mode="Markdown")
-
-
-async def set_user_level(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.message.chat.type in ["group", "supergroup"]:
-        return
-    
-    user_id = update.effective_user.id
-    game = get_game(user_id)
-    
-    if not game.data.get("is_admin", False):
-        await update.message.reply_text("❌ شما ادمین نیستید")
-        return
-    
-    parts = update.message.text.split()
-    if len(parts) != 3:
-        await update.message.reply_text("❌ فرمت: setlevel [آیدی/یوزرنیم] [عدد]\nمثال: setlevel @username 5")
-        return
-    
-    try:
-        new_level = int(parts[2])
-        if not 1 <= new_level <= MAX_LEVEL:
-            await update.message.reply_text(f"❌ سطح باید بین 1 تا {MAX_LEVEL} باشد")
-            return
-    except:
-        await update.message.reply_text("❌ لطفاً یک عدد معتبر وارد کن")
-        return
-    
-    user_data = get_user_by_identifier(parts[1])
-    if not user_data:
-        await update.message.reply_text(f"❌ کاربری با شناسه `{parts[1]}` در دیتابیس ثبت نشده است.", parse_mode="Markdown")
-        return
-    
-    target_game = get_game(int(user_data['user_id']))
-    old_level = target_game.data["level"]
-    target_game.data["level"] = str(new_level)
-    target_game.data["hop_count"] = "0"
-    target_game.save_data()
-    
-    await update.message.reply_text(f"✅ سطح کاربر `{user_data['player_name']}` از {old_level} به {new_level} تغییر یافت.", parse_mode="Markdown")
-    
-    try:
-        await context.bot.send_message(int(user_data['user_id']), f"⭐ سطح هاپویی شما به {new_level} تغییر یافت!")
-    except:
-        pass
-
-
-async def add_user_level(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.message.chat.type in ["group", "supergroup"]:
-        return
-    
-    user_id = update.effective_user.id
-    game = get_game(user_id)
-    
-    if not game.data.get("is_admin", False):
-        await update.message.reply_text("❌ شما ادمین نیستید")
-        return
-    
-    parts = update.message.text.split()
-    if len(parts) != 3:
-        await update.message.reply_text("❌ فرمت: addlevel [آیدی/یوزرنیم] [عدد]\nمثال: addlevel @username 5")
-        return
-    
-    try:
-        add_amount = int(parts[2])
-        if add_amount <= 0:
-            await update.message.reply_text("❌ مقدار باید مثبت باشد")
-            return
-    except:
-        await update.message.reply_text("❌ لطفاً یک عدد معتبر وارد کن")
-        return
-    
-    user_data = get_user_by_identifier(parts[1])
-    if not user_data:
-        await update.message.reply_text(f"❌ کاربری با شناسه `{parts[1]}` در دیتابیس ثبت نشده است.", parse_mode="Markdown")
-        return
-    
-    target_game = get_game(int(user_data['user_id']))
-    old_level = int(target_game.data["level"]) if str(target_game.data["level"]).isdigit() else 1
-    new_level = min(old_level + add_amount, MAX_LEVEL)
-    target_game.data["level"] = str(new_level)
-    target_game.data["hop_count"] = "0"
-    target_game.save_data()
-    
-    await update.message.reply_text(f"✅ {add_amount} سطح به کاربر `{user_data['player_name']}` اضافه شد.\nسطح جدید: {new_level}", parse_mode="Markdown")
-    
-    try:
-        await context.bot.send_message(int(user_data['user_id']), f"⭐ {add_amount} سطح به هاپوهای شما اضافه شد!\nسطح جدید: {new_level}")
-    except:
-        pass
-
-
-async def set_user_point(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.message.chat.type in ["group", "supergroup"]:
-        return
-    
-    user_id = update.effective_user.id
-    game = get_game(user_id)
-    
-    if not game.data.get("is_admin", False):
-        await update.message.reply_text("❌ شما ادمین نیستید")
-        return
-    
-    parts = update.message.text.split()
-    if len(parts) != 3:
-        await update.message.reply_text("❌ فرمت: setpoint [آیدی/یوزرنیم] [عدد]\nمثال: setpoint @username 1000")
-        return
-    
-    try:
-        new_point = int(parts[2])
-        if new_point < 0:
-            await update.message.reply_text("❌ پوینت نمی‌تواند منفی باشد")
-            return
-    except:
-        await update.message.reply_text("❌ لطفاً یک عدد معتبر وارد کن")
-        return
-    
-    user_data = get_user_by_identifier(parts[1])
-    if not user_data:
-        await update.message.reply_text(f"❌ کاربری با شناسه `{parts[1]}` در دیتابیس ثبت نشده است.", parse_mode="Markdown")
-        return
-    
-    target_game = get_game(int(user_data['user_id']))
-    old_point = target_game.data["hop_point"]
-    target_game.data["hop_point"] = str(new_point)
-    target_game.save_data()
-    
-    await update.message.reply_text(f"✅ پوینت کاربر `{user_data['player_name']}` از {format_number(old_point)} به {format_number(new_point)} تغییر یافت.", parse_mode="Markdown")
-    
-    try:
-        await context.bot.send_message(int(user_data['user_id']), f"💰 هاپو پوینت‌های شما به {format_number(new_point)} تغییر یافت!")
-    except:
-        pass
-
-
-async def add_user_point(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.message.chat.type in ["group", "supergroup"]:
-        return
-    
-    user_id = update.effective_user.id
-    game = get_game(user_id)
-    
-    if not game.data.get("is_admin", False):
-        await update.message.reply_text("❌ شما ادمین نیستید")
-        return
-    
-    parts = update.message.text.split()
-    if len(parts) != 3:
-        await update.message.reply_text("❌ فرمت: addpoint [آیدی/یوزرنیم] [عدد]\nمثال: addpoint @username 1000")
-        return
-    
-    try:
-        add_amount = int(parts[2])
-        if add_amount <= 0:
-            await update.message.reply_text("❌ مقدار باید مثبت باشد")
-            return
-    except:
-        await update.message.reply_text("❌ لطفاً یک عدد معتبر وارد کن")
-        return
-    
-    user_data = get_user_by_identifier(parts[1])
-    if not user_data:
-        await update.message.reply_text(f"❌ کاربری با شناسه `{parts[1]}` در دیتابیس ثبت نشده است.", parse_mode="Markdown")
-        return
-    
-    target_game = get_game(int(user_data['user_id']))
-    old_point = int(target_game.data["hop_point"]) if str(target_game.data["hop_point"]).isdigit() else 0
-    new_point = old_point + add_amount
-    target_game.data["hop_point"] = str(new_point)
-    target_game.save_data()
-    
-    await update.message.reply_text(f"✅ {format_number(add_amount)} هاپو پوینت به کاربر `{user_data['player_name']}` اضافه شد.\nپوینت جدید: {format_number(new_point)}", parse_mode="Markdown")
-    
-    try:
-        await context.bot.send_message(int(user_data['user_id']), f"💰 {format_number(add_amount)} هاپو پوینت به حساب شما اضافه شد!\nموجودی جدید: {format_number(new_point)}")
-    except:
-        pass
