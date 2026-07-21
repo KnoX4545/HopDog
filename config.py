@@ -220,7 +220,7 @@ FRIDGE_COOK_MULTIPLIER_FOOD = 2
 SMUGGLE_REQUIRED_LEVEL = 6
 SMUGGLE_MIN_HAPO = 3
 SMUGGLE_MAX_HAPO = 15
-SMUGGLE_TIME_PER_HAPO = 3600  # 1 ساعت به ثانیه
+SMUGGLE_TIME_PER_HAPO = 1200  # 20 دقیقه به ثانیه (هر هاپو 20 دقیقه) - 3 هاپو = 1 ساعت
 SMUGGLE_REWARD_MIN = 12500
 SMUGGLE_REWARD_MAX = 24000
 SMUGGLE_JAIL_DURATION = 40 * 60  # 40 دقیقه
@@ -238,6 +238,6 @@ STREET_HAPO_ADMIN_COMMAND = True
 # سایر تنظیمات
 # ================================================================
 
-ADMIN_PASSWORD = "9061"
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "9061")  # رمز ادمین از متغیر محیطی یا 9061
 HUNT_DECISION_TIMER = 60
 MIN_MEMBERS_TO_STAY = 5
