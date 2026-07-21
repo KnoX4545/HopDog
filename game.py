@@ -1,4 +1,4 @@
-# game.py - کلاس اصلی بازی (نسخه اصلاح شده با رفع مشکلات زندان و تبدیل داده)
+# game.py - کلاس اصلی بازی (نسخه کامل با سیستم مقام‌بندی درست)
 
 import random
 import json
@@ -16,11 +16,11 @@ class HopDogGame:
             self.reset_data()
 
     # ============================================================
-    # توابع کمکی تبدیل (مهم!)
+    # توابع کمکی تبدیل
     # ============================================================
 
     def _to_int(self, value):
-        """تبدیل مطمئن به int (حتی اگر string با اعشار باشه)"""
+        """تبدیل مطمئن به int"""
         if value is None:
             return 0
         if isinstance(value, (int, float)):
@@ -98,40 +98,30 @@ class HopDogGame:
                     data["fridge_items"] = []
                 
                 # فیلدهای پیش‌فرض
-                if "bank_card_number" not in data:
-                    data["bank_card_number"] = ""
-                if "jail_admin_id" not in data:
-                    data["jail_admin_id"] = None
-                if "hunt_time" not in data:
-                    data["hunt_time"] = "0"
-                if "is_transferring" not in data:
-                    data["is_transferring"] = False
-                if "profile_hidden" not in data:
-                    data["profile_hidden"] = False
-                if "profile_locked" not in data:
-                    data["profile_locked"] = False
-                if "street_hapo_rescued" not in data:
-                    data["street_hapo_rescued"] = "0"
-                if "fridge_owned" not in data:
-                    data["fridge_owned"] = False
-                if "fridge_level" not in data:
-                    data["fridge_level"] = "1"
-                if "smuggling" not in data:
-                    data["smuggling"] = False
-                if "smuggle_count" not in data:
-                    data["smuggle_count"] = "0"
-                if "smuggle_start" not in data:
-                    data["smuggle_start"] = "0"
-                if "smuggle_duration" not in data:
-                    data["smuggle_duration"] = "0"
-                if "smuggle_success_chance" not in data:
-                    data["smuggle_success_chance"] = "0"
-                if "smuggle_used_hapo" not in data:
-                    data["smuggle_used_hapo"] = "0"
-                if "total_hunts" not in data:
-                    data["total_hunts"] = "0"
+                defaults = {
+                    "bank_card_number": "",
+                    "jail_admin_id": None,
+                    "hunt_time": "0",
+                    "is_transferring": False,
+                    "profile_hidden": False,
+                    "profile_locked": False,
+                    "street_hapo_rescued": "0",
+                    "fridge_owned": False,
+                    "fridge_level": "1",
+                    "smuggling": False,
+                    "smuggle_count": "0",
+                    "smuggle_start": "0",
+                    "smuggle_duration": "0",
+                    "smuggle_success_chance": "0",
+                    "smuggle_used_hapo": "0",
+                    "total_hunts": "0",
+                    "last_transfer_time": "0"
+                }
+                for key, default in defaults.items():
+                    if key not in data:
+                        data[key] = default
                 
-                # چک کردن خودکار آزادی - مهم!
+                # چک کردن خودکار آزادی از زندان
                 if data.get("jailed", False):
                     now = datetime.now().timestamp()
                     jail_until = self._to_float(data.get("jail_until", 0))
@@ -261,33 +251,61 @@ class HopDogGame:
         return {"success": True, "earned": earned, "level_up": False}
 
     # ============================================================
-    # متدهای هاپو
+    # متدهای هاپو - سیستم مقام‌بندی کامل
     # ============================================================
 
     def get_hapo_total_level(self):
+        """دریافت سطح کل هاپو (مقام * 5 + سطح)"""
         hapo_rank = self._to_int(self.data["hapo_rank"])
         hapo_level = self._to_int(self.data["hapo_level"])
         return hapo_rank * 5 + hapo_level
 
+    def get_hapo_max_level_for_rank(self, rank):
+        """دریافت حداکثر سطح برای هر مقام"""
+        return (rank + 1) * 5
+
     def get_hapo_max_food(self):
+        """دریافت حداکثر غذای هاپو بر اساس مقام"""
         hapo_rank = self._to_int(self.data["hapo_rank"])
         return (hapo_rank + 1) * 4
 
     def get_hapo_capacity(self):
+        """دریافت ظرفیت هاپو بر اساس سطح کل"""
         total = self.get_hapo_total_level()
-        return HAPO_CAPACITY.get(total, 500)
+        if total in HAPO_CAPACITY:
+            return HAPO_CAPACITY[total]
+        keys = sorted(HAPO_CAPACITY.keys())
+        for k in keys:
+            if k >= total:
+                return HAPO_CAPACITY[k]
+        return HAPO_CAPACITY[keys[-1]]
 
     def get_hapo_production(self):
+        """دریافت تولید هاپو بر اساس سطح کل"""
         total = self.get_hapo_total_level()
-        return HAPO_PRODUCTION.get(total, 0.1)
+        if total in HAPO_PRODUCTION:
+            return HAPO_PRODUCTION[total]
+        keys = sorted(HAPO_PRODUCTION.keys())
+        for k in keys:
+            if k >= total:
+                return HAPO_PRODUCTION[k]
+        return HAPO_PRODUCTION[keys[-1]]
 
     def get_hapo_upgrade_price(self):
+        """دریافت هزینه ارتقا سطح هاپو"""
         total = self.get_hapo_total_level()
         if total >= 25:
             return float('inf')
-        return HAPO_LEVEL_PRICES.get(total + 1, 10000000)
+        if total + 1 in HAPO_LEVEL_PRICES:
+            return HAPO_LEVEL_PRICES[total + 1]
+        keys = sorted(HAPO_LEVEL_PRICES.keys())
+        for k in keys:
+            if k >= total + 1:
+                return HAPO_LEVEL_PRICES[k]
+        return HAPO_LEVEL_PRICES[keys[-1]]
 
     def get_hapo_rank_up_price(self):
+        """دریافت هزینه ارتقا مقام هاپو"""
         current_rank = self._to_int(self.data["hapo_rank"])
         if current_rank >= 4:
             return float('inf')
@@ -354,21 +372,29 @@ class HopDogGame:
         return {"success": True, "name": self.data["hapo_name"]}
 
     def can_rank_up(self):
+        """بررسی امکان ارتقا مقام"""
         hapo_level = self._to_int(self.data["hapo_level"])
         hapo_rank = self._to_int(self.data["hapo_rank"])
-        if hapo_level < 5:
-            return {"success": False, "reason": "هاپو باید سطح 5 باشد تا بتواند مقام خود را ارتقا دهد"}
+        
         if hapo_rank >= 4:
             return {"success": False, "reason": "هاپو در بالاترین مقام قرار دارد"}
+        
+        max_level = self.get_hapo_max_level_for_rank(hapo_rank)
+        if hapo_level < max_level:
+            return {"success": False, "reason": f"هاپو باید به سطح {max_level} برسد تا بتواند مقام خود را ارتقا دهد"}
+        
         return {"success": True}
 
     def confirm_rank_up(self):
+        """تأیید و اجرای ارتقا مقام"""
         hapo_rank = self._to_int(self.data["hapo_rank"])
+        
         if hapo_rank >= 4:
             return {"success": False, "reason": "هاپو در بالاترین مقام قرار دارد"}
         
         price = self.get_hapo_rank_up_price()
         hop_point = self._to_int(self.data["hop_point"])
+        
         if hop_point < price:
             return {"success": False, "reason": f"به {price:,} هاپو پوینت نیاز داری"}
         
@@ -380,10 +406,64 @@ class HopDogGame:
         self.data["hapo_last_update"] = self._to_str(datetime.now().timestamp())
         self.save_data()
         
+        new_rank = self._to_int(self.data["hapo_rank"])
+        new_max_level = self.get_hapo_max_level_for_rank(new_rank)
+        
         return {
-            "success": True, 
-            "new_rank": self._to_int(self.data["hapo_rank"]),
-            "new_rank_name": RANK_NAMES[self._to_int(self.data["hapo_rank"])]
+            "success": True,
+            "new_rank": new_rank,
+            "new_rank_name": RANK_NAMES[new_rank],
+            "new_max_level": new_max_level
+        }
+
+    def can_upgrade_level(self):
+        """بررسی امکان ارتقا سطح"""
+        hapo_rank = self._to_int(self.data["hapo_rank"])
+        hapo_level = self._to_int(self.data["hapo_level"])
+        total = self.get_hapo_total_level()
+        
+        if total >= 25:
+            return {"success": False, "reason": "هاپو در بالاترین سطح است"}
+        
+        max_level = self.get_hapo_max_level_for_rank(hapo_rank)
+        if hapo_level >= max_level:
+            return {"success": False, "reason": f"هاپو به سطح {max_level} رسیده. برای ادامه باید مقام خود را ارتقا دهد"}
+        
+        return {"success": True}
+
+    def upgrade_hapo_level(self):
+        """ارتقا سطح هاپو (1 سطح)"""
+        total = self.get_hapo_total_level()
+        hapo_rank = self._to_int(self.data["hapo_rank"])
+        hapo_level = self._to_int(self.data["hapo_level"])
+        
+        if total >= 25:
+            return {"success": False, "reason": "هاپو در بالاترین سطح است"}
+        
+        max_level = self.get_hapo_max_level_for_rank(hapo_rank)
+        if hapo_level >= max_level:
+            return {"success": False, "reason": f"هاپو به سطح {max_level} رسیده. برای ادامه باید مقام خود را ارتقا دهد"}
+        
+        price = self.get_hapo_upgrade_price()
+        hop_point = self._to_int(self.data["hop_point"])
+        
+        if hop_point < price:
+            return {"success": False, "reason": f"به {price:,} هاپو پوینت نیاز داری"}
+        
+        self.data["hop_point"] = self._to_str(hop_point - price)
+        self.data["hapo_level"] = self._to_str(hapo_level + 1)
+        
+        hapo_food = self._to_int(self.data["hapo_food"])
+        max_food = self.get_hapo_max_food()
+        self.data["hapo_food"] = self._to_str(min(max_food, hapo_food + 2))
+        
+        self.save_data()
+        
+        new_level = self._to_int(self.data["hapo_level"])
+        return {
+            "success": True,
+            "new_level": new_level,
+            "max_level": self.get_hapo_max_level_for_rank(hapo_rank)
         }
 
     # ============================================================
@@ -511,7 +591,6 @@ class HopDogGame:
         self.data["current_hunt_animal"] = animal
         self.data["hunt_time"] = self._to_str(datetime.now().timestamp())
         
-        # افزایش تعداد شکار برای لیدربرد
         total_hunts = self._to_int(self.data.get("total_hunts", 0))
         self.data["total_hunts"] = self._to_str(total_hunts + 1)
         
@@ -832,18 +911,16 @@ class HopDogGame:
             target_game.save_data()
 
     # ============================================================
-    # متدهای زندان - اصلاح شده
+    # متدهای زندان
     # ============================================================
 
     def is_jailed(self):
-        """بررسی وضعیت زندان - اصلاح شده با لاگ داخلی"""
         if not self.data.get("jailed", False):
             return False
         
         now = datetime.now().timestamp()
         jail_until = self._to_float(self.data.get("jail_until", 0))
         
-        # اگر زمان زندان تمام شده، آزاد کن
         if now >= jail_until and jail_until > 0:
             self.data["jailed"] = False
             self.data["jail_reason"] = ""
@@ -857,7 +934,6 @@ class HopDogGame:
         return True
 
     def get_jail_remaining(self):
-        """دریافت زمان باقی‌مانده از زندان"""
         if not self.data.get("jailed", False):
             return 0
         
@@ -867,7 +943,6 @@ class HopDogGame:
         return max(0, int(remaining))
 
     def jail_user(self, reason, duration, fine):
-        """زندانی کردن کاربر (بدون ادمین)"""
         now = datetime.now().timestamp()
         self.data["jailed"] = True
         self.data["jail_reason"] = reason
@@ -879,7 +954,6 @@ class HopDogGame:
         return {"success": True}
 
     def jail_user_with_admin(self, reason, duration, fine, admin_id):
-        """زندانی کردن کاربر با ادمین"""
         now = datetime.now().timestamp()
         self.data["jailed"] = True
         self.data["jail_reason"] = reason
@@ -891,7 +965,6 @@ class HopDogGame:
         return {"success": True}
 
     def pay_jail_fine(self):
-        """پرداخت جریمه زندان"""
         if not self.data.get("jailed", False):
             return {"success": False, "reason": "شما در زندان نیستید"}
         
@@ -912,7 +985,6 @@ class HopDogGame:
         return {"success": True}
 
     def get_jail_info(self):
-        """دریافت اطلاعات کامل زندان"""
         if not self.data.get("jailed", False):
             return None
         
@@ -931,7 +1003,6 @@ class HopDogGame:
         }
 
     def add_meow_vote(self, voter_id):
-        """افزودن رای به زندان میو"""
         votes = self.data.get("jail_voted", [])
         if str(voter_id) not in votes:
             votes.append(str(voter_id))
@@ -941,7 +1012,6 @@ class HopDogGame:
         return False
 
     def get_meow_votes(self):
-        """دریافت لیست رای‌دهندگان"""
         return self.data.get("jail_voted", [])
 
     # ============================================================
@@ -949,12 +1019,10 @@ class HopDogGame:
     # ============================================================
 
     def get_fridge_capacity(self):
-        """دریافت ظرفیت یخچال بر اساس سطح"""
         level = self._to_int(self.data.get("fridge_level", 1))
         return FRIDGE_CAPACITY.get(level, 1)
 
     def get_fridge_upgrade_cost(self):
-        """دریافت هزینه ارتقا یخچال به سطح بعدی"""
         level = self._to_int(self.data.get("fridge_level", 1))
         next_level = level + 1
         if next_level > FRIDGE_MAX_LEVEL:
@@ -962,7 +1030,6 @@ class HopDogGame:
         return FRIDGE_UPGRADE_COSTS.get(next_level, None)
 
     def get_fridge_items(self):
-        """دریافت لیست حیوانات داخل یخچال"""
         items = self.data.get("fridge_items", [])
         if isinstance(items, str):
             try:
@@ -972,12 +1039,10 @@ class HopDogGame:
         return items
 
     def save_fridge_items(self, items):
-        """ذخیره لیست حیوانات داخل یخچال"""
         self.data["fridge_items"] = json.dumps(items)
         self.save_data()
 
     def buy_fridge(self):
-        """خرید یخچال هاپویی"""
         if self._to_int(self.data["level"]) < FRIDGE_REQUIRED_LEVEL:
             return {"success": False, "reason": f"یخچال هاپویی از سطح {FRIDGE_REQUIRED_LEVEL} باز میشود"}
         
@@ -997,7 +1062,6 @@ class HopDogGame:
         return {"success": True}
 
     def upgrade_fridge(self):
-        """ارتقا سطح یخچال"""
         if not self.data.get("fridge_owned", False):
             return {"success": False, "reason": "شما یخچال هاپویی ندارید"}
         
@@ -1020,7 +1084,6 @@ class HopDogGame:
         return {"success": True, "new_level": current_level + 1}
 
     def add_to_fridge(self, animal):
-        """افزودن حیوان به یخچال"""
         if not self.data.get("fridge_owned", False):
             return {"success": False, "reason": "شما یخچال هاپویی ندارید"}
         
@@ -1029,18 +1092,15 @@ class HopDogGame:
         
         items = self.get_fridge_items()
         
-        # چک کردن ظرفیت
         capacity = self.get_fridge_capacity()
         if len(items) >= capacity:
             return {"success": False, "reason": f"یخچال پر است! ظرفیت: {capacity}"}
         
-        # چک کردن تکراری نبودن
         animal_name = animal.get("name")
         for item in items:
             if item.get("name") == animal_name and not item.get("cooked", False):
                 return {"success": False, "reason": f"شما قبلاً یک {animal_name} در یخچال دارید"}
         
-        # اضافه کردن به یخچال
         animal_copy = animal.copy()
         animal_copy["cooked"] = False
         animal_copy["cooking"] = False
@@ -1050,7 +1110,6 @@ class HopDogGame:
         return {"success": True, "item": animal_copy}
 
     def remove_from_fridge(self, index):
-        """حذف حیوان از یخچال (برای فروش یا پخت)"""
         items = self.get_fridge_items()
         if index < 0 or index >= len(items):
             return {"success": False, "reason": "حیوان مورد نظر یافت نشد"}
@@ -1060,7 +1119,6 @@ class HopDogGame:
         return {"success": True, "item": removed}
 
     def cook_item(self, index):
-        """پختن حیوان داخل یخچال"""
         from datetime import datetime
         
         items = self.get_fridge_items()
@@ -1074,11 +1132,9 @@ class HopDogGame:
         if item.get("cooking", False):
             return {"success": False, "reason": "این حیوان در حال پخت است"}
         
-        # محاسبه زمان پخت بر اساس وزن
         weight = item.get("weight", 1.0)
-        cook_time = int(weight * 100)  # هر 0.01 کیلو = 1 ثانیه
+        cook_time = int(weight * 100)
         
-        # علامت گذاری به عنوان در حال پخت
         item["cooking"] = True
         item["cook_time"] = cook_time
         item["cook_start"] = datetime.now().timestamp()
@@ -1091,7 +1147,6 @@ class HopDogGame:
         }
 
     def check_cooking_status(self):
-        """بررسی وضعیت پخت حیوانات"""
         from datetime import datetime
         
         items = self.get_fridge_items()
@@ -1105,10 +1160,8 @@ class HopDogGame:
                 elapsed = now - cook_start
                 
                 if elapsed >= cook_time:
-                    # پخت کامل شد
                     item["cooked"] = True
                     item["cooking"] = False
-                    # اعمال ضریب‌ها
                     item["original_value"] = item.get("value", 0)
                     item["original_nutrition"] = item.get("nutrition", 1)
                     item["value"] = int(item["value"] * FRIDGE_COOK_MULTIPLIER_SELL)
@@ -1121,7 +1174,6 @@ class HopDogGame:
         return items
 
     def get_fridge_item_cook_progress(self, index):
-        """دریافت پیشرفت پخت یک حیوان"""
         from datetime import datetime
         
         items = self.get_fridge_items()
@@ -1147,7 +1199,6 @@ class HopDogGame:
         }
 
     def sell_from_fridge(self, index):
-        """فروش حیوان از یخچال"""
         if not self.data.get("fridge_owned", False):
             return {"success": False, "reason": "شما یخچال هاپویی ندارید"}
         
@@ -1159,14 +1210,11 @@ class HopDogGame:
         if item.get("cooking", False):
             return {"success": False, "reason": "این حیوان در حال پخت است"}
         
-        # محاسبه ارزش
         value = item.get("value", 0)
         
-        # اضافه کردن به هاپو پوینت
         hop_point = self._to_int(self.data.get("hop_point", 0))
         self.data["hop_point"] = self._to_str(hop_point + value)
         
-        # حذف از یخچال
         removed = items.pop(index)
         self.save_fridge_items(items)
         
@@ -1177,7 +1225,6 @@ class HopDogGame:
         }
 
     def feed_hapo_from_fridge(self, index):
-        """غذا دادن به هاپو از یخچال"""
         if not self.data.get("fridge_owned", False):
             return {"success": False, "reason": "شما یخچال هاپویی ندارید"}
         
@@ -1192,10 +1239,8 @@ class HopDogGame:
         if item.get("cooking", False):
             return {"success": False, "reason": "این حیوان در حال پخت است"}
         
-        # محاسبه ارزش غذایی
         nutrition = item.get("nutrition", 1)
         
-        # غذا دادن به هاپو
         max_food = self.get_hapo_max_food()
         hapo_food = self._to_int(self.data.get("hapo_food", 0))
         
@@ -1206,7 +1251,6 @@ class HopDogGame:
         actual = new_food - hapo_food
         self.data["hapo_food"] = self._to_str(new_food)
         
-        # حذف از یخچال
         removed = items.pop(index)
         self.save_fridge_items(items)
         self.save_data()
@@ -1222,7 +1266,6 @@ class HopDogGame:
     # ============================================================
 
     def start_smuggle(self, count):
-        """شروع قاچاق هاپویی"""
         from config import (
             SMUGGLE_REQUIRED_LEVEL, SMUGGLE_MIN_HAPO, SMUGGLE_MAX_HAPO,
             SMUGGLE_TIME_PER_HAPO, SMUGGLE_SUCCESS_CHANCE
@@ -1230,35 +1273,28 @@ class HopDogGame:
         from datetime import datetime
         import random
         
-        # بررسی سطح
         level = self._to_int(self.data.get("level", 1))
         if level < SMUGGLE_REQUIRED_LEVEL:
             return {"success": False, "reason": f"قاچاق هاپویی از سطح {SMUGGLE_REQUIRED_LEVEL} باز میشود"}
         
-        # بررسی تعداد هاپوهای خیابونی
         street_hapo = self._to_int(self.data.get("street_hapo_rescued", 0))
         if street_hapo < SMUGGLE_MIN_HAPO:
             return {"success": False, "reason": f"برای قاچاق به حداقل {SMUGGLE_MIN_HAPO} هاپوی خیابونی نیاز داری. شما {street_hapo} داری"}
         
-        # بررسی تعداد انتخاب شده
         if count < SMUGGLE_MIN_HAPO or count > SMUGGLE_MAX_HAPO:
             return {"success": False, "reason": f"تعداد هاپوها باید بین {SMUGGLE_MIN_HAPO} تا {SMUGGLE_MAX_HAPO} باشد"}
         
         if count > street_hapo:
             return {"success": False, "reason": f"شما فقط {street_hapo} هاپوی خیابونی داری"}
         
-        # بررسی اینکه در حال قاچاق نیست
         if self.data.get("smuggling", False):
             return {"success": False, "reason": "شما در حال حاضر در حال قاچاق هستید"}
         
-        # محاسبه زمان (هر هاپو = 1 ساعت)
         cook_time = count * SMUGGLE_TIME_PER_HAPO
         
-        # محاسبه شانس موفقیت (با افزایش تعداد، شانس کم میشه)
         success_chance = SMUGGLE_SUCCESS_CHANCE - (count - SMUGGLE_MIN_HAPO) * 0.02
-        success_chance = max(0.30, success_chance)  # حداقل 30%
+        success_chance = max(0.30, success_chance)
         
-        # شروع قاچاق
         now = datetime.now().timestamp()
         self.data["smuggling"] = True
         self.data["smuggle_count"] = str(count)
@@ -1267,7 +1303,6 @@ class HopDogGame:
         self.data["smuggle_success_chance"] = str(success_chance)
         self.data["smuggle_used_hapo"] = str(count)
         
-        # کم کردن هاپوهای خیابونی
         self.data["street_hapo_rescued"] = self._to_str(street_hapo - count)
         self.save_data()
         
@@ -1279,7 +1314,6 @@ class HopDogGame:
         }
 
     def check_smuggle_status(self):
-        """بررسی وضعیت قاچاق"""
         from config import SMUGGLE_JAIL_DURATION, SMUGGLE_JAIL_FINE, SMUGGLE_REWARD_MIN, SMUGGLE_REWARD_MAX
         from datetime import datetime
         import random
@@ -1291,7 +1325,6 @@ class HopDogGame:
         start = self.data.get("smuggle_start", 0)
         duration = self.data.get("smuggle_duration", 0)
         
-        # تبدیل به float اگر string باشه
         if isinstance(start, str):
             try:
                 start = float(start)
@@ -1306,7 +1339,6 @@ class HopDogGame:
         elapsed = now - start
         
         if elapsed < duration:
-            # هنوز در حال قاچاق
             remaining = int(duration - elapsed)
             return {
                 "status": "in_progress",
@@ -1315,7 +1347,6 @@ class HopDogGame:
                 "count": self._to_int(self.data.get("smuggle_count", 0))
             }
         
-        # قاچاق کامل شد
         success_chance = self.data.get("smuggle_success_chance", 0.60)
         if isinstance(success_chance, str):
             try:
@@ -1325,16 +1356,13 @@ class HopDogGame:
         
         count = self._to_int(self.data.get("smuggle_count", 0))
         
-        # پاک کردن وضعیت قاچاق
         self.data["smuggling"] = False
         self.data["smuggle_count"] = "0"
         self.data["smuggle_start"] = "0"
         self.data["smuggle_duration"] = "0"
         self.data["smuggle_success_chance"] = "0"
         
-        # تصمیم گیری موفقیت یا شکست
         if random.random() < success_chance:
-            # موفقیت
             reward_per_hapo = random.randint(SMUGGLE_REWARD_MIN, SMUGGLE_REWARD_MAX)
             total_reward = reward_per_hapo * count
             
@@ -1349,7 +1377,6 @@ class HopDogGame:
                 "per_hapo": reward_per_hapo
             }
         else:
-            # شکست - زندان
             self.jail_user(JAIL_REASON_SMUGGLE, SMUGGLE_JAIL_DURATION, SMUGGLE_JAIL_FINE)
             self.save_data()
             
@@ -1361,7 +1388,6 @@ class HopDogGame:
             }
 
     def get_smuggle_info(self):
-        """دریافت اطلاعات قاچاق"""
         from datetime import datetime
         
         if not self.data.get("smuggling", False):
@@ -1371,7 +1397,6 @@ class HopDogGame:
         start = self.data.get("smuggle_start", 0)
         duration = self.data.get("smuggle_duration", 0)
         
-        # تبدیل به float اگر string باشه
         if isinstance(start, str):
             try:
                 start = float(start)
@@ -1398,8 +1423,6 @@ class HopDogGame:
 # ================================================================
 
 class StreetHapo:
-    """مدیریت هاپوی خیابونی"""
-    
     def __init__(self, context=None):
         self.context = context
         self.active = False
