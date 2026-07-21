@@ -274,7 +274,6 @@ def update_group_stats(chat_id, hops=0, points=0, hunts=0):
     """به‌روزرسانی آمار گروه"""
     try:
         chat_id = str(chat_id)
-        # دریافت آمار فعلی
         current = get_group_stats(chat_id)
         if current is None:
             return False
@@ -290,7 +289,7 @@ def update_group_stats(chat_id, hops=0, points=0, hunts=0):
             "last_activity": datetime.now().isoformat()
         }).eq("chat_id", chat_id).execute()
         
-        logger.info(f"📊 آمار گروه {chat_id} آپدیت شد: هاپ={new_hops}, پوینت={new_points}, شکار={new_hunts}")
+        logger.info(f"📊 گروه {chat_id}: هاپ={new_hops}, پوینت={new_points}, شکار={new_hunts}")
         return True
     except Exception as e:
         logger.error(f"Error updating group stats: {e}")
@@ -334,50 +333,6 @@ def remove_group(chat_id):
     except Exception as e:
         logger.error(f"Error removing group: {e}")
         return False
-
-
-def get_leaderboard_groups(category, limit=5):
-    """دریافت لیدربرد گروهی"""
-    try:
-        if category == "hop":
-            response = supabase.table("groups").select("chat_id, title, total_hops").eq("is_active", True).order("total_hops", desc=True).limit(limit).execute()
-        elif category == "population":
-            response = supabase.table("groups").select("chat_id, title, member_count").eq("is_active", True).order("member_count", desc=True).limit(limit).execute()
-        elif category == "wealth":
-            response = supabase.table("groups").select("chat_id, title, total_hapo_points").eq("is_active", True).order("total_hapo_points", desc=True).limit(limit).execute()
-        elif category == "hunt":
-            response = supabase.table("groups").select("chat_id, title, total_hunts").eq("is_active", True).order("total_hunts", desc=True).limit(limit).execute()
-        else:
-            return []
-        
-        if response.data:
-            data = response.data
-            for item in data:
-                if category == "hop":
-                    try:
-                        item["total_hops"] = int(float(item.get("total_hops", 0)))
-                    except:
-                        item["total_hops"] = 0
-                elif category == "population":
-                    try:
-                        item["member_count"] = int(float(item.get("member_count", 0)))
-                    except:
-                        item["member_count"] = 0
-                elif category == "wealth":
-                    try:
-                        item["total_hapo_points"] = int(float(item.get("total_hapo_points", 0)))
-                    except:
-                        item["total_hapo_points"] = 0
-                elif category == "hunt":
-                    try:
-                        item["total_hunts"] = int(float(item.get("total_hunts", 0)))
-                    except:
-                        item["total_hunts"] = 0
-            return data
-        return []
-    except Exception as e:
-        logger.error(f"Error getting leaderboard groups: {e}")
-        return []
 
 
 # ================================================================
