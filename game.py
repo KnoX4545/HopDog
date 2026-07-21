@@ -1182,11 +1182,15 @@ class HopDogGame:
         }
 
     # ============================================================
-    # متدهای قاچاق هاپویی
+    # متدهای قاچاق هاپویی - اصلاح شده
     # ============================================================
 
     def start_smuggle(self, count):
         """شروع قاچاق هاپویی"""
+        from config import (
+            SMUGGLE_REQUIRED_LEVEL, SMUGGLE_MIN_HAPO, SMUGGLE_MAX_HAPO,
+            SMUGGLE_TIME_PER_HAPO, SMUGGLE_SUCCESS_CHANCE
+        )
         from datetime import datetime
         import random
         
@@ -1211,21 +1215,21 @@ class HopDogGame:
         if self.data.get("smuggling", False):
             return {"success": False, "reason": "شما در حال حاضر در حال قاچاق هستید"}
         
-        # محاسبه زمان
+        # محاسبه زمان (هر هاپو = 1 ساعت)
         cook_time = count * SMUGGLE_TIME_PER_HAPO
         
-        # محاسبه شانس موفقیت
+        # محاسبه شانس موفقیت (با افزایش تعداد، شانس کم میشه)
         success_chance = SMUGGLE_SUCCESS_CHANCE - (count - SMUGGLE_MIN_HAPO) * 0.02
         success_chance = max(0.30, success_chance)  # حداقل 30%
         
         # شروع قاچاق
         now = datetime.now().timestamp()
         self.data["smuggling"] = True
-        self.data["smuggle_count"] = count
-        self.data["smuggle_start"] = now
-        self.data["smuggle_duration"] = cook_time
-        self.data["smuggle_success_chance"] = success_chance
-        self.data["smuggle_used_hapo"] = count
+        self.data["smuggle_count"] = str(count)
+        self.data["smuggle_start"] = str(now)
+        self.data["smuggle_duration"] = str(cook_time)
+        self.data["smuggle_success_chance"] = str(success_chance)
+        self.data["smuggle_used_hapo"] = str(count)
         
         # کم کردن هاپوهای خیابونی
         self.data["street_hapo_rescued"] = self._to_str(street_hapo - count)
@@ -1240,6 +1244,7 @@ class HopDogGame:
 
     def check_smuggle_status(self):
         """بررسی وضعیت قاچاق"""
+        from config import SMUGGLE_JAIL_DURATION, SMUGGLE_JAIL_FINE, SMUGGLE_REWARD_MIN, SMUGGLE_REWARD_MAX
         from datetime import datetime
         import random
         
@@ -1249,6 +1254,19 @@ class HopDogGame:
         now = datetime.now().timestamp()
         start = self.data.get("smuggle_start", 0)
         duration = self.data.get("smuggle_duration", 0)
+        
+        # تبدیل به float اگر string باشه
+        if isinstance(start, str):
+            try:
+                start = float(start)
+            except:
+                start = 0
+        if isinstance(duration, str):
+            try:
+                duration = float(duration)
+            except:
+                duration = 0
+        
         elapsed = now - start
         
         if elapsed < duration:
@@ -1257,20 +1275,26 @@ class HopDogGame:
             return {
                 "status": "in_progress",
                 "remaining": remaining,
-                "progress": int((elapsed / duration) * 100),
-                "count": self.data.get("smuggle_count", 0)
+                "progress": int((elapsed / duration) * 100) if duration > 0 else 0,
+                "count": self._to_int(self.data.get("smuggle_count", 0))
             }
         
         # قاچاق کامل شد
         success_chance = self.data.get("smuggle_success_chance", 0.60)
-        count = self.data.get("smuggle_count", 0)
+        if isinstance(success_chance, str):
+            try:
+                success_chance = float(success_chance)
+            except:
+                success_chance = 0.60
+        
+        count = self._to_int(self.data.get("smuggle_count", 0))
         
         # پاک کردن وضعیت قاچاق
         self.data["smuggling"] = False
-        self.data["smuggle_count"] = 0
-        self.data["smuggle_start"] = 0
-        self.data["smuggle_duration"] = 0
-        self.data["smuggle_success_chance"] = 0
+        self.data["smuggle_count"] = "0"
+        self.data["smuggle_start"] = "0"
+        self.data["smuggle_duration"] = "0"
+        self.data["smuggle_success_chance"] = "0"
         
         # تصمیم گیری موفقیت یا شکست
         if random.random() < success_chance:
@@ -1310,11 +1334,24 @@ class HopDogGame:
         now = datetime.now().timestamp()
         start = self.data.get("smuggle_start", 0)
         duration = self.data.get("smuggle_duration", 0)
+        
+        # تبدیل به float اگر string باشه
+        if isinstance(start, str):
+            try:
+                start = float(start)
+            except:
+                start = 0
+        if isinstance(duration, str):
+            try:
+                duration = float(duration)
+            except:
+                duration = 0
+        
         elapsed = now - start
         remaining = int(duration - elapsed)
         
         return {
-            "count": self.data.get("smuggle_count", 0),
+            "count": self._to_int(self.data.get("smuggle_count", 0)),
             "remaining": remaining,
             "progress": int((elapsed / duration) * 100) if duration > 0 else 0
         }
