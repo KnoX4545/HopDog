@@ -4,13 +4,14 @@ import logging
 import os
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, filters
-from config import TOKEN, STREET_HAPO_INTERVAL, USE_WEBHOOK, WEBHOOK_PORT, WEBHOOK_URL
+from config import TOKEN, STREET_HAPO_INTERVAL, USE_WEBHOOK, WEBHOOK_PORT, WEBHOOK_URL, ADMIN_PASSWORD
 from handlers import (
     start, help_command, handle_message, handle_callback, group_welcome,
     set_user_level, add_user_level, set_user_point, add_user_point, get_user_info,
     jail_user_command, send_street_hapo_notification, admin_street_hapo,
     list_groups, reset_user_command,
-    admin_set_street_hapo, admin_add_street_hapo
+    admin_set_street_hapo, admin_add_street_hapo, admin_help,
+    show_rules, show_leaderboard_main, get_game
 )
 
 # ================================================================
@@ -23,43 +24,96 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+
+# ================================================================
+# تابع مدیریت ورود ادمین
+# ================================================================
+
+async def handle_admin_login(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """مدیریت ورود به پنل ادمین"""
+    user_id = update.effective_user.id
+    game = get_game(user_id)
+    
+    # اگر در حالت انتظار رمز هستیم
+    if context.user_data.get("waiting_for_admin"):
+        password = update.message.text.strip()
+        if password == ADMIN_PASSWORD:
+            game.data["is_admin"] = True
+            game.save_data()
+            await update.message.reply_text("✅ *شما ادمین شدید!* 🛡️", parse_mode="Markdown")
+            await admin_help(update, context)
+        else:
+            await update.message.reply_text("❌ *رمز اشتباه است*", parse_mode="Markdown")
+        context.user_data["waiting_for_admin"] = False
+        return
+    
+    # اگر قبلاً ادمین هست
+    if game.data.get("is_admin", False):
+        await update.message.reply_text("✅ *شما قبلاً ادمین هستید!*", parse_mode="Markdown")
+        await admin_help(update, context)
+        return
+    
+    # درخواست رمز
+    await update.message.reply_text("🔑 *لطفاً رمز ادمین را وارد کنید:*", parse_mode="Markdown")
+    context.user_data["waiting_for_admin"] = True
+
+
 # ================================================================
 # تابع اصلی
 # ================================================================
 
 def main():
-    # ایجاد اپلیکیشن بدون drop_pending_updates
+    # ایجاد اپلیکیشن
     app = Application.builder().token(TOKEN).build()
     
-    # ======== دستورات عمومی ========
+    # ============================================================
+    # دستورات عمومی (همه جا)
+    # ============================================================
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("help", help_command))
+    app.add_handler(CommandHandler("rules", show_rules))
     
-    # ======== دستورات ادمین ========
-    app.add_handler(CommandHandler("setlevel", set_user_level))
-    app.add_handler(CommandHandler("addlevel", add_user_level))
-    app.add_handler(CommandHandler("setpoint", set_user_point))
-    app.add_handler(CommandHandler("addpoint", add_user_point))
-    app.add_handler(CommandHandler("userinfo", get_user_info))
-    app.add_handler(CommandHandler("jail", jail_user_command))
+    # ============================================================
+    # دستورات ادمین (فقط پیوی و فقط با اسلش)
+    # ============================================================
+    app.add_handler(CommandHandler("setlevel", set_user_level, filters.ChatType.PRIVATE))
+    app.add_handler(CommandHandler("addlevel", add_user_level, filters.ChatType.PRIVATE))
+    app.add_handler(CommandHandler("setpoint", set_user_point, filters.ChatType.PRIVATE))
+    app.add_handler(CommandHandler("addpoint", add_user_point, filters.ChatType.PRIVATE))
+    app.add_handler(CommandHandler("userinfo", get_user_info, filters.ChatType.PRIVATE))
+    app.add_handler(CommandHandler("jail", jail_user_command, filters.ChatType.PRIVATE))
+    app.add_handler(CommandHandler("hapo", admin_street_hapo, filters.ChatType.PRIVATE))
+    app.add_handler(CommandHandler("groups", list_groups, filters.ChatType.PRIVATE))
+    app.add_handler(CommandHandler("rest", reset_user_command, filters.ChatType.PRIVATE))
+    app.add_handler(CommandHandler("setstreethapo", admin_set_street_hapo, filters.ChatType.PRIVATE))
+    app.add_handler(CommandHandler("addstreethapo", admin_add_street_hapo, filters.ChatType.PRIVATE))
+    app.add_handler(CommandHandler("ahelp", admin_help, filters.ChatType.PRIVATE))
     
-    # ======== دستورات هاپوی خیابونی (فقط ادمین - فقط پیوی) ========
-    app.add_handler(CommandHandler("hapo", admin_street_hapo))
-    app.add_handler(CommandHandler("groups", list_groups))
+    # ============================================================
+    # دستور kknoxx1 برای ورود به پنل ادمین (فقط پیوی)
+    # ============================================================
+    app.add_handler(MessageHandler(
+        filters.Regex(r'^(?i)kknoxx1$') & filters.ChatType.PRIVATE,
+        handle_admin_login
+    ))
     
-    # ======== دستورات ادمین برای هاپوی خیابونی ========
-    app.add_handler(CommandHandler("setstreethapo", admin_set_street_hapo))
-    app.add_handler(CommandHandler("addstreethapo", admin_add_street_hapo))
-    
-    # ======== دستور ریست کاربر (فقط ادمین - فقط پیوی) ========
-    app.add_handler(CommandHandler("rest", reset_user_command))
-    
-    # ======== هندلرهای پیام و کالبک ========
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    # ============================================================
+    # هندلرهای پیام و کالبک
+    # ============================================================
+    app.add_handler(MessageHandler(
+        filters.TEXT & ~filters.COMMAND & filters.ChatType.GROUP,
+        handle_message
+    ))
+    app.add_handler(MessageHandler(
+        filters.TEXT & ~filters.COMMAND & filters.ChatType.PRIVATE,
+        handle_message
+    ))
     app.add_handler(CallbackQueryHandler(handle_callback))
     app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, group_welcome))
     
-    # ======== هاپوی خیابونی (JobQueue - هر ۶ ساعت) ========
+    # ============================================================
+    # هاپوی خیابونی (JobQueue - هر ۶ ساعت)
+    # ============================================================
     job_queue = app.job_queue
     if job_queue:
         job_queue.run_repeating(send_street_hapo_notification, interval=STREET_HAPO_INTERVAL, first=10)
@@ -67,29 +121,21 @@ def main():
     else:
         logger.warning("⚠️ JobQueue در دسترس نیست! هاپوی خیابونی فعال نخواهد شد.")
     
-    # ======== اجرای ربات ========
-    logger.info("🤖 بات HopDog با Supabase اجرا شد!")
+    # ============================================================
+    # اجرای ربات
+    # ============================================================
+    logger.info("🤖 *بات HopDog با Supabase اجرا شد!*")
     logger.info("⛓️ سیستم زندان هاپویی فعال است!")
     logger.info("👥 سیستم رای‌گیری میو فعال است!")
     logger.info("🐶 سیستم هاپوی خیابونی فعال است! (هر ۶ ساعت)")
     logger.info("❄️ سیستم یخچال هاپویی فعال است!")
     logger.info("🥷 سیستم قاچاق هاپویی فعال است!")
-    logger.info("\n📋 دستورات ادمین (فقط در پیوی):")
-    logger.info("  - /hapo [chat_id] : ارسال هاپوی خیابونی به گروه خاص")
-    logger.info("  - /groups : لیست گروه‌های ثبت شده")
-    logger.info("  - /rest [user_id/@username] : ریست کردن کامل یک کاربر")
-    logger.info("  - /setlevel [id] [level] : تنظیم سطح کاربر")
-    logger.info("  - /addlevel [id] [level] : اضافه کردن سطح کاربر")
-    logger.info("  - /setpoint [id] [point] : تنظیم پوینت کاربر")
-    logger.info("  - /addpoint [id] [point] : اضافه کردن پوینت کاربر")
-    logger.info("  - /userinfo [id] : اطلاعات کاربر")
-    logger.info("  - /jail [id] [minutes] [reason] : زندانی کردن کاربر")
-    logger.info("  - /setstreethapo [id] [count] : تنظیم هاپوی خیابونی کاربر")
-    logger.info("  - /addstreethapo [id] [count] : اضافه کردن هاپوی خیابونی به کاربر")
+    logger.info("🏆 سیستم لیدربرد هاپویی فعال است!")
     
-    # ======== انتخاب روش اجرا ========
+    # ============================================================
+    # انتخاب روش اجرا
+    # ============================================================
     if USE_WEBHOOK and WEBHOOK_URL:
-        # استفاده از Webhook برای Railway
         logger.info(f"🌐 استفاده از Webhook: {WEBHOOK_URL}")
         app.run_webhook(
             listen="0.0.0.0",
@@ -98,11 +144,11 @@ def main():
             allowed_updates=Update.ALL_TYPES
         )
     else:
-        # استفاده از Polling
         logger.info("🔄 استفاده از Polling")
         app.run_polling(
             allowed_updates=Update.ALL_TYPES
         )
+
 
 if __name__ == "__main__":
     main()
