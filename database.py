@@ -1,4 +1,4 @@
-# database.py - نسخه نهایی با ستون‌های یخچال و قاچاق
+# database.py - نسخه نهایی با ستون‌های یخچال، قاچاق و لیدربرد
 
 import json
 import logging
@@ -82,29 +82,11 @@ def get_user_data(user_id):
             if "smuggle_used_hapo" not in data:
                 data["smuggle_used_hapo"] = "0"
             
-            # تبدیل String به عدد برای استفاده در کد
-            if "hop_point" in data and isinstance(data["hop_point"], str):
-                try:
-                    data["hop_point"] = int(float(data["hop_point"]))
-                except:
-                    data["hop_point"] = 0
-            if "level" in data and isinstance(data["level"], str):
-                try:
-                    data["level"] = int(data["level"])
-                except:
-                    data["level"] = 1
-            if "hop_count" in data and isinstance(data["hop_count"], str):
-                try:
-                    data["hop_count"] = int(float(data["hop_count"]))
-                except:
-                    data["hop_count"] = 0
-            if "last_hop_time" in data and isinstance(data["last_hop_time"], str):
-                try:
-                    data["last_hop_time"] = float(data["last_hop_time"])
-                except:
-                    data["last_hop_time"] = 0
+            # فیلدهای لیدربرد
+            if "total_hunts" not in data:
+                data["total_hunts"] = "0"
             
-            # چک کردن زندان
+            # چک کردن خودکار آزادی
             if data.get("jailed", False):
                 now = datetime.now().timestamp()
                 jail_until = float(data.get("jail_until", 0))
@@ -116,7 +98,6 @@ def get_user_data(user_id):
                     data["jail_arrest_time"] = "0"
                     data["jail_admin_id"] = None
                     save_user_data(user_id, data)
-            
             return data
         return None
     except Exception as e:
@@ -164,7 +145,8 @@ def save_user_data(user_id, data):
             "street_hapo_rescued",
             "jail_until", "jail_fine", "jail_arrest_time",
             "fridge_level", "smuggle_count", "smuggle_start", 
-            "smuggle_duration", "smuggle_success_chance", "smuggle_used_hapo"
+            "smuggle_duration", "smuggle_success_chance", "smuggle_used_hapo",
+            "total_hunts"
         ]
         
         for field in string_fields:
@@ -253,7 +235,11 @@ def add_group(chat_id, title):
             "title": title,
             "added_at": datetime.now().isoformat(),
             "is_active": True,
-            "last_activity": datetime.now().isoformat()
+            "last_activity": datetime.now().isoformat(),
+            "total_hops": "0",
+            "total_hapo_points": "0",
+            "total_hunts": "0",
+            "member_count": "0"
         }).execute()
         return True
     except Exception as e:
