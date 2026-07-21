@@ -1,20 +1,35 @@
 # bot.py - فایل اصلی (ورودی برنامه)
 
 import logging
+import os
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, filters
-from config import TOKEN, STREET_HAPO_INTERVAL
+from config import TOKEN, STREET_HAPO_INTERVAL, USE_WEBHOOK, WEBHOOK_PORT, WEBHOOK_URL
 from handlers import (
     start, help_command, handle_message, handle_callback, group_welcome,
     set_user_level, add_user_level, set_user_point, add_user_point, get_user_info,
     jail_user_command, send_street_hapo_notification, admin_street_hapo,
-    list_groups, reset_user_command
+    list_groups, reset_user_command,
+    admin_set_street_hapo, admin_add_street_hapo
 )
 
-logging.basicConfig(level=logging.INFO)
+# ================================================================
+# تنظیمات لاگ
+# ================================================================
+
+logging.basicConfig(
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    level=logging.INFO
+)
+logger = logging.getLogger(__name__)
+
+# ================================================================
+# تابع اصلی
+# ================================================================
 
 def main():
-    app = Application.builder().token(TOKEN).build()
+    # drop_pending_updates=True برای جلوگیری از Conflict
+    app = Application.builder().token(TOKEN).drop_pending_updates(True).build()
     
     # ======== دستورات عمومی ========
     app.add_handler(CommandHandler("start", start))
@@ -32,6 +47,10 @@ def main():
     app.add_handler(CommandHandler("hapo", admin_street_hapo))
     app.add_handler(CommandHandler("groups", list_groups))
     
+    # ======== دستورات ادمین برای هاپوی خیابونی ========
+    app.add_handler(CommandHandler("setstreethapo", admin_set_street_hapo))
+    app.add_handler(CommandHandler("addstreethapo", admin_add_street_hapo))
+    
     # ======== دستور ریست کاربر (فقط ادمین - فقط پیوی) ========
     app.add_handler(CommandHandler("rest", reset_user_command))
     
@@ -44,27 +63,48 @@ def main():
     job_queue = app.job_queue
     if job_queue:
         job_queue.run_repeating(send_street_hapo_notification, interval=STREET_HAPO_INTERVAL, first=10)
-        logging.info("✅ هاپوی خیابونی: هر ۶ ساعت یکبار فعال شد")
+        logger.info("✅ هاپوی خیابونی: هر ۶ ساعت یکبار فعال شد")
     else:
-        logging.warning("⚠️ JobQueue در دسترس نیست! هاپوی خیابونی فعال نخواهد شد.")
+        logger.warning("⚠️ JobQueue در دسترس نیست! هاپوی خیابونی فعال نخواهد شد.")
     
-    # ======== شروع ربات ========
-    print("🤖 بات HopDog با Supabase اجرا شد!")
-    print("⛓️ سیستم زندان هاپویی فعال است!")
-    print("👥 سیستم رای‌گیری میو فعال است!")
-    print("🐶 سیستم هاپوی خیابونی فعال است! (هر ۶ ساعت)")
-    print("\n📋 دستورات ادمین (فقط در پیوی):")
-    print("  - /hapo [chat_id] : ارسال هاپوی خیابونی به گروه خاص")
-    print("  - /groups : لیست گروه‌های ثبت شده")
-    print("  - /rest [user_id/@username] : ریست کردن کامل یک کاربر")
-    print("  - /setlevel [id] [level] : تنظیم سطح کاربر")
-    print("  - /addlevel [id] [level] : اضافه کردن سطح کاربر")
-    print("  - /setpoint [id] [point] : تنظیم پوینت کاربر")
-    print("  - /addpoint [id] [point] : اضافه کردن پوینت کاربر")
-    print("  - /userinfo [id] : اطلاعات کاربر")
-    print("  - /jail [id] [minutes] [reason] : زندانی کردن کاربر")
+    # ======== اجرای ربات ========
+    logger.info("🤖 بات HopDog با Supabase اجرا شد!")
+    logger.info("⛓️ سیستم زندان هاپویی فعال است!")
+    logger.info("👥 سیستم رای‌گیری میو فعال است!")
+    logger.info("🐶 سیستم هاپوی خیابونی فعال است! (هر ۶ ساعت)")
+    logger.info("❄️ سیستم یخچال هاپویی فعال است!")
+    logger.info("🥷 سیستم قاچاق هاپویی فعال است!")
+    logger.info("\n📋 دستورات ادمین (فقط در پیوی):")
+    logger.info("  - /hapo [chat_id] : ارسال هاپوی خیابونی به گروه خاص")
+    logger.info("  - /groups : لیست گروه‌های ثبت شده")
+    logger.info("  - /rest [user_id/@username] : ریست کردن کامل یک کاربر")
+    logger.info("  - /setlevel [id] [level] : تنظیم سطح کاربر")
+    logger.info("  - /addlevel [id] [level] : اضافه کردن سطح کاربر")
+    logger.info("  - /setpoint [id] [point] : تنظیم پوینت کاربر")
+    logger.info("  - /addpoint [id] [point] : اضافه کردن پوینت کاربر")
+    logger.info("  - /userinfo [id] : اطلاعات کاربر")
+    logger.info("  - /jail [id] [minutes] [reason] : زندانی کردن کاربر")
+    logger.info("  - /setstreethapo [id] [count] : تنظیم هاپوی خیابونی کاربر")
+    logger.info("  - /addstreethapo [id] [count] : اضافه کردن هاپوی خیابونی به کاربر")
     
-    app.run_polling(allowed_updates=Update.ALL_TYPES)
+    # ======== انتخاب روش اجرا ========
+    if USE_WEBHOOK and WEBHOOK_URL:
+        # استفاده از Webhook برای Railway
+        logger.info(f"🌐 استفاده از Webhook: {WEBHOOK_URL}")
+        app.run_webhook(
+            listen="0.0.0.0",
+            port=WEBHOOK_PORT,
+            webhook_url=f"{WEBHOOK_URL}/webhook",
+            drop_pending_updates=True,
+            allowed_updates=Update.ALL_TYPES
+        )
+    else:
+        # استفاده از Polling
+        logger.info("🔄 استفاده از Polling")
+        app.run_polling(
+            drop_pending_updates=True,
+            allowed_updates=Update.ALL_TYPES
+        )
 
 if __name__ == "__main__":
     main()
