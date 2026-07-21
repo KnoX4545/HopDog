@@ -1343,7 +1343,6 @@ async def handle_fridge_back(update: Update, context: ContextTypes.DEFAULT_TYPE,
     
     await show_fridge_menu(update, game)
 
-
 async def handle_hunt_to_fridge(update: Update, context: ContextTypes.DEFAULT_TYPE, query, animal_name):
     """ذخیره حیوان شکار شده در یخچال"""
     user_id = update.effective_user.id
@@ -1360,17 +1359,27 @@ async def handle_hunt_to_fridge(update: Update, context: ContextTypes.DEFAULT_TY
         await query.edit_message_text("❌ خطا در شناسایی حیوان")
         return
     
-    if game.data.get("hunt_time", 0) > 0:
-        now = datetime.now().timestamp()
-        hunt_time = game.data["hunt_time"]
-        if isinstance(hunt_time, str):
+    # اصلاح: تبدیل hunt_time به float قبل از مقایسه
+    hunt_time = game.data.get("hunt_time", 0)
+    if isinstance(hunt_time, str):
+        try:
             hunt_time = float(hunt_time)
+        except:
+            hunt_time = 0
+    
+    if hunt_time > 0:
+        now = datetime.now().timestamp()
         if (now - hunt_time) > HUNT_DECISION_TIMER:
             game.data["current_hunt_animal"] = None
             game.data["hunt_time"] = "0"
             game.save_data()
             await query.edit_message_text("🦌 حیوان فرار کرد! وقتت تموم شد.")
             return
+    
+    # بررسی اینکه یخچال خریداری شده یا نه
+    if not game.data.get("fridge_owned", False):
+        await query.edit_message_text("❌ شما یخچال هاپویی ندارید! با دستور «یخچال هاپویی» بخر.")
+        return
     
     result = game.add_to_fridge(animal)
     if result["success"]:
@@ -1383,8 +1392,7 @@ async def handle_hunt_to_fridge(update: Update, context: ContextTypes.DEFAULT_TY
         )
     else:
         await query.edit_message_text(f"❌ {result['reason']}")
-
-
+        
 # ================================================================
 # قاچاق هاپویی
 # ================================================================
