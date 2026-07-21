@@ -1,4 +1,4 @@
-# handlers.py - هندلرهای پیام و کالبک (نسخه نهایی با دیباگ کامل)
+# handlers.py - هندلرهای پیام و کالبک (نسخه نهایی اصلاح شده)
 
 import os
 import json
@@ -288,67 +288,130 @@ def check_spam(user_id):
 
 
 # ================================================================
-# توابع لیدربرد
+# توابع لیدربرد - اصلاح شده
 # ================================================================
 
 async def get_leaderboard_data(category, limit=250, group=False):
-    """دریافت داده‌های لیدربرد از دیتابیس"""
+    """دریافت داده‌های لیدربرد از دیتابیس با مرتب‌سازی صحیح"""
     try:
         if group:
             limit = LEADERBOARD_MAX_GROUPS
             if category == "hop":
-                response = supabase.table("groups").select("chat_id, title, total_hops").eq("is_active", True).order("total_hops", desc=True).limit(limit).execute()
+                response = supabase.table("groups").select("chat_id, title, total_hops").eq("is_active", True).execute()
+                if response.data:
+                    data = response.data
+                    for item in data:
+                        try:
+                            item["total_hops"] = int(float(item.get("total_hops", 0)))
+                        except:
+                            item["total_hops"] = 0
+                    data.sort(key=lambda x: x["total_hops"], reverse=True)
+                    return data[:limit]
+                return []
             elif category == "population":
-                response = supabase.table("groups").select("chat_id, title, member_count").eq("is_active", True).order("member_count", desc=True).limit(limit).execute()
+                response = supabase.table("groups").select("chat_id, title, member_count").eq("is_active", True).execute()
+                if response.data:
+                    data = response.data
+                    for item in data:
+                        try:
+                            item["member_count"] = int(float(item.get("member_count", 0)))
+                        except:
+                            item["member_count"] = 0
+                    data.sort(key=lambda x: x["member_count"], reverse=True)
+                    return data[:limit]
+                return []
             elif category == "wealth":
-                response = supabase.table("groups").select("chat_id, title, total_hapo_points").eq("is_active", True).order("total_hapo_points", desc=True).limit(limit).execute()
+                response = supabase.table("groups").select("chat_id, title, total_hapo_points").eq("is_active", True).execute()
+                if response.data:
+                    data = response.data
+                    for item in data:
+                        try:
+                            item["total_hapo_points"] = int(float(item.get("total_hapo_points", 0)))
+                        except:
+                            item["total_hapo_points"] = 0
+                    data.sort(key=lambda x: x["total_hapo_points"], reverse=True)
+                    return data[:limit]
+                return []
             elif category == "hunt":
-                response = supabase.table("groups").select("chat_id, title, total_hunts").eq("is_active", True).order("total_hunts", desc=True).limit(limit).execute()
+                response = supabase.table("groups").select("chat_id, title, total_hunts").eq("is_active", True).execute()
+                if response.data:
+                    data = response.data
+                    for item in data:
+                        try:
+                            item["total_hunts"] = int(float(item.get("total_hunts", 0)))
+                        except:
+                            item["total_hunts"] = 0
+                    data.sort(key=lambda x: x["total_hunts"], reverse=True)
+                    return data[:limit]
+                return []
             else:
                 return []
-            
-            if response.data:
-                return response.data
-            return []
         else:
             if category == "point":
-                response = supabase.table("users").select("user_id, player_name, hop_point").order("hop_point", desc=True).limit(limit).execute()
+                response = supabase.table("users").select("user_id, player_name, hop_point").execute()
+                if response.data:
+                    data = response.data
+                    for item in data:
+                        try:
+                            item["hop_point"] = int(float(item.get("hop_point", 0)))
+                        except:
+                            item["hop_point"] = 0
+                    data.sort(key=lambda x: x["hop_point"], reverse=True)
+                    return data[:limit]
+                return []
             elif category == "hop":
-                response = supabase.table("users").select("user_id, player_name, hop_count").order("hop_count", desc=True).limit(limit).execute()
+                response = supabase.table("users").select("user_id, player_name, hop_count").execute()
+                if response.data:
+                    data = response.data
+                    for item in data:
+                        try:
+                            item["hop_count"] = int(float(item.get("hop_count", 0)))
+                        except:
+                            item["hop_count"] = 0
+                    data.sort(key=lambda x: x["hop_count"], reverse=True)
+                    return data[:limit]
+                return []
             elif category == "street":
-                response = supabase.table("users").select("user_id, player_name, street_hapo_rescued").order("street_hapo_rescued", desc=True).limit(limit).execute()
+                response = supabase.table("users").select("user_id, player_name, street_hapo_rescued").execute()
+                if response.data:
+                    data = response.data
+                    for item in data:
+                        try:
+                            item["street_hapo_rescued"] = int(float(item.get("street_hapo_rescued", 0)))
+                        except:
+                            item["street_hapo_rescued"] = 0
+                    data.sort(key=lambda x: x["street_hapo_rescued"], reverse=True)
+                    return data[:limit]
+                return []
             elif category == "hunt":
-                response = supabase.table("users").select("user_id, player_name, total_hunts").order("total_hunts", desc=True).limit(limit).execute()
+                response = supabase.table("users").select("user_id, player_name, total_hunts").execute()
+                if response.data:
+                    data = response.data
+                    for item in data:
+                        try:
+                            item["total_hunts"] = int(float(item.get("total_hunts", 0)))
+                        except:
+                            item["total_hunts"] = 0
+                    data.sort(key=lambda x: x["total_hunts"], reverse=True)
+                    return data[:limit]
+                return []
             else:
                 return []
-            
-            if response.data:
-                return response.data
-            return []
     except Exception as e:
-        logging.error(f"Error getting leaderboard data: {e}")
+        logger.error(f"Error getting leaderboard data: {e}")
         return []
 
 
 async def get_user_rank(user_id, category):
     """دریافت رتبه کاربر در لیدربرد"""
     try:
-        if category == "point":
-            response = supabase.table("users").select("user_id").gt("hop_point", f"{user_id}").execute()
-        elif category == "hop":
-            response = supabase.table("users").select("user_id").gt("hop_count", f"{user_id}").execute()
-        elif category == "street":
-            response = supabase.table("users").select("user_id").gt("street_hapo_rescued", f"{user_id}").execute()
-        elif category == "hunt":
-            response = supabase.table("users").select("user_id").gt("total_hunts", f"{user_id}").execute()
-        else:
-            return None
-        
-        if response.data:
-            return len(response.data) + 1
-        return 1
+        data = await get_leaderboard_data(category, limit=1000, group=False)
+        for i, item in enumerate(data):
+            if str(item.get("user_id")) == str(user_id):
+                return i + 1
+        return None
     except Exception as e:
-        logging.error(f"Error getting user rank: {e}")
+        logger.error(f"Error getting user rank: {e}")
         return None
 
 
@@ -620,7 +683,7 @@ async def group_welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
                             parse_mode="Markdown"
                         )
                 except Exception as e:
-                    logging.error(f"Error checking group members: {e}")
+                    logger.error(f"Error checking group members: {e}")
                 break
 
 
@@ -780,13 +843,11 @@ async def my_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if isinstance(level, str):
         level = int(level) if level.isdigit() else 1
     
-    # دریافت رتبه‌ها
     point_rank = await get_user_rank(user_id, "point")
     hop_rank = await get_user_rank(user_id, "hop")
     street_rank = await get_user_rank(user_id, "street")
     hunt_rank = await get_user_rank(user_id, "hunt")
     
-    # تعداد شکار
     total_hunts = game.data.get("total_hunts", 0)
     if isinstance(total_hunts, str):
         try:
@@ -908,13 +969,11 @@ async def show_user_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if isinstance(level, str):
         level = int(level) if level.isdigit() else 1
     
-    # دریافت رتبه‌ها
     point_rank = await get_user_rank(target_user_id, "point")
     hop_rank = await get_user_rank(target_user_id, "hop")
     street_rank = await get_user_rank(target_user_id, "street")
     hunt_rank = await get_user_rank(target_user_id, "hunt")
     
-    # تعداد شکار
     total_hunts = target_data.get("total_hunts", 0)
     if isinstance(total_hunts, str):
         try:
@@ -989,6 +1048,17 @@ async def do_hop(update: Update, game):
         await update.message.reply_text(f"⏳ *هنوز هاپت نمیاد ...*\nباید {mins}:{secs:02d} صبر کنی", parse_mode="Markdown")
         return
     
+    # ======== آپدیت آمار گروه برای لیدربرد ========
+    try:
+        if update.message.chat.type in ["group", "supergroup"]:
+            chat_id = update.message.chat.id
+            response = supabase.table("groups").select("total_hops").eq("chat_id", str(chat_id)).execute()
+            if response.data:
+                current = int(float(response.data[0].get("total_hops", 0)))
+                supabase.table("groups").update({"total_hops": str(current + 1)}).eq("chat_id", str(chat_id)).execute()
+    except Exception as e:
+        logger.error(f"Error updating group hops: {e}")
+    
     hop_point = game.data["hop_point"]
     if isinstance(hop_point, str):
         try:
@@ -1036,7 +1106,7 @@ async def show_hapo_menu(update: Update, game):
         keyboard = get_hapo_menu_keyboard(game)
         await update.message.reply_text(msg, reply_markup=keyboard)
     except Exception as e:
-        logging.error(f"Error in show_hapo_menu: {e}")
+        logger.error(f"Error in show_hapo_menu: {e}")
         await update.message.reply_text("🐕 *هاپو*\n\n❌ *خطا در نمایش منوی هاپو. لطفاً دوباره تلاش کنید.*", parse_mode="Markdown")
 
 
@@ -1177,7 +1247,7 @@ async def hunt_animal_timer(update: Update, context: ContextTypes.DEFAULT_TYPE, 
             except:
                 pass
     except Exception as e:
-        logging.error(f"Error in hunt_animal_timer: {e}")
+        logger.error(f"Error in hunt_animal_timer: {e}")
 
 
 # ================================================================
@@ -1221,7 +1291,7 @@ async def show_bank_menu(update: Update, game):
         keyboard = get_bank_keyboard(False)
         await update.message.reply_text(msg, reply_markup=keyboard)
     except Exception as e:
-        logging.error(f"Error in show_bank_menu: {e}")
+        logger.error(f"Error in show_bank_menu: {e}")
         await update.message.reply_text("🏦 *بانک هاپویی*\n\n❌ *خطا در نمایش بانک. لطفاً دوباره تلاش کنید.*", parse_mode="Markdown")
 
 
@@ -1786,7 +1856,7 @@ async def cook_timer(update: Update, context: ContextTypes.DEFAULT_TYPE, user_id
         except:
             pass
     except Exception as e:
-        logging.error(f"Error in cook_timer: {e}")
+        logger.error(f"Error in cook_timer: {e}")
 
 
 async def handle_fridge_sell(update: Update, context: ContextTypes.DEFAULT_TYPE, query, index):
@@ -2085,7 +2155,7 @@ async def smuggle_timer(update: Update, context: ContextTypes.DEFAULT_TYPE, user
             except:
                 pass
     except Exception as e:
-        logging.error(f"Error in smuggle_timer: {e}")
+        logger.error(f"Error in smuggle_timer: {e}")
 
 
 # ================================================================
@@ -2427,7 +2497,7 @@ async def send_street_hapo_notification(context: ContextTypes.DEFAULT_TYPE):
         asyncio.create_task(street_hapo_timer(street_hapo, context))
         
     except Exception as e:
-        logging.error(f"Error sending street hapo notification: {e}")
+        logger.error(f"Error sending street hapo notification: {e}")
 
 
 async def street_hapo_timer(street_hapo, context):
@@ -2610,7 +2680,7 @@ async def admin_street_hapo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"✅ *هاپوی خیابونی به گروه با chat_id `{parts[1]}` ارسال شد!*", parse_mode="Markdown")
         
     except Exception as e:
-        logging.error(f"Error sending admin street hapo: {e}")
+        logger.error(f"Error sending admin street hapo: {e}")
         street_hapo.active = False
         street_hapo.save_status()
         await update.message.reply_text(f"❌ *خطا در ارسال:* {e}", parse_mode="Markdown")
@@ -2915,7 +2985,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         is_private = update.message.chat.type == "private"
         is_group = update.message.chat.type in ["group", "supergroup"]
         
-        # ======== لاگ قوی ========
+        # ======== لاگ ========
         logger.info(f"📩 پیام از {user_id} در {update.message.chat.type}: '{text}'")
         
         if is_group:
@@ -3045,7 +3115,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
         
         # ============================================================
-        # گروه
+        # گروه - نسخه اصلاح شده با ترتیب درست
         # ============================================================
         if is_group:
             text_clean = text_lower.strip()
@@ -3053,75 +3123,80 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             # ======== لاگ ========
             logger.info(f"📩 گروه - پردازش: '{text_clean}' از {user_id}")
             
-            # زندان
+            # 1. زندان
             if text_clean in ["زندان هاپویی", "زندان"]:
                 await show_jail(update, context)
                 return
             
-            # میو
+            # 2. میو
             if text_clean in ["میو", "معو", "میاو", "میو میو", "mio", "mio mio", "meo", "meo meo", "meow", "meow meow"]:
                 await handle_meow(update, context)
                 return
             
-            # پروفایل خود
+            # 3. پروفایل خود (قبل از هاپو)
             if text_clean in ["هاپوهام", "هاپو هام"]:
                 await my_profile(update, context)
                 return
             
-            # پروفایل دیگران
+            # 4. پروفایل دیگران (قبل از هاپو)
             if text_clean in ["هاپوهاش", "هاپو هاش"]:
                 await show_user_profile(update, context)
                 return
             
-            # انتقال
+            # 5. انتقال
             if text_clean in ["انتقال هاپویی", "انتقالهاپویی"]:
                 await transfer_points_command(update, context)
                 return
             
-            # هاپ هاپ - با startswith
-            hop_keywords = ["هاپ هاپ", "هاپ", "hop", "hop hop", "واق", "واق واق", "هاپ هوپ", "هوپ", "hap", "hap hap"]
-            if any(text_clean == kw or text_clean.startswith(kw) for kw in hop_keywords):
+            # 6. هاپ (کوتاه‌ترین دستور)
+            if text_clean in ["هاپ", "hop", "واق", "هوپ", "hap"]:
+                logger.info(f"✅ شناسایی شد: هاپ از {user_id}")
+                await do_hop(update, game)
+                return
+            
+            # 7. هاپ هاپ (با فاصله)
+            if text_clean in ["هاپ هاپ", "hop hop", "واق واق", "هاپ هوپ", "hap hap"]:
                 logger.info(f"✅ شناسایی شد: هاپ هاپ از {user_id}")
                 await do_hop(update, game)
                 return
             
-            # آکادمی
-            if text_clean in ["آکادمی هاپویی", "اکادمی هاپویی", "اکادمی", "آکادمی"]:
-                await show_academy_main(update)
-                return
-            
-            # لیدربرد
-            if text_clean in ["لیدربرد هاپویی", "لیدربرد", "leaderboard"]:
-                await show_leaderboard_main(update, context)
-                return
-            
-            # هاپو
+            # 8. هاپو - آخرین دستور (مهم!)
             hapo_name_lower = game.data.get("hapo_name", "").lower().strip()
             if text_clean in ["هاپو", "hapo"] or (hapo_name_lower and text_clean == hapo_name_lower):
                 await show_hapo_menu(update, game)
                 return
             
-            # پنجه
+            # 9. آکادمی
+            if text_clean in ["آکادمی هاپویی", "اکادمی هاپویی", "اکادمی", "آکادمی"]:
+                await show_academy_main(update)
+                return
+            
+            # 10. لیدربرد
+            if text_clean in ["لیدربرد هاپویی", "لیدربرد", "leaderboard"]:
+                await show_leaderboard_main(update, context)
+                return
+            
+            # 11. پنجه
             if text_clean in ["پنجه", "claw"]:
                 await show_claw_menu(update, game)
                 return
             
-            # شکار
+            # 12. شکار
             if text_clean in ["شکار", "hunt"]:
                 await do_hunt(update, game)
                 return
             
-            # بانک
+            # 13. بانک
             if text_clean in ["بانک هاپویی", "هاپو بانک", "بانک"]:
                 await show_bank_menu(update, game)
                 return
             
-            # یخچال
+            # 14. یخچال
             if text_clean in ["یخچال هاپویی", "یخچال"]:
                 await show_fridge_menu(update, game)
                 return
             
-            # قاچاق
+            # 15. قاچاق
             if text_clean in ["قاچاق هاپویی", "قاچاق"]:
                 await show_smuggle_menu(update, game)
                 return
@@ -3140,7 +3215,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 # ================================================================
-# هندلر Callback - ادامه
+# ادامه handle_callback
 # ================================================================
 
 async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
