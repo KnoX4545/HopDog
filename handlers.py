@@ -1,4 +1,4 @@
-# handlers.py - هندلرهای پیام و کالبک (نسخه کامل با اصلاحات بازی)
+# handlers.py - هندلرهای پیام و کالبک (نسخه کامل با اصلاح GAME_XO_STATE)
 
 import os
 import json
@@ -53,14 +53,15 @@ from academy import (
 )
 
 # ================================================================
-# Import بازی‌ها (جدید)
+# Import بازی‌ها (با GAME_XO_STATE)
 # ================================================================
 
 from game_functions import game_manager
 from game_handlers import (
     show_games_menu, show_xo_main, handle_xo_set_bet, process_xo_bet,
     handle_xo_create, handle_xo_join, handle_xo_move,
-    handle_xo_close, handle_xo_cancel
+    handle_xo_close, handle_xo_cancel,
+    GAME_XO_STATE
 )
 
 # ================================================================
@@ -3237,7 +3238,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ================================================================
 
 async def my_profile_from_callback(query, game):
-    user_id = int(game.user_id)  # اصلاح: استفاده از game.user_id
+    user_id = int(game.user_id)
     full_name = game.data["player_name"]
     required = game.get_required_for_level(game._to_int(game.data["level"]))
     is_hidden = game.data.get("profile_hidden", False)
