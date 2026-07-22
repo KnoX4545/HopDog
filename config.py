@@ -1,4 +1,4 @@
-# config.py - تنظیمات و ثابت‌های اصلی (نسخه نهایی)
+# config.py - تنظیمات و ثابت‌های اصلی (نسخه نهایی کامل)
 
 import os
 from datetime import timedelta
@@ -279,6 +279,20 @@ SMUGGLE_JAIL_DURATION = 40 * 60
 SMUGGLE_JAIL_FINE = 5000
 SMUGGLE_SUCCESS_CHANCE = 0.60
 SMUGGLE_FAIL_CHANCE = 0.40
+
+# ================================================================
+# تنظیمات بازی‌ها (جدید)
+# ================================================================
+
+GAME_REQUIRED_LEVEL = 2
+GAME_HOST_REQUIRED_LEVEL = 3
+GAME_XO_MIN_BET = 50
+GAME_XO_MAX_BET = 1000000
+GAME_TURN_TIMEOUT = 60  # 60 ثانیه
+GAME_COOLDOWN = 120  # 2 دقیقه بین بازی‌ها
+GAME_XO_BOARD_SIZE = 3
+GAME_MAX_ACTIVE_GAMES = 50
+GAME_CLEANUP_DELAY = 300  # 5 دقیقه بعد از پایان بازی
 
 # ================================================================
 # تنظیمات لیدربرد
