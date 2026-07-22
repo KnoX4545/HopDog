@@ -1,4 +1,4 @@
-# game.py - کلاس اصلی بازی (نسخه نهایی کامل)
+# game.py - کلاس اصلی بازی (نسخه نهایی کامل با بازی‌ها)
 
 import random
 import json
@@ -283,25 +283,16 @@ class HopDogGame:
         return HAPO_PRODUCTION[keys[-1]]
 
     def get_hapo_upgrade_price(self):
-        """دریافت هزینه ارتقا سطح هاپو - مستقل از مقام"""
         total = self.get_hapo_total_level()
         
-        # حداکثر سطح 20 هست
         if total >= 20:
             return float('inf')
         
-        # سطح بعدی برای ارتقا = total + 1
         next_level = total + 1
         
-        logger.info(f"🔍 هاپو - سطح کل: {total}, سطح بعدی: {next_level}")
-        
-        # قیمت رو از دیکشنری بگیر
         if next_level in HAPO_LEVEL_PRICES:
-            price = HAPO_LEVEL_PRICES[next_level]
-            logger.info(f"💰 قیمت ارتقا سطح {next_level}: {price}")
-            return price
+            return HAPO_LEVEL_PRICES[next_level]
         
-        # اگر نبود، از نزدیک‌ترین مقدار استفاده کن
         keys = sorted(HAPO_LEVEL_PRICES.keys())
         for k in keys:
             if k >= next_level:
@@ -389,7 +380,6 @@ class HopDogGame:
         return {"success": True}
 
     def confirm_rank_up(self):
-        """تأیید و اجرای ارتقا مقام - هاپو سیر میشه"""
         hapo_rank = self._to_int(self.data["hapo_rank"])
         
         if hapo_rank >= 4:
@@ -405,7 +395,6 @@ class HopDogGame:
         self.data["hapo_rank"] = self._to_str(hapo_rank + 1)
         self.data["hapo_level"] = "1"
         
-        # هاپو سیر میشه
         self.data["hapo_food"] = self._to_str(self.get_hapo_max_food())
         
         self.data["hapo_harvest"] = "0"
@@ -660,7 +649,6 @@ class HopDogGame:
     # ============================================================
 
     def get_fridge_items(self):
-        """دریافت لیست حیوانات داخل یخچال"""
         items = self.data.get("fridge_items", [])
         if isinstance(items, str):
             try:
@@ -672,12 +660,10 @@ class HopDogGame:
         return items
 
     def save_fridge_items(self, items):
-        """ذخیره لیست حیوانات داخل یخچال"""
         if not isinstance(items, list):
             items = []
         self.data["fridge_items"] = json.dumps(items)
         self.save_data()
-        logger.info(f"❄️ یخچال ذخیره شد: {len(items)} آیتم")
         return True
 
     def get_fridge_capacity(self):
@@ -733,7 +719,6 @@ class HopDogGame:
         return {"success": True, "new_level": current_level + 1}
 
     def add_to_fridge(self, animal):
-        """افزودن حیوان به یخچال"""
         if not self.data.get("fridge_owned", False):
             return {"success": False, "reason": "شما یخچال هاپویی ندارید"}
         
@@ -757,12 +742,9 @@ class HopDogGame:
         items.append(animal_copy)
         self.save_fridge_items(items)
         
-        logger.info(f"✅ {animal_name} به یخچال اضافه شد (تعداد: {len(items)})")
-        
         return {"success": True, "item": animal_copy}
 
     def remove_from_fridge(self, index):
-        """حذف حیوان از یخچال"""
         items = self.get_fridge_items()
         if index < 0 or index >= len(items):
             return {"success": False, "reason": "حیوان مورد نظر یافت نشد"}
@@ -852,7 +834,6 @@ class HopDogGame:
         }
 
     def sell_from_fridge(self, index):
-        """فروش حیوان از یخچال"""
         if not self.data.get("fridge_owned", False):
             return {"success": False, "reason": "شما یخچال هاپویی ندارید"}
         
@@ -872,8 +853,6 @@ class HopDogGame:
         removed = items.pop(index)
         self.save_fridge_items(items)
         
-        logger.info(f"💰 {removed.get('name')} فروخته شد: {value} 🪙")
-        
         return {
             "success": True,
             "value": value,
@@ -881,7 +860,6 @@ class HopDogGame:
         }
 
     def feed_hapo_from_fridge(self, index):
-        """غذا دادن به هاپو از یخچال"""
         if not self.data.get("fridge_owned", False):
             return {"success": False, "reason": "شما یخچال هاپویی ندارید"}
         
@@ -911,8 +889,6 @@ class HopDogGame:
         removed = items.pop(index)
         self.save_fridge_items(items)
         self.save_data()
-        
-        logger.info(f"🍖 {removed.get('name')} به هاپو داده شد: {actual} کالری")
         
         return {
             "success": True,
