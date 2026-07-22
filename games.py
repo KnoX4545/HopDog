@@ -1,4 +1,4 @@
-# games.py - منطق بازی‌ها (XO - دوز)
+# games.py - منطق بازی‌ها (XO - دوز) - نسخه اصلاح شده نهایی
 
 import random
 import json
@@ -8,15 +8,15 @@ from typing import Dict, Optional, Tuple, List
 
 logger = logging.getLogger(__name__)
 
-# ================================================================
-# کلاس بازی XO
-# ================================================================
 
 class GameXO:
     """بازی دوز (XO) با شرط‌بندی هاپو پوینت"""
     
     def __init__(self, host_id: int, host_name: str, bet_amount: int):
-        self.game_id = f"xo_{host_id}_{int(datetime.now().timestamp())}"
+        import time
+        import random
+        # ایجاد game_id منحصر به فرد با استفاده از - به عنوان جداکننده
+        self.game_id = f"xo-{host_id}-{int(time.time() * 1000)}-{random.randint(100, 999)}"
         self.host_id = str(host_id)
         self.host_name = host_name
         self.bet_amount = bet_amount
@@ -31,6 +31,8 @@ class GameXO:
         self.host_symbol = "❌"
         self.player_symbol = "⭕"
         self.move_count = 0
+        
+        logger.info(f"🎮 بازی جدید ساخته شد - game_id: {self.game_id}, میزبان: {host_name}")
     
     def to_dict(self) -> dict:
         return {
@@ -82,6 +84,7 @@ class GameXO:
         self.status = "playing"
         self.current_turn = "host"
         self.last_move_at = datetime.now().timestamp()
+        logger.info(f"🎮 بازیکن به بازی پیوست - game_id: {self.game_id}, بازیکن: {player_name}")
         return True
     
     def make_move(self, user_id: int, row: int, col: int) -> dict:
@@ -106,10 +109,13 @@ class GameXO:
         self.move_count += 1
         self.last_move_at = datetime.now().timestamp()
         
+        logger.info(f"🎮 حرکت انجام شد - game_id: {self.game_id}, کاربر: {user_id}, خانه: {row},{col}, نماد: {symbol}")
+        
         winner = self.check_winner()
         if winner:
             self.winner = winner
             self.status = "finished"
+            logger.info(f"🏆 بازی تمام شد - game_id: {self.game_id}, برنده: {winner}")
             return {
                 "success": True,
                 "winner": winner,
@@ -120,6 +126,7 @@ class GameXO:
         if self.move_count >= 9:
             self.winner = "draw"
             self.status = "finished"
+            logger.info(f"🤝 بازی مساوی شد - game_id: {self.game_id}")
             return {
                 "success": True,
                 "winner": "draw",
@@ -141,14 +148,17 @@ class GameXO:
         """بررسی برنده"""
         board = self.board
         
+        # بررسی سطرها
         for row in range(3):
             if board[row][0] == board[row][1] == board[row][2] != " ":
                 return "host" if board[row][0] == self.host_symbol else "player"
         
+        # بررسی ستون‌ها
         for col in range(3):
             if board[0][col] == board[1][col] == board[2][col] != " ":
                 return "host" if board[0][col] == self.host_symbol else "player"
         
+        # بررسی قطرها
         if board[0][0] == board[1][1] == board[2][2] != " ":
             return "host" if board[0][0] == self.host_symbol else "player"
         if board[0][2] == board[1][1] == board[2][0] != " ":
@@ -180,10 +190,6 @@ class GameXO:
         return ""
 
 
-# ================================================================
-# کلاس مدیریت بازی‌ها
-# ================================================================
-
 class GameManager:
     """مدیریت همه بازی‌ها"""
     
@@ -191,17 +197,21 @@ class GameManager:
         self.games: Dict[str, GameXO] = {}
         self.user_games: Dict[str, str] = {}
         self.user_cooldowns: Dict[str, float] = {}
+        logger.info("🎮 GameManager راه‌اندازی شد")
     
     def create_game(self, host_id: int, host_name: str, bet_amount: int) -> Tuple[bool, str, Optional[GameXO]]:
         """ایجاد بازی جدید"""
         host_id_str = str(host_id)
         
+        # بررسی محدودیت تعداد بازی‌ها
         if len(self.games) >= 50:
             return False, "تعداد بازی‌های فعال به حداکثر رسیده است", None
         
+        # بررسی اینکه کاربر در بازی دیگری نیست
         if host_id_str in self.user_games:
             return False, "شما در حال حاضر در یک بازی دیگر هستید", None
         
+        # بررسی مبلغ شرط
         if bet_amount < 50:
             return False, f"حداقل مبلغ شرط‌بندی {50} هاپو پوینت است", None
         if bet_amount > 1000000:
@@ -210,6 +220,8 @@ class GameManager:
         game = GameXO(host_id, host_name, bet_amount)
         self.games[game.game_id] = game
         self.user_games[host_id_str] = game.game_id
+        
+        logger.info(f"✅ بازی ساخته شد - game_id: {game.game_id}")
         return True, game.game_id, game
     
     def join_game(self, game_id: str, player_id: int, player_name: str) -> Tuple[bool, str, Optional[GameXO]]:
@@ -231,6 +243,8 @@ class GameManager:
             return False, "خطا در پیوستن به بازی", None
         
         self.user_games[player_id_str] = game_id
+        
+        logger.info(f"✅ بازیکن به بازی پیوست - game_id: {game_id}, بازیکن: {player_name}")
         return True, game_id, game
     
     def make_move(self, game_id: str, user_id: int, row: int, col: int) -> dict:
@@ -241,12 +255,13 @@ class GameManager:
         game = self.games[game_id]
         result = game.make_move(user_id, row, col)
         
+        # اگر بازی تمام شد، کاربران رو از لیست حذف کن
         if result.get("success") and result.get("winner"):
             if game.host_id in self.user_games:
                 del self.user_games[game.host_id]
             if game.player_id and game.player_id in self.user_games:
                 del self.user_games[game.player_id]
-            return result
+            logger.info(f"🗑️ بازی تمام شد و حذف شد - game_id: {game_id}")
         
         return result
     
@@ -264,6 +279,7 @@ class GameManager:
         return None
     
     def remove_game(self, game_id: str):
+        """حذف بازی"""
         if game_id in self.games:
             game = self.games[game_id]
             if game.host_id in self.user_games:
@@ -271,6 +287,7 @@ class GameManager:
             if game.player_id and game.player_id in self.user_games:
                 del self.user_games[game.player_id]
             del self.games[game_id]
+            logger.info(f"🗑️ بازی حذف شد - game_id: {game_id}")
     
     def check_timeout(self):
         """بررسی تایم‌اوت بازی‌ها"""
@@ -278,11 +295,13 @@ class GameManager:
         to_remove = []
         
         for game_id, game in self.games.items():
+            # بازی تمام شده و بیش از 5 دقیقه گذشته
             if game.status == "finished":
                 if now - game.last_move_at > 300:
                     to_remove.append(game_id)
                 continue
             
+            # بازی در حال انجام و 60 ثانیه از آخرین حرکت گذشته
             if game.status == "playing":
                 if now - game.last_move_at > 60:
                     loser_id = game.host_id if game.current_turn == "host" else game.player_id
@@ -298,6 +317,7 @@ class GameManager:
                     logger.info(f"⏰ بازی {game_id} - بازیکن {loser_id} به خاطر تایم‌اوت بازنده شد")
                     to_remove.append(game_id)
             
+            # بازی در حال انتظار و بیش از 5 دقیقه گذشته
             if game.status == "waiting":
                 if now - game.created_at > 300:
                     to_remove.append(game_id)
@@ -306,23 +326,25 @@ class GameManager:
             self.remove_game(game_id)
     
     def is_on_cooldown(self, user_id: int) -> Tuple[bool, int]:
-        """بررسی خنک‌سازی"""
+        """بررسی خنک‌سازی بین بازی‌ها (2 دقیقه)"""
         user_id_str = str(user_id)
         if user_id_str not in self.user_cooldowns:
             return False, 0
         
         elapsed = datetime.now().timestamp() - self.user_cooldowns[user_id_str]
-        if elapsed < 120:
+        if elapsed < 120:  # 2 دقیقه
             return True, int(120 - elapsed)
         
         return False, 0
     
     def set_cooldown(self, user_id: int):
+        """تنظیم خنک‌سازی"""
         self.user_cooldowns[str(user_id)] = datetime.now().timestamp()
+        logger.info(f"⏳ خنک‌سازی برای کاربر {user_id} تنظیم شد")
 
 
 # ================================================================
-# نمونه global
+# نمونه global برای استفاده در کل پروژه
 # ================================================================
 
 game_manager = GameManager()
