@@ -1,7 +1,8 @@
-# bot.py - فایل اصلی (نسخه کامل با هندلرهای ادمین)
+# bot.py - فایل اصلی (نسخه کامل با هندلرهای ادمین و بازی‌ها)
 
 import logging
 import os
+import asyncio
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, filters, ContextTypes
 from config import TOKEN, STREET_HAPO_INTERVAL, USE_WEBHOOK, WEBHOOK_PORT, WEBHOOK_URL, ADMIN_PASSWORD
@@ -13,6 +14,7 @@ from handlers import (
     admin_set_street_hapo, admin_add_street_hapo, admin_help,
     show_rules, show_leaderboard_main, get_game
 )
+from games import game_manager
 
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -45,6 +47,15 @@ async def handle_admin_login(update: Update, context: ContextTypes.DEFAULT_TYPE)
     
     await update.message.reply_text("🔑 *لطفاً رمز ادمین را وارد کنید:*", parse_mode="Markdown")
     context.user_data["waiting_for_admin"] = True
+
+
+async def cleanup_games(context: ContextTypes.DEFAULT_TYPE):
+    """پاک‌سازی خودکار بازی‌های منقضی شده"""
+    try:
+        game_manager.check_timeout()
+        logger.info("🧹 پاک‌سازی خودکار بازی‌ها انجام شد")
+    except Exception as e:
+        logger.error(f"خطا در پاک‌سازی بازی‌ها: {e}")
 
 
 def main():
@@ -118,6 +129,12 @@ def main():
     if job_queue:
         job_queue.run_repeating(send_street_hapo_notification, interval=STREET_HAPO_INTERVAL, first=10)
         logger.info("✅ هاپوی خیابونی فعال شد")
+        
+        # ============================================================
+        # پاک‌سازی خودکار بازی‌ها (هر 30 ثانیه)
+        # ============================================================
+        job_queue.run_repeating(cleanup_games, interval=30, first=5)
+        logger.info("✅ پاک‌سازی خودکار بازی‌ها فعال شد")
     else:
         logger.warning("⚠️ JobQueue در دسترس نیست!")
     
