@@ -1,4 +1,4 @@
-# handlers.py - هندلرهای پیام و کالبک (نسخه نهایی کامل)
+# handlers.py - هندلرهای پیام و کالبک (نسخه نهایی کامل با بازی XO)
 
 import os
 import json
@@ -743,11 +743,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     username = update.effective_user.username
     full_name = update.effective_user.full_name or f"کاربر{user_id}"
     
-    # دریافت نام نمایشی مناسب
     display_name = get_user_display_name(user_id, username, full_name)
     game = get_game(user_id, display_name)
     
-    # اگر نام کاربر در دیتابیس با "کاربر" شروع میشه، به‌روز کن
     if game.data.get("player_name", "").startswith("کاربر") and display_name and not display_name.startswith("کاربر"):
         game.data["player_name"] = display_name
         game.save_data()
@@ -796,6 +794,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_type = update.message.chat.type
     if chat_type in ["group", "supergroup"]:
+        await show_academy_main(update)
         return
     await show_academy_main(update)
 
@@ -1106,7 +1105,6 @@ async def show_hapo_menu(update: Update, game):
 
 
 async def show_claw_menu(update: Update, game):
-    """نمایش منوی پنجه"""
     if game.is_jailed():
         await update.message.reply_text("⛓️ *شما در زندان هستید و نمی‌توانید این کار را انجام دهید.*", parse_mode="Markdown")
         return
@@ -2388,9 +2386,7 @@ async def send_street_hapo_notification(context: ContextTypes.DEFAULT_TYPE):
         
         street_hapo = get_street_hapo()
         
-        # بررسی دقیق وضعیت هاپوی خیابونی
         if street_hapo.active:
-            # اگر هاپوی خیابونی فعاله ولی منقضی شده، غیرفعالش کن
             if street_hapo.is_expired():
                 street_hapo.active = False
                 street_hapo.save_status()
@@ -2475,7 +2471,6 @@ async def handle_street_hapo_rescue(update: Update, context: ContextTypes.DEFAUL
     
     street_hapo = get_street_hapo()
     
-    # بررسی دقیق وضعیت هاپوی خیابونی
     if not street_hapo.active:
         await query.answer("🐶 هیچ هاپوی خیابونی در دسترس نیست!", show_alert=True)
         await query.message.reply_text("🐶 *هیچ هاپوی خیابونی در دسترس نیست!*", parse_mode="Markdown")
@@ -2584,7 +2579,6 @@ async def admin_street_hapo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     street_hapo = get_street_hapo()
     
-    # بررسی دقیق وضعیت هاپوی خیابونی
     if street_hapo.active:
         if street_hapo.is_expired():
             street_hapo.active = False
@@ -2880,11 +2874,26 @@ async def add_user_point(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 # ================================================================
-# بازی‌های هاپویی - توابع جدید
+# بازی‌های هاپویی - توابع اصلی
 # ================================================================
 
 def get_xo_board_keyboard(game, user_id: int):
-    """دریافت کیبورد تخته بازی XO"""
+    """دریافت کیبورد تخته بازی XO - با دکمه‌های منحصر به فرد"""
+    from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+    
+    # بررسی اینکه game و game_id وجود داره
+    if not game:
+        logger.error("❌ game در get_xo_board_keyboard وجود ندارد!")
+        return InlineKeyboardMarkup([[
+            InlineKeyboardButton("❌ خطا", callback_data="xo_no_move")
+        ]])
+    
+    if not game.game_id:
+        logger.error(f"❌ game_id در get_xo_board_keyboard وجود ندارد! game: {game}")
+        return InlineKeyboardMarkup([[
+            InlineKeyboardButton("❌ خطا", callback_data="xo_no_move")
+        ]])
+    
     keyboard = []
     user_id_str = str(user_id)
     
@@ -2895,19 +2904,23 @@ def get_xo_board_keyboard(game, user_id: int):
         elif game.current_turn == "player" and user_id_str == game.player_id:
             is_my_turn = True
     
+    # ساخت تخته 3x3 با دکمه‌های منحصر به فرد
     for row in range(3):
         row_buttons = []
         for col in range(3):
             symbol = game.board[row][col]
             if symbol == " ":
                 if is_my_turn:
-                    row_buttons.append(InlineKeyboardButton("⬜", callback_data=f"xo_move_{game.game_id}_{row}_{col}"))
+                    # هر خانه یک callback_data منحصر به فرد
+                    callback = f"xo_move_{game.game_id}_{row}_{col}"
+                    row_buttons.append(InlineKeyboardButton("⬜", callback_data=callback))
                 else:
                     row_buttons.append(InlineKeyboardButton("⬜", callback_data="xo_no_move"))
             else:
                 row_buttons.append(InlineKeyboardButton(symbol, callback_data="xo_no_move"))
         keyboard.append(row_buttons)
     
+    # دکمه‌های وضعیت
     if game.status == "waiting":
         keyboard.append([InlineKeyboardButton("⏳ در انتظار بازیکن...", callback_data="xo_no_move")])
     elif game.status == "playing":
@@ -2920,6 +2933,7 @@ def get_xo_board_keyboard(game, user_id: int):
             winner_name = game.host_name if game.winner == "host" else game.player_name
             keyboard.append([InlineKeyboardButton(f"🏆 {winner_name} برنده شد!", callback_data="xo_no_move")])
     
+    # دکمه‌های عملیاتی
     if game.status == "finished":
         keyboard.append([InlineKeyboardButton("🔙 بستن بازی", callback_data=f"xo_close_{game.game_id}")])
     elif game.status == "waiting" and user_id_str == game.host_id:
@@ -3142,6 +3156,8 @@ async def handle_xo_create(update: Update, context: ContextTypes.DEFAULT_TYPE, b
         await query.edit_message_text(f"❌ *{game_id}*", parse_mode="Markdown")
         return
     
+    logger.info(f"✅ بازی ساخته شد - game_id: {game_id}")
+    
     game_obj.data["hop_point"] = str(hop_point - bet_amount)
     game_obj.save_data()
     
@@ -3199,6 +3215,8 @@ async def handle_xo_join(update: Update, context: ContextTypes.DEFAULT_TYPE, gam
     if not game:
         await query.edit_message_text("❌ *بازی مورد نظر یافت نشد.*", parse_mode="Markdown")
         return
+    
+    logger.info(f"🎮 پیوستن به بازی - game_id: {game_id}")
     
     if game.status != "waiting":
         await query.edit_message_text("❌ *این بازی در حال انجام است یا به پایان رسیده.*", parse_mode="Markdown")
@@ -3388,7 +3406,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         display_name = get_user_display_name(user_id, username, full_name)
         game = get_game(user_id, display_name)
         
-        # به‌روزرسانی نام کاربر در دیتابیس
         if game.data.get("player_name", "").startswith("کاربر") and display_name and not display_name.startswith("کاربر"):
             game.data["player_name"] = display_name
             game.save_data()
@@ -3543,8 +3560,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await show_hapo_menu(update, game)
                 return
             
-            # آکادمی
-            if text_clean in ["راهنما", "آکادمی هاپویی", "اکادمی هاپویی", "اکادمی", "آکادمی"]:
+            # آکادمی و راهنما
+            if text_clean in ["آکادمی هاپویی", "اکادمی هاپویی", "اکادمی", "آکادمی", "راهنما", "راهنما هاپویی"]:
                 await show_academy_main(update)
                 return
             
