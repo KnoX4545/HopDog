@@ -1,4 +1,4 @@
-# game.py - کلاس اصلی بازی (نسخه کامل نهایی)
+# game.py - کلاس اصلی بازی (نسخه کامل نهایی با اصلاحات)
 
 import random
 import json
@@ -136,9 +136,11 @@ class HopDogGame:
             return None
 
     def save_data(self):
+        """ذخیره داده‌ها - اصلاح شده با self.user_id"""
         return save_user_data(self.user_id, self.data)
 
     def reset_data(self):
+        """ریست کردن داده‌ها - اصلاح شده با self.user_id"""
         self.data = {
             "user_id": self.user_id,
             "player_name": self.username or f"کاربر{self.user_id}",
