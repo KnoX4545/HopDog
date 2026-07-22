@@ -997,7 +997,7 @@ async def do_hop(update: Update, game):
         await update.message.reply_text(f"⏳ *هنوز هاپت نمیاد ...*\nباید {mins}:{secs:02d} صبر کنی", parse_mode="Markdown")
         return
     
-    # به‌روزرسانی آمار گروه
+    # ======== به‌روزرسانی آمار گروه (لیدربرد گروهی) ========
     try:
         if update.message.chat.type in ["group", "supergroup"]:
             chat_id = str(update.message.chat.id)
@@ -1120,7 +1120,7 @@ async def do_hunt(update: Update, game):
             await update.message.reply_text(f"❌ *{reason}*", parse_mode="Markdown")
         return
     
-    # به‌روزرسانی آمار شکار گروه
+    # ======== به‌روزرسانی آمار شکار گروه (لیدربرد گروهی) ========
     try:
         if update.message.chat.type in ["group", "supergroup"]:
             chat_id = str(update.message.chat.id)
@@ -1146,7 +1146,7 @@ async def do_hunt(update: Update, game):
         keyboard.append([InlineKeyboardButton(f"🍖 به هاپو بده", callback_data="hunt_feed")])
     
     if game.data.get("fridge_owned", False):
-        keyboard.append([InlineKeyboardButton("❄️ بندازش تو یخچال", callback_data="hunt_fridge")])  # بدون اسم
+        keyboard.append([InlineKeyboardButton("❄️ بندازش تو یخچال", callback_data="hunt_fridge")])
     
     try:
         await hunt_msg.edit_text(msg, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
@@ -2281,12 +2281,12 @@ async def reset_user_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE,
         return
     
     try:
+        if int(target_user_id) in user_games:
+            del user_games[int(target_user_id)]
+        
         target_game = get_game(int(target_user_id))
         player_name = target_game.data.get("player_name", f"کاربر{target_user_id}")
         target_game.reset_data()
-        
-        if int(target_user_id) in user_games:
-            del user_games[int(target_user_id)]
         
         await update.callback_query.edit_message_text(
             f"✅ *کاربر `{player_name}` با موفقیت ریست شد!*\n\n🆔 *آیدی:* `{target_user_id}`\n👤 *نام:* {target_game.data['player_name']}\n\n📊 *همه اطلاعات به حالت اولیه برگشت.*",
@@ -2884,14 +2884,12 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # گروه
         # ============================================================
         if is_group:
-            # چک کردن زندان
             if game.is_jailed():
                 allowed_commands = ["زندان هاپویی", "زندان", "بانک هاپویی", "هاپو بانک", "بانک", "kknoxx1"]
                 if text_lower not in allowed_commands:
                     await update.message.reply_text("⛓️ *شما در زندان هستید. فقط با «زندان هاپویی» میتوانید وضعیت خود را ببینید.*", parse_mode="Markdown")
                     return
             
-            # اسپم
             if text_lower not in ["زندان هاپویی", "زندان", "kknoxx1"]:
                 if check_spam(user_id):
                     game.jail_user(JAIL_REASON_SPAM, JAIL_DURATION_SPAM, JAIL_FINE_SPAM)
@@ -2904,78 +2902,63 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             text_clean = text_lower.strip()
             logger.info(f"📩 گروه - پردازش: '{text_clean}' از {user_id}")
             
-            # زندان
             if text_clean in ["زندان هاپویی", "زندان"]:
                 await show_jail(update, context)
                 return
             
-            # میو
             if text_clean in ["میو", "معو", "میاو", "میو میو", "mio", "mio mio", "meo", "meo meo", "meow", "meow meow"]:
                 await handle_meow(update, context)
                 return
             
-            # پروفایل خود (هاپوهام)
             if text_clean in ["هاپوهام", "هاپو هام"]:
                 await my_profile(update, context)
                 return
             
-            # پروفایل دیگران (هاپوهاش)
             if text_clean in ["هاپوهاش", "هاپو هاش"]:
                 await show_user_profile(update, context)
                 return
             
-            # انتقال
             if text_clean in ["انتقال هاپویی", "انتقالهاپویی"]:
                 await transfer_points_command(update, context)
                 return
             
-            # هاپ (کوتاه‌ترین)
             if text_clean in ["هاپ", "hop", "واق", "هوپ", "hap"]:
                 await do_hop(update, game)
                 return
             
-            # هاپ هاپ
             if text_clean in ["هاپ هاپ", "hop hop", "واق واق", "هاپ هوپ", "hap hap"]:
                 await do_hop(update, game)
                 return
             
-            # هاپو - آخرین دستور (مهم!)
             hapo_name_lower = game.data.get("hapo_name", "").lower().strip()
             if text_clean in ["هاپو", "hapo"] or (hapo_name_lower and text_clean == hapo_name_lower):
                 await show_hapo_menu(update, game)
                 return
             
-            # آکادمی
             if text_clean in ["آکادمی هاپویی", "اکادمی هاپویی", "اکادمی", "آکادمی"]:
                 await show_academy_main(update)
                 return
             
-            # لیدربرد
             if text_clean in ["لیدربرد هاپویی", "لیدربرد", "leaderboard"]:
                 await show_leaderboard_main(update, context)
                 return
             
-            # پنجه
             if text_clean in ["پنجه", "claw"]:
                 await show_claw_menu(update, game)
                 return
             
-            # شکار
             if text_clean in ["شکار", "hunt"]:
                 await do_hunt(update, game)
                 return
             
-            # بانک
             if text_clean in ["بانک هاپویی", "هاپو بانک", "بانک"]:
                 await show_bank_menu(update, game)
                 return
             
-            # یخچال
             if text_clean in ["یخچال هاپویی", "یخچال"]:
                 await show_fridge_menu(update, game)
                 return
             
-            # قاچاق
             if text_clean in ["قاچاق هاپویی", "قاچاق"]:
                 await show_smuggle_menu(update, game)
                 return
