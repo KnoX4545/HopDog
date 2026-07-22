@@ -1,4 +1,4 @@
-# handlers.py - هندلرهای پیام و کالبک (نسخه کامل با اصلاح GAME_XO_STATE)
+# handlers.py - هندلرهای پیام و کالبک (نسخه کامل با اصلاحات هاپو)
 
 import os
 import json
@@ -3107,7 +3107,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.edit_message_text("❌ *پرداخت جریمه لغو شد*", parse_mode="Markdown")
             return
         
-        # ======== هاپو ========
+        # ======== هاپو (اصلاح شده) ========
         if data == "confirm_hapo_name":
             new_name = context.user_data.get("new_hapo_name", "")
             if not new_name:
@@ -3115,7 +3115,14 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 return
             hop_point = game._to_int(game.data["hop_point"])
             if hop_point < 750:
-                await query.answer("❌ پوینت کافی نیست!", show_alert=True)
+                msg = get_hapo_menu_text(game)
+                keyboard = get_hapo_menu_keyboard(game)
+                await query.edit_message_text(
+                    f"❌ *پوینت کافی نیست!*\n💰 نیاز: 750 🪙\n💰 موجودی: {format_number(hop_point)} 🪙\n\n{msg}",
+                    reply_markup=keyboard,
+                    parse_mode="Markdown"
+                )
+                context.user_data["new_hapo_name"] = None
                 return
             old_name = game.data["hapo_name"]
             game.data["hapo_name"] = new_name
@@ -3128,17 +3135,34 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             keyboard = get_hapo_menu_keyboard(game)
             await query.edit_message_text(msg, reply_markup=keyboard, parse_mode="Markdown")
             return
+        
         if data == "cancel_hapo_name":
             await query.edit_message_text("❌ *تغییر اسم هاپو لغو شد*", parse_mode="Markdown")
             context.user_data["new_hapo_name"] = None
+            await asyncio.sleep(1)
+            msg = get_hapo_menu_text(game)
+            keyboard = get_hapo_menu_keyboard(game)
+            await query.edit_message_text(msg, reply_markup=keyboard, parse_mode="Markdown")
             return
+        
         if data == "buy_hapo":
             result = game.buy_hapo()
             if result["success"]:
                 await query.edit_message_text(f"✅ *هاپو خریداری شد!*\nاسم هاپو: {result['name']}", parse_mode="Markdown")
+                await asyncio.sleep(2)
+                msg = get_hapo_menu_text(game)
+                keyboard = get_hapo_menu_keyboard(game)
+                await query.edit_message_text(msg, reply_markup=keyboard, parse_mode="Markdown")
             else:
-                await query.answer(f"❌ {result['reason']}", show_alert=True)
+                msg = get_hapo_menu_text(game)
+                keyboard = get_hapo_menu_keyboard(game)
+                await query.edit_message_text(
+                    f"❌ *{result['reason']}*\n\n{msg}",
+                    reply_markup=keyboard,
+                    parse_mode="Markdown"
+                )
             return
+        
         if data == "hapo_harvest":
             hapo_harvest = game._to_int(game.data["hapo_harvest"])
             if hapo_harvest > 0:
@@ -3152,18 +3176,39 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 keyboard = get_hapo_menu_keyboard(game)
                 await query.edit_message_text(msg, reply_markup=keyboard, parse_mode="Markdown")
             else:
-                await query.answer("❌ هیچ هاپو پوینتی برای برداشت نیست", show_alert=True)
+                msg = get_hapo_menu_text(game)
+                keyboard = get_hapo_menu_keyboard(game)
+                await query.edit_message_text(
+                    f"❌ *هیچ هاپو پوینتی برای برداشت نیست*\n\n{msg}",
+                    reply_markup=keyboard,
+                    parse_mode="Markdown"
+                )
             return
+        
         if data == "hapo_level_up":
             check = game.can_upgrade_level()
             if not check["success"]:
-                await query.answer(f"❌ {check['reason']}", show_alert=True)
+                msg = get_hapo_menu_text(game)
+                keyboard = get_hapo_menu_keyboard(game)
+                await query.edit_message_text(
+                    f"❌ *{check['reason']}*\n\n{msg}",
+                    reply_markup=keyboard,
+                    parse_mode="Markdown"
+                )
                 return
+            
             price = game.get_hapo_upgrade_price()
             hop_point = game._to_int(game.data["hop_point"])
             if hop_point < price:
-                await query.answer(f"❌ به {format_number(price)} هاپو پوینت نیاز داری", show_alert=True)
+                msg = get_hapo_menu_text(game)
+                keyboard = get_hapo_menu_keyboard(game)
+                await query.edit_message_text(
+                    f"❌ *پوینت کافی نیست!*\n💰 نیاز: {format_number(price)} 🪙\n💰 موجودی: {format_number(hop_point)} 🪙\n\n{msg}",
+                    reply_markup=keyboard,
+                    parse_mode="Markdown"
+                )
                 return
+            
             result = game.upgrade_hapo_level()
             if result["success"]:
                 msg = f"✅ *سطح هاپو به {result['new_level']} ارتقا یافت*"
@@ -3173,18 +3218,39 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 keyboard = get_hapo_menu_keyboard(game)
                 await query.edit_message_text(msg, reply_markup=keyboard, parse_mode="Markdown")
             else:
-                await query.answer(f"❌ {result['reason']}", show_alert=True)
+                msg = get_hapo_menu_text(game)
+                keyboard = get_hapo_menu_keyboard(game)
+                await query.edit_message_text(
+                    f"❌ *{result['reason']}*\n\n{msg}",
+                    reply_markup=keyboard,
+                    parse_mode="Markdown"
+                )
             return
+        
         if data == "hapo_rank_up_confirm":
             check = game.can_rank_up()
             if not check["success"]:
-                await query.answer(f"❌ {check['reason']}", show_alert=True)
+                msg = get_hapo_menu_text(game)
+                keyboard = get_hapo_menu_keyboard(game)
+                await query.edit_message_text(
+                    f"❌ *{check['reason']}*\n\n{msg}",
+                    reply_markup=keyboard,
+                    parse_mode="Markdown"
+                )
                 return
+            
             price = game.get_hapo_rank_up_price()
             hop_point = game._to_int(game.data["hop_point"])
             if hop_point < price:
-                await query.answer(f"❌ به {format_number(price)} هاپو پوینت نیاز داری", show_alert=True)
+                msg = get_hapo_menu_text(game)
+                keyboard = get_hapo_menu_keyboard(game)
+                await query.edit_message_text(
+                    f"❌ *پوینت کافی نیست!*\n💰 نیاز: {format_number(price)} 🪙\n💰 موجودی: {format_number(hop_point)} 🪙\n\n{msg}",
+                    reply_markup=keyboard,
+                    parse_mode="Markdown"
+                )
                 return
+            
             hapo_rank = game._to_int(game.data["hapo_rank"])
             current_max = game.get_hapo_max_level_for_rank(hapo_rank)
             next_max = game.get_hapo_max_level_for_rank(hapo_rank + 1)
@@ -3194,8 +3260,13 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             msg += f"📊 *سقف سطح فعلی:* {current_max}\n"
             msg += f"📊 *سقف سطح جدید:* {next_max}\n"
             msg += f"💰 *هزینه:* {format_number(price)} 🪙"
-            await query.edit_message_text(msg, reply_markup=get_confirm_keyboard("hapo_rank_up_yes", "hapo_rank_up_no"), parse_mode="Markdown")
+            await query.edit_message_text(
+                msg,
+                reply_markup=get_confirm_keyboard("hapo_rank_up_yes", "hapo_rank_up_no"),
+                parse_mode="Markdown"
+            )
             return
+        
         if data == "hapo_rank_up_yes":
             result = game.confirm_rank_up()
             if result["success"]:
@@ -3208,22 +3279,46 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 keyboard = get_hapo_menu_keyboard(game)
                 await query.edit_message_text(msg, reply_markup=keyboard, parse_mode="Markdown")
             else:
-                await query.answer(f"❌ {result['reason']}", show_alert=True)
+                msg = get_hapo_menu_text(game)
+                keyboard = get_hapo_menu_keyboard(game)
+                await query.edit_message_text(
+                    f"❌ *{result['reason']}*\n\n{msg}",
+                    reply_markup=keyboard,
+                    parse_mode="Markdown"
+                )
             return
+        
         if data == "hapo_rank_up_no":
             await query.edit_message_text("❌ *ارتقا مقام لغو شد*", parse_mode="Markdown")
+            await asyncio.sleep(1)
+            msg = get_hapo_menu_text(game)
+            keyboard = get_hapo_menu_keyboard(game)
+            await query.edit_message_text(msg, reply_markup=keyboard, parse_mode="Markdown")
             return
+        
         if data == "hapo_rename":
             hop_point = game._to_int(game.data["hop_point"])
             if hop_point < 750:
-                await query.answer("❌ به 750 هاپو پوینت نیاز داری", show_alert=True)
+                msg = get_hapo_menu_text(game)
+                keyboard = get_hapo_menu_keyboard(game)
+                await query.edit_message_text(
+                    f"❌ *پوینت کافی نیست!*\n💰 نیاز: 750 🪙\n💰 موجودی: {format_number(hop_point)} 🪙\n\n{msg}",
+                    reply_markup=keyboard,
+                    parse_mode="Markdown"
+                )
                 return
             await query.edit_message_text("✏️ *اسم جدید هاپو رو وارد کن:*", parse_mode="Markdown")
             context.user_data["waiting_for_hapo_name"] = True
             return
+        
         if data == "hapo_max":
             await query.edit_message_text("🏆 *هاپو در بالاترین سطح است*", parse_mode="Markdown")
+            await asyncio.sleep(1)
+            msg = get_hapo_menu_text(game)
+            keyboard = get_hapo_menu_keyboard(game)
+            await query.edit_message_text(msg, reply_markup=keyboard, parse_mode="Markdown")
             return
+        
     except Exception as e:
         logger.error(f"Error in handle_callback: {e}")
         logger.error(traceback.format_exc())
