@@ -1,4 +1,4 @@
-# game.py - کلاس اصلی بازی (نسخه نهایی کامل)
+# game.py - کلاس اصلی بازی (نسخه نهایی)
 
 import random
 import json
@@ -68,7 +68,6 @@ class HopDogGame:
         try:
             data = get_user_data(self.user_id)
             if data:
-                # تبدیل JSON فیلدها
                 if "current_hunt_animal" in data and data["current_hunt_animal"]:
                     try:
                         data["current_hunt_animal"] = json.loads(data["current_hunt_animal"])
@@ -96,7 +95,6 @@ class HopDogGame:
                 else:
                     data["fridge_items"] = []
                 
-                # فیلدهای پیش‌فرض
                 defaults = {
                     "bank_card_number": "",
                     "jail_admin_id": None,
@@ -120,7 +118,6 @@ class HopDogGame:
                     if key not in data:
                         data[key] = default
                 
-                # چک کردن خودکار آزادی از زندان
                 if data.get("jailed", False):
                     now = datetime.now().timestamp()
                     jail_until = self._to_float(data.get("jail_until", 0))
