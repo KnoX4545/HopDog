@@ -814,7 +814,7 @@ async def show_academy_features_menu(update: Update, query=None):
             InlineKeyboardButton("🏹 شکار", callback_data="academy_hunt")
         ],
         [
-            InlineKeyboardButton("🏦 بانک", callback_data="academy_bank"),
+            InlineKeyboardButton("🏦 بانک هاپویی", callback_data="academy_bank"),
             InlineKeyboardButton("🧲 انتقال هاپویی", callback_data="academy_transfer")
         ],
         [
