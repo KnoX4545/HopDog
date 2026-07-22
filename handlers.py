@@ -1,4 +1,4 @@
-# handlers.py - هندلرهای پیام و کالبک (نسخه نهایی کامل)
+# handlers.py - هندلرهای پیام و کالبک (نسخه نهایی کامل با بازی‌ها)
 
 import os
 import json
@@ -45,17 +45,20 @@ from academy import (
     ACADEMY_HAPO, ACADEMY_HUNT, ACADEMY_BANK, ACADEMY_TRANSFER, ACADEMY_JAIL, ACADEMY_STREET_HAPO,
     ACADEMY_HOP, ACADEMY_POINTS, ACADEMY_EXP, ACADEMY_PROFILE,
     ACADEMY_FRIDGE, ACADEMY_SMUGGLE, ACADEMY_LEADERBOARD,
+    ACADEMY_GAMES, ACADEMY_GAMES_XO, ACADEMY_GAMES_MENU,
     show_academy_main, show_academy_system_menu, show_academy_features_menu,
-    show_academy_adventure_menu,
+    show_academy_adventure_menu, show_academy_games_menu, show_academy_game_xo,
     show_academy_system_pages, show_academy_animals_pages, show_academy_claw_pages,
     show_feature_page, show_adventure_page, show_street_hapo_page
 )
+from games import game_manager, GameXO
 
 # دیکشنری‌های عمومی
 user_games = {}
 SPAM_TRACKER = {}
 MEOW_VOTES = {}
 TRANSFER_STATE = {}
+GAME_XO_STATE = {}
 street_hapo_instance = None
 
 # تنظیم لاگ
@@ -684,7 +687,8 @@ async def group_welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
                             "⛓️ زندان هاپویی - اطلاعات زندان\n"
                             "📚 آکادمی - راهنمای کامل\n"
                             "❄️ یخچال هاپویی - ذخیره حیوانات\n"
-                            "🥷 قاچاق هاپویی - قاچاق هاپوها",
+                            "🥷 قاچاق هاپویی - قاچاق هاپوها\n"
+                            "🕹 بازی هاپویی - بازی‌های هاپویی",
                             parse_mode="Markdown"
                         )
                 except Exception as e:
@@ -741,6 +745,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "📚 آکادمی - راهنمای کامل\n"
             "❄️ یخچال هاپویی - ذخیره حیوانات\n"
             "🥷 قاچاق هاپویی - قاچاق هاپوها\n"
+            "🕹 بازی هاپویی - بازی‌های هاپویی\n"
             "🔒 برای دستورات ادمین، از پیوی بات استفاده کنید.",
             reply_markup=InlineKeyboardMarkup(keyboard),
             parse_mode="Markdown"
@@ -997,12 +1002,11 @@ async def do_hop(update: Update, game):
         await update.message.reply_text(f"⏳ *هنوز هاپت نمیاد ...*\nباید {mins}:{secs:02d} صبر کنی", parse_mode="Markdown")
         return
     
-    # ======== به‌روزرسانی آمار گروه ========
+    # به‌روزرسانی آمار گروه
     try:
         if update.message.chat.type in ["group", "supergroup"]:
             chat_id = str(update.message.chat.id)
             
-            # اول گروه رو ثبت کن
             add_group(chat_id, update.message.chat.title or "گروه بدون نام")
             
             response = supabase.table("groups").select("total_hops, total_hapo_points").eq("chat_id", chat_id).execute()
@@ -1104,7 +1108,7 @@ async def show_claw_menu(update: Update, game):
 
 
 # ================================================================
-# اصلاح شده: تابع do_hunt با context
+# تابع do_hunt با context
 # ================================================================
 async def do_hunt(update: Update, context: ContextTypes.DEFAULT_TYPE, game: HopDogGame):
     if game.is_jailed():
@@ -1128,12 +1132,11 @@ async def do_hunt(update: Update, context: ContextTypes.DEFAULT_TYPE, game: HopD
             await update.message.reply_text(f"❌ *{reason}*", parse_mode="Markdown")
         return
     
-    # ======== به‌روزرسانی آمار شکار گروه ========
+    # به‌روزرسانی آمار شکار گروه
     try:
         if update.message.chat.type in ["group", "supergroup"]:
             chat_id = str(update.message.chat.id)
             
-            # اول گروه رو ثبت کن
             add_group(chat_id, update.message.chat.title or "گروه بدون نام")
             
             response = supabase.table("groups").select("total_hunts").eq("chat_id", chat_id).execute()
@@ -1169,7 +1172,6 @@ async def do_hunt(update: Update, context: ContextTypes.DEFAULT_TYPE, game: HopD
         await update.message.reply_text(msg, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
     
     user_id = update.effective_user.id
-    # ======== اصلاح: context رو پاس بده ========
     asyncio.create_task(hunt_animal_timer(update, context, user_id, hunt_msg))
 
 
@@ -2896,12 +2898,21 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
         
         # ============================================================
+        # پردازش مبلغ شرط بازی XO
+        # ============================================================
+        if str(user_id) in GAME_XO_STATE:
+            state = GAME_XO_STATE[str(user_id)]
+            if state.get("state") == "betting":
+                await process_xo_bet(update, context)
+                return
+        
+        # ============================================================
         # گروه
         # ============================================================
         if is_group:
             # چک کردن زندان
             if game.is_jailed():
-                allowed_commands = ["زندان هاپویی", "زندان", "بانک هاپویی", "هاپو بانک", "بانک", "kknoxx1"]
+                allowed_commands = ["زندان هاپویی", "زندان", "بانک هاپویی", "هاپو بانک", "بانک", "kknoxx1", "بازی هاپویی", "بازی"]
                 if text_lower not in allowed_commands:
                     await update.message.reply_text("⛓️ *شما در زندان هستید. فقط با «زندان هاپویی» میتوانید وضعیت خود را ببینید.*", parse_mode="Markdown")
                     return
@@ -2995,6 +3006,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await show_smuggle_menu(update, game)
                 return
             
+            # بازی هاپویی
+            if text_clean in ["بازی هاپویی", "بازی"]:
+                await show_games_menu(update, game)
+                return
+            
             logger.info(f"❌ دستور ناشناخته در گروه: '{text_clean}' از {user_id}")
             return
         
@@ -3005,7 +3021,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if text_lower in ["start", "/start"]:
                 keyboard = [[InlineKeyboardButton("➕ افزودن به گروه", url=f"https://t.me/{context.bot.username}?startgroup=start")]]
                 await update.message.reply_text("🐾 *این بات را به گروه خود اضافه کنید!*", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
-            elif text_lower in ["/help", "help"]:
+            elif text_lower in ["/help", "help", "راهنما", "کامند", "command", "/commands"]:
                 await show_academy_main(update)
             elif text_lower in ["/rules", "rules", "قوانین"]:
                 await show_rules(update, context, 1)
@@ -3017,6 +3033,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 else:
                     await update.message.reply_text("🔑 *رمز ادمین را وارد کن:*", parse_mode="Markdown")
                     context.user_data["waiting_for_admin"] = True
+            # بازی در پیوی
+            elif text_lower in ["بازی هاپویی", "بازی"]:
+                await show_games_menu(update, game)
             return
         
     except Exception as e:
@@ -3043,6 +3062,15 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         game = get_game(user_id, username or full_name)
         data = query.data
         
+        # ======== دکمه‌های غیرفعال ========
+        if data == "xo_no_move":
+            await query.answer()
+            return
+        
+        if data == "street_hapo_ignore":
+            await query.answer()
+            return
+        
         # ======== آکادمی ========
         if data == "academy_back_main":
             await show_academy_main(update, query)
@@ -3055,6 +3083,12 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
         if data == "academy_adventure_menu":
             await show_academy_adventure_menu(update, query)
+            return
+        if data == "academy_games_menu":
+            await show_academy_games_menu(update, query)
+            return
+        if data == "academy_game_xo":
+            await show_academy_game_xo(update, query)
             return
         if data.startswith("academy_system_page"):
             await show_academy_system_pages(update, query, int(data.replace("academy_system_page", "")))
@@ -3163,8 +3197,6 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if data == "street_hapo_rescue":
             await handle_street_hapo_rescue(update, context, query)
             return
-        if data == "street_hapo_ignore":
-            return
         
         # ======== انتقال ========
         if data.startswith("transfer_confirm_"):
@@ -3218,6 +3250,38 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await show_smuggle_menu(update, game)
             return
         
+        # ======== بازی XO ========
+        if data == "game_xo_main":
+            await show_xo_main(update, query, game)
+            return
+        if data == "game_xo_set_bet":
+            await handle_xo_set_bet(update, context)
+            return
+        if data.startswith("game_xo_create_"):
+            bet_amount = int(data.replace("game_xo_create_", ""))
+            await handle_xo_create(update, context, bet_amount)
+            return
+        if data.startswith("game_xo_join_"):
+            game_id = data.replace("game_xo_join_", "")
+            await handle_xo_join(update, context, game_id)
+            return
+        if data.startswith("xo_move_"):
+            parts = data.replace("xo_move_", "").split("_")
+            if len(parts) == 3:
+                game_id = parts[0]
+                row = int(parts[1])
+                col = int(parts[2])
+                await handle_xo_move(update, context, game_id, row, col)
+            return
+        if data.startswith("xo_close_"):
+            game_id = data.replace("xo_close_", "")
+            await handle_xo_close(update, context, game_id)
+            return
+        if data.startswith("xo_cancel_"):
+            game_id = data.replace("xo_cancel_", "")
+            await handle_xo_cancel(update, context, game_id)
+            return
+        
         # ======== هاپو ========
         if data == "confirm_hapo_name":
             new_name = context.user_data.get("new_hapo_name", "")
@@ -3227,7 +3291,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
             hop_point = game._to_int(game.data["hop_point"])
             if hop_point < 750:
-                await query.edit_message_text("❌ *پوینت کافی نیست*", parse_mode="Markdown")
+                await query.answer("❌ پوینت کافی نیست!", show_alert=True)
                 return
             
             old_name = game.data["hapo_name"]
@@ -3252,7 +3316,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if result["success"]:
                 await query.edit_message_text(f"✅ *هاپو خریداری شد!*\nاسم هاپو: {result['name']}\n\n💡 *برای دیدن منوی هاپو، کلمه «هاپو» رو بزن*", parse_mode="Markdown")
             else:
-                await query.edit_message_text(f"❌ *{result['reason']}*", parse_mode="Markdown")
+                await query.answer(f"❌ {result['reason']}", show_alert=True)
             return
         
         if data == "hapo_harvest":
@@ -3268,20 +3332,20 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 keyboard = get_hapo_menu_keyboard(game)
                 await query.edit_message_text(msg, reply_markup=keyboard, parse_mode="Markdown")
             else:
-                await query.edit_message_text("❌ *هیچ هاپو پوینتی برای برداشت نیست*", parse_mode="Markdown")
+                await query.answer("❌ هیچ هاپو پوینتی برای برداشت نیست", show_alert=True)
             return
         
         if data == "hapo_level_up":
             check = game.can_upgrade_level()
             if not check["success"]:
-                await query.edit_message_text(f"❌ *{check['reason']}*", parse_mode="Markdown")
+                await query.answer(f"❌ {check['reason']}", show_alert=True)
                 return
             
             price = game.get_hapo_upgrade_price()
             hop_point = game._to_int(game.data["hop_point"])
             
             if hop_point < price:
-                await query.edit_message_text(f"❌ *به {format_number(price)} هاپو پوینت نیاز داری*", parse_mode="Markdown")
+                await query.answer(f"❌ به {format_number(price)} هاپو پوینت نیاز داری", show_alert=True)
                 return
             
             result = game.upgrade_hapo_level()
@@ -3301,20 +3365,20 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 keyboard = get_hapo_menu_keyboard(game)
                 await query.edit_message_text(msg, reply_markup=keyboard, parse_mode="Markdown")
             else:
-                await query.edit_message_text(f"❌ *{result['reason']}*", parse_mode="Markdown")
+                await query.answer(f"❌ {result['reason']}", show_alert=True)
             return
         
         if data == "hapo_rank_up_confirm":
             check = game.can_rank_up()
             if not check["success"]:
-                await query.edit_message_text(f"❌ *{check['reason']}*", parse_mode="Markdown")
+                await query.answer(f"❌ {check['reason']}", show_alert=True)
                 return
             
             price = game.get_hapo_rank_up_price()
             hop_point = game._to_int(game.data["hop_point"])
             
             if hop_point < price:
-                await query.edit_message_text(f"❌ *به {format_number(price)} هاپو پوینت نیاز داری*", parse_mode="Markdown")
+                await query.answer(f"❌ به {format_number(price)} هاپو پوینت نیاز داری", show_alert=True)
                 return
             
             hapo_rank = game._to_int(game.data["hapo_rank"])
@@ -3350,7 +3414,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 keyboard = get_hapo_menu_keyboard(game)
                 await query.edit_message_text(msg, reply_markup=keyboard, parse_mode="Markdown")
             else:
-                await query.edit_message_text(f"❌ *{result['reason']}*", parse_mode="Markdown")
+                await query.answer(f"❌ {result['reason']}", show_alert=True)
             return
         
         if data == "hapo_rank_up_no":
@@ -3360,7 +3424,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if data == "hapo_rename":
             hop_point = game._to_int(game.data["hop_point"])
             if hop_point < 750:
-                await query.edit_message_text("❌ *به 750 هاپو پوینت نیاز داری*", parse_mode="Markdown")
+                await query.answer("❌ به 750 هاپو پوینت نیاز داری", show_alert=True)
                 return
             await query.edit_message_text("✏️ *اسم جدید هاپو رو وارد کن:*\n\n💡 *فقط اسم جدید رو تایپ کن و ارسال کن.*", parse_mode="Markdown")
             context.user_data["waiting_for_hapo_name"] = True
@@ -3370,7 +3434,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.edit_message_text("🏆 *هاپو در بالاترین سطح است (مقام نهایی)*", parse_mode="Markdown")
             return
         
-        # ======== پنجه و شکار ========
+        # ======== پنجه ========
         if data == "buy_claw":
             result = game.buy_claw()
             if result["success"]:
@@ -3387,7 +3451,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 except:
                     await query.message.reply_text(msg, reply_markup=InlineKeyboardMarkup(keyboard) if keyboard else None, parse_mode="Markdown")
             else:
-                await query.message.reply_text(f"❌ *{result['reason']}*", parse_mode="Markdown")
+                await query.answer(f"❌ {result['reason']}", show_alert=True)
             return
         
         if data == "upgrade_claw":
@@ -3412,9 +3476,10 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 except:
                     await query.message.reply_text(msg, reply_markup=InlineKeyboardMarkup(keyboard) if keyboard else None, parse_mode="Markdown")
             else:
-                await query.message.reply_text(f"❌ *{result['reason']}*", parse_mode="Markdown")
+                await query.answer(f"❌ {result['reason']}", show_alert=True)
             return
         
+        # ======== شکار ========
         if data == "hunt_sell":
             hunt_time = game._to_float(game.data.get("hunt_time", 0))
             if hunt_time > 0:
@@ -3430,7 +3495,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if result["success"]:
                 await query.message.reply_text(f"💰 *حیوان فروخته شد!*\n✅ *{format_number(result['value'])} هاپو پوینت دریافت کردی*", parse_mode="Markdown")
             else:
-                await query.message.reply_text(f"❌ *{result['reason']}*", parse_mode="Markdown")
+                await query.answer(f"❌ {result['reason']}", show_alert=True)
             return
         
         if data == "hunt_feed":
@@ -3448,6 +3513,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if result["success"]:
                 await query.message.reply_text(f"🍖 *{result['fed']} غذا به هاپو داده شد*\n✅ *هاپو سیر شد!*", parse_mode="Markdown")
                 return
+            
             error_msg = result["reason"]
             animal = game.data.get("current_hunt_animal")
             if error_msg == "هاپو سیر است" and animal:
@@ -3460,11 +3526,25 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         game.save_data()
                         await query.message.reply_text("🦌 *حیوان فرار کرد! وقتت تموم شد.*", parse_mode="Markdown")
                         return
-                await query.message.reply_text(f"❌ *هاپو سیر است!*\nمی‌تونی حیوان رو بفروشی.\n\n{animal['emoji']} {animal['name']}\n⭐ *سطح :* {animal['rarity_name']}\n⚖️ *وزن :* {animal['weight']} کیلو\n💰 *ارزش فروش :* {format_number(animal['value'])} 🪙", parse_mode="Markdown")
-                keyboard = [[InlineKeyboardButton(f"💰 فروش ({format_number(animal['value'])})", callback_data="hunt_sell")]]
-                await query.message.reply_text("برای فروش کلیک کن:", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
+                
+                msg = f"❌ *هاپو سیر است!*\n\n"
+                msg += f"{animal['emoji']} *{animal['name']}*\n"
+                msg += f"⭐ *سطح :* {animal['rarity_name']}\n"
+                msg += f"⚖️ *وزن :* {animal['weight']} کیلو\n"
+                msg += f"💰 *ارزش فروش :* {format_number(animal['value'])} 🪙\n\n"
+                msg += "❗️ *میخوای چیکارش کنی ؟*"
+                
+                keyboard = [
+                    [InlineKeyboardButton(f"💰 فروش ({format_number(animal['value'])})", callback_data="hunt_sell")]
+                ]
+                
+                if game.data.get("fridge_owned", False):
+                    keyboard.append([InlineKeyboardButton("❄️ بندازش تو یخچال", callback_data="hunt_fridge")])
+                
+                await query.message.reply_text(msg, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
                 return
-            await query.message.reply_text(f"❌ *{error_msg}*", parse_mode="Markdown")
+            
+            await query.answer(f"❌ {error_msg}", show_alert=True)
             return
         
         # ======== پروفایل ========
@@ -3503,7 +3583,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 keyboard = get_bank_keyboard(False)
                 await query.edit_message_text(msg, reply_markup=keyboard, parse_mode="Markdown")
             else:
-                await query.edit_message_text(f"❌ *{result['reason']}*", parse_mode="Markdown")
+                await query.answer(f"❌ {result['reason']}", show_alert=True)
             return
         if data == "bank_deposit":
             await query.edit_message_text("💰 *مبلغ واریزی رو بنویس:*\n\n💡 *فقط عدد مبلغ رو تایپ کن و ارسال کن.*", parse_mode="Markdown")
@@ -3524,7 +3604,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
         if data == "bank_change_card":
             if not game.data["bank_opened"]:
-                await query.edit_message_text("❌ *شما بانک ندارید.*", parse_mode="Markdown")
+                await query.answer("❌ شما بانک ندارید.", show_alert=True)
                 return
             msg = get_change_card_confirm_text(game)
             await query.edit_message_text(msg, reply_markup=get_confirm_keyboard("bank_change_card_yes", "bank_change_card_no"), parse_mode="Markdown")
@@ -3538,7 +3618,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 keyboard = get_bank_keyboard(False)
                 await query.edit_message_text(msg, reply_markup=keyboard, parse_mode="Markdown")
             else:
-                await query.edit_message_text(f"❌ *{result['reason']}*", parse_mode="Markdown")
+                await query.answer(f"❌ {result['reason']}", show_alert=True)
             return
         if data == "bank_change_card_no":
             await query.edit_message_text("❌ *تغییر شماره حساب لغو شد.*", parse_mode="Markdown")
@@ -3552,15 +3632,15 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if data.startswith("meow_vote_"):
             vote_key = data.replace("meow_vote_", "")
             if vote_key not in MEOW_VOTES:
-                await query.edit_message_text("❌ *رای‌گیری به پایان رسیده است.*", parse_mode="Markdown")
+                await query.answer("❌ رای‌گیری به پایان رسیده است.", show_alert=True)
                 return
             vote_data = MEOW_VOTES[vote_key]
             voter_id = user_id
             if voter_id == vote_data["target_id"]:
-                await query.answer("❌ نمی‌تونی به خودت رای بدی!")
+                await query.answer("❌ نمی‌تونی به خودت رای بدی!", show_alert=True)
                 return
             if voter_id in vote_data["votes"]:
-                await query.answer("❌ تو قبلاً رای دادی!")
+                await query.answer("❌ تو قبلاً رای دادی!", show_alert=True)
                 return
             vote_data["votes"].append(voter_id)
             votes_count = len(vote_data["votes"])
@@ -3577,7 +3657,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         if data == "jail_pay_fine":
             if not game.is_jailed():
-                await query.edit_message_text("❌ *شما در زندان نیستید.*", parse_mode="Markdown")
+                await query.answer("❌ شما در زندان نیستید.", show_alert=True)
                 return
             fine = game._to_int(game.data.get("jail_fine", 0))
             await query.edit_message_text(f"⚠️ *آیا از پرداخت جریمه {format_number(fine)} 🪙 مطمئنی؟*\n\nبا پرداخت جریمه از زندان آزاد میشوی.", reply_markup=get_confirm_keyboard("jail_pay_fine_yes", "jail_pay_fine_no"), parse_mode="Markdown")
@@ -3587,7 +3667,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if result["success"]:
                 await query.edit_message_text("✅ *جریمه پرداخت شد و شما آزاد شدید!* 🎉", parse_mode="Markdown")
             else:
-                await query.edit_message_text(f"❌ *{result['reason']}*", parse_mode="Markdown")
+                await query.answer(f"❌ {result['reason']}", show_alert=True)
             return
         if data == "jail_pay_fine_no":
             await query.edit_message_text("❌ *پرداخت جریمه لغو شد.*", parse_mode="Markdown")
@@ -3597,7 +3677,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.error(f"Error in handle_callback: {e}")
         logger.error(traceback.format_exc())
         try:
-            await query.edit_message_text("❌ *خطایی رخ داد! لطفاً دوباره تلاش کنید.*", parse_mode="Markdown")
+            await query.answer("❌ خطایی رخ داد!", show_alert=True)
         except:
             pass
 
