@@ -2909,11 +2909,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # گروه
         if is_group:
             if game.is_jailed():
-                allowed_commands = ["زندان هاپویی", "زندان", "بانک هاپویی", "هاپو بانک", "بانک", "kknoxx1", "بازی هاپویی", "بازی"]
+                allowed_commands = ["زندان هاپویی", "بانک هاپویی", "هاپو بانک", "kknoxx1"]
                 if text_lower not in allowed_commands:
                     await update.message.reply_text("⛓️ *شما در زندان هستید.*", parse_mode="Markdown")
                     return
-            if text_lower not in ["زندان هاپویی", "زندان", "kknoxx1"]:
+            if text_lower not in ["زندان هاپویی", "kknoxx1"]:
                 if check_spam(user_id):
                     game.jail_user(JAIL_REASON_SPAM, JAIL_DURATION_SPAM, JAIL_FINE_SPAM)
                     await update.message.reply_text(
@@ -2924,7 +2924,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             text_clean = text_lower.strip()
             logger.info(f"📩 گروه - پردازش: '{text_clean}' از {user_id}")
             # زندان
-            if text_clean in ["زندان هاپویی", "زندان"]:
+            if text_clean in ["زندان هاپویی"]:
                 await show_jail(update, context)
                 return
             # میو
@@ -2973,19 +2973,19 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await do_hunt(update, context, game)
                 return
             # بانک
-            if text_clean in ["بانک هاپویی", "هاپو بانک", "بانک"]:
+            if text_clean in ["هاپو بانک", "بانک هاپویی"]:
                 await show_bank_menu(update, game)
                 return
             # یخچال
-            if text_clean in ["یخچال هاپویی", "یخچال"]:
+            if text_clean in ["یخچال هاپویی"]:
                 await show_fridge_menu(update, game)
                 return
             # قاچاق
-            if text_clean in ["قاچاق هاپویی", "قاچاق"]:
+            if text_clean in ["قاچاق هاپویی"]:
                 await show_smuggle_menu(update, game)
                 return
             # بازی هاپویی
-            if text_clean in ["بازی هاپویی", "بازی", "game"]:
+            if text_clean in ["بازی هاپویی", "game"]:
                 await show_games_menu(update, game)
                 return
             logger.info(f"❌ دستور ناشناخته در گروه: '{text_clean}'")
@@ -3007,7 +3007,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 else:
                     await update.message.reply_text("🔑 *رمز ادمین را وارد کن:*", parse_mode="Markdown")
                     context.user_data["waiting_for_admin"] = True
-            elif text_lower in ["بازی هاپویی", "بازی", "game"]:
+            elif text_lower in ["بازی هاپویی", "game"]:
                 await show_games_menu(update, game)
             return
     except Exception as e:
