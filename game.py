@@ -1,4 +1,4 @@
-# game.py - کلاس اصلی بازی (نسخه نهایی)
+# game.py - کلاس اصلی بازی (نسخه نهایی کامل)
 
 import random
 import json
@@ -656,7 +656,7 @@ class HopDogGame:
         return {"success": True, "fed": actual}
 
     # ============================================================
-    # متدهای یخچال هاپویی - اصلاح شده
+    # متدهای یخچال هاپویی
     # ============================================================
 
     def get_fridge_items(self):
@@ -742,18 +742,15 @@ class HopDogGame:
         
         items = self.get_fridge_items()
         
-        # چک کردن ظرفیت
         capacity = self.get_fridge_capacity()
         if len(items) >= capacity:
             return {"success": False, "reason": f"یخچال پر است! ظرفیت: {capacity}"}
         
-        # چک کردن تکراری نبودن
         animal_name = animal.get("name")
         for item in items:
             if item.get("name") == animal_name and not item.get("cooked", False):
                 return {"success": False, "reason": f"شما قبلاً یک {animal_name} در یخچال دارید"}
         
-        # اضافه کردن به یخچال
         animal_copy = animal.copy()
         animal_copy["cooked"] = False
         animal_copy["cooking"] = False
