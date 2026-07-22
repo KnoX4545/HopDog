@@ -14,7 +14,7 @@ from handlers import (
     admin_set_street_hapo, admin_add_street_hapo, admin_help,
     show_rules, show_leaderboard_main, get_game
 )
-from games import game_manager
+from game_functions import game_manager
 
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
