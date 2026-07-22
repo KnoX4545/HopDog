@@ -1,4 +1,4 @@
-# handlers.py - هندلرهای پیام و کالبک (نسخه نهایی کامل با بازی‌ها)
+# handlers.py - هندلرهای پیام و کالبک (نسخه نهایی کامل)
 
 import os
 import json
@@ -70,6 +70,39 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+# ================================================================
+# توابع کمکی برای نمایش نام کاربر
+# ================================================================
+
+def get_user_display_name(user_id, username="", full_name=""):
+    """دریافت نام نمایشی کاربر با اولویت: full_name > username > user_id"""
+    if full_name and full_name.strip() and not full_name.startswith("کاربر"):
+        return full_name
+    if username and username.strip():
+        return f"@{username}"
+    return f"کاربر{user_id}"
+
+
+def get_user_display_name_from_game(game):
+    """دریافت نام نمایشی از روی game.data"""
+    user_id = game.user_id
+    player_name = game.data.get("player_name", "")
+    
+    if player_name and not player_name.startswith("کاربر"):
+        return player_name
+    
+    try:
+        data = get_user_data(user_id)
+        if data and data.get("player_name"):
+            player_name = data.get("player_name")
+            if player_name and not player_name.startswith("کاربر"):
+                return player_name
+    except:
+        pass
+    
+    return f"کاربر{user_id}"
+
+
 def get_game(user_id, username=""):
     if user_id not in user_games:
         user_games[user_id] = HopDogGame(user_id, username)
@@ -84,7 +117,7 @@ def get_street_hapo():
 
 
 def get_user_link(user_id, username, full_name):
-    display_name = full_name or f"کاربر{user_id}"
+    display_name = get_user_display_name(user_id, username, full_name)
     if username:
         return f"@{username}"
     else:
@@ -709,8 +742,15 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     username = update.effective_user.username
     full_name = update.effective_user.full_name or f"کاربر{user_id}"
-    display_name = get_user_link(user_id, username, full_name)
-    game = get_game(user_id, username or full_name)
+    
+    # دریافت نام نمایشی مناسب
+    display_name = get_user_display_name(user_id, username, full_name)
+    game = get_game(user_id, display_name)
+    
+    # اگر نام کاربر در دیتابیس با "کاربر" شروع میشه، به‌روز کن
+    if game.data.get("player_name", "").startswith("کاربر") and display_name and not display_name.startswith("کاربر"):
+        game.data["player_name"] = display_name
+        game.save_data()
     
     keyboard = [[InlineKeyboardButton("➕ افزودن به گروه", url=f"https://t.me/{context.bot.username}?startgroup=start")]]
     
@@ -814,7 +854,8 @@ async def my_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     username = update.effective_user.username
     full_name = update.effective_user.full_name or f"کاربر{user_id}"
-    game = get_game(user_id, username or full_name)
+    display_name = get_user_display_name(user_id, username, full_name)
+    game = get_game(user_id, display_name)
     
     if game.is_jailed():
         await update.message.reply_text("⛓️ *شما در زندان هستید و نمی‌توانید این کار را انجام دهید.*", parse_mode="Markdown")
@@ -839,7 +880,7 @@ async def my_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     total_hunts = game._to_int(game.data.get("total_hunts", 0))
     
     msg = f"╮──「 🐶 *پروفایل هاپویی* 🐶 」\n\n"
-    msg += f"┐─ 👤 *کاربر :* {full_name}\n"
+    msg += f"┐─ 👤 *کاربر :* {display_name}\n"
     if not is_hidden:
         msg += f"‏┘─ 🪪 *آیدی :* `{user_id}`\n\n"
     else:
@@ -903,8 +944,9 @@ async def show_user_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     target_user_id = update.message.reply_to_message.from_user.id
     target_username = update.message.reply_to_message.from_user.username
     target_full_name = update.message.reply_to_message.from_user.full_name or f"کاربر{target_user_id}"
+    target_display_name = get_user_display_name(target_user_id, target_username, target_full_name)
     
-    target_game = get_game(target_user_id, target_username or target_full_name)
+    target_game = get_game(target_user_id, target_display_name)
     
     game = get_game(user_id)
     if game.is_jailed():
@@ -915,7 +957,7 @@ async def show_user_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     if target_data.get("profile_hidden", False):
         msg = f"╮──「 🐶 *پروفایل هاپویی* 🐶 」\n\n"
-        msg += f"┐─ 👤 *کاربر :* {target_full_name}\n"
+        msg += f"┐─ 👤 *کاربر :* {target_display_name}\n"
         msg += f"┘─ 🔒 این کاربر پروفایل خود را مخفی کرده است."
         await update.message.reply_text(msg, parse_mode="Markdown")
         return
@@ -937,7 +979,7 @@ async def show_user_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     total_hunts = target_game._to_int(target_data.get("total_hunts", 0))
     
     msg = f"╮──「 🐶 *پروفایل هاپویی* 🐶 」\n\n"
-    msg += f"┐─ 👤 *کاربر :* {target_full_name}\n"
+    msg += f"┐─ 👤 *کاربر :* {target_display_name}\n"
     msg += f"‏┘─ 🪪 *آیدی :* `{target_user_id}`\n\n"
     
     msg += f"┐─ 💰 *هاپ پوینت ها :* {format_number(hop_point)} 🪙"
@@ -1064,6 +1106,7 @@ async def show_hapo_menu(update: Update, game):
 
 
 async def show_claw_menu(update: Update, game):
+    """نمایش منوی پنجه"""
     if game.is_jailed():
         await update.message.reply_text("⛓️ *شما در زندان هستید و نمی‌توانید این کار را انجام دهید.*", parse_mode="Markdown")
         return
@@ -1523,6 +1566,14 @@ async def show_fridge_menu(update: Update, game):
     upgrade_cost = game.get_fridge_upgrade_cost()
     
     player_name = game.data.get("player_name", "کاربر")
+    if player_name.startswith("کاربر"):
+        try:
+            user_data = get_user_data(int(game.user_id))
+            if user_data and user_data.get("player_name") and not user_data.get("player_name").startswith("کاربر"):
+                player_name = user_data.get("player_name")
+        except:
+            pass
+    
     msg = f"❄️ *یخچال هاپویی {player_name}*\n\n"
     msg += f"⭐️ *سطح یخچال :* {fridge_level}\n"
     msg += f"📦 *ظرفیت یخچال :* {len(items)}/{capacity}\n\n"
@@ -1641,7 +1692,7 @@ async def show_fridge_item_detail(update: Update, context: ContextTypes.DEFAULT_
             ])
     else:
         keyboard.append([
-            InlineKeyboardButton(f"🔥 بپزش ({int(weight * 100)} ثانیه)", callback_data=f"fridge_cook_{index}")
+            InlineKeyboardButton(f"🔥 بپوخش ({int(weight * 100)} ثانیه)", callback_data=f"fridge_cook_{index}")
         ])
         keyboard.append([
             InlineKeyboardButton(f"💰 فروش ({format_number(value)} 🪙)", callback_data=f"fridge_sell_{index}")
@@ -2336,8 +2387,16 @@ async def send_street_hapo_notification(context: ContextTypes.DEFAULT_TYPE):
             return
         
         street_hapo = get_street_hapo()
+        
+        # بررسی دقیق وضعیت هاپوی خیابونی
         if street_hapo.active:
-            return
+            # اگر هاپوی خیابونی فعاله ولی منقضی شده، غیرفعالش کن
+            if street_hapo.is_expired():
+                street_hapo.active = False
+                street_hapo.save_status()
+            else:
+                logger.info("🐶 هاپوی خیابونی در حال حاضر فعال است")
+                return
         
         now = datetime.now().timestamp()
         available_groups = []
@@ -2354,6 +2413,7 @@ async def send_street_hapo_notification(context: ContextTypes.DEFAULT_TYPE):
         
         success, msg = street_hapo.start_event(int(chat_id))
         if not success:
+            logger.info(f"🐶 خطا در شروع هاپوی خیابونی: {msg}")
             return
         
         STREET_HAPO_LAST_SENT[chat_id] = now
@@ -2371,6 +2431,8 @@ async def send_street_hapo_notification(context: ContextTypes.DEFAULT_TYPE):
         street_hapo.data["message_id"] = message.message_id
         street_hapo.save_status()
         asyncio.create_task(street_hapo_timer(street_hapo, context))
+        
+        logger.info(f"🐶 هاپوی خیابونی به گروه {chat_id} ارسال شد")
         
     except Exception as e:
         logger.error(f"Error sending street hapo notification: {e}")
@@ -2413,23 +2475,28 @@ async def handle_street_hapo_rescue(update: Update, context: ContextTypes.DEFAUL
     
     street_hapo = get_street_hapo()
     
+    # بررسی دقیق وضعیت هاپوی خیابونی
     if not street_hapo.active:
         await query.answer("🐶 هیچ هاپوی خیابونی در دسترس نیست!", show_alert=True)
-        return
-    
-    if street_hapo.data.get("rescued", False):
-        await query.answer("❌ این هاپوی خیابونی قبلاً نجات پیدا کرده!", show_alert=True)
+        await query.message.reply_text("🐶 *هیچ هاپوی خیابونی در دسترس نیست!*", parse_mode="Markdown")
         return
     
     if street_hapo.is_expired():
         street_hapo.active = False
         street_hapo.save_status()
         await query.answer("⏰ هاپوی خیابونی فرار کرد!", show_alert=True)
+        await query.message.reply_text("⏰ *هاپوی خیابونی فرار کرد!*", parse_mode="Markdown")
+        return
+    
+    if street_hapo.data.get("rescued", False):
+        await query.answer("❌ این هاپوی خیابونی قبلاً نجات پیدا کرده!", show_alert=True)
+        await query.message.reply_text("❌ *این هاپوی خیابونی قبلاً نجات پیدا کرده!*", parse_mode="Markdown")
         return
     
     attempts = street_hapo.data.get("attempts", 0)
     if attempts >= STREET_HAPO_MAX_ATTEMPTS:
         await query.answer("❌ همه شانس‌ها از دست رفته!", show_alert=True)
+        await query.message.reply_text("❌ *همه شانس‌ها از دست رفته! هاپوی خیابونی نتونست نجات پیدا کنه...* 😢", parse_mode="Markdown")
         return
     
     result = street_hapo.attempt_rescue(user_id, full_name, game)
@@ -2516,9 +2583,15 @@ async def admin_street_hapo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     
     street_hapo = get_street_hapo()
+    
+    # بررسی دقیق وضعیت هاپوی خیابونی
     if street_hapo.active:
-        await update.message.reply_text("⏳ *هم اکنون یک هاپوی خیابونی در حال نجات است!*", parse_mode="Markdown")
-        return
+        if street_hapo.is_expired():
+            street_hapo.active = False
+            street_hapo.save_status()
+        else:
+            await update.message.reply_text("⏳ *هم اکنون یک هاپوی خیابونی در حال نجات است!*", parse_mode="Markdown")
+            return
     
     success, msg = street_hapo.start_event(chat_id)
     if not success:
@@ -3038,7 +3111,10 @@ async def process_xo_bet(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def handle_xo_create(update: Update, context: ContextTypes.DEFAULT_TYPE, bet_amount: int):
-    """ساخت میز بازی XO"""
+    """ساخت میز بازی XO - ارسال پیام جدید با دکمه پیوستن"""
+    from games import game_manager
+    from bank import format_number
+    
     query = update.callback_query
     await query.answer()
     
@@ -3069,25 +3145,39 @@ async def handle_xo_create(update: Update, context: ContextTypes.DEFAULT_TYPE, b
     game_obj.data["hop_point"] = str(hop_point - bet_amount)
     game_obj.save_data()
     
+    # نمایش بازی به میزبان
     msg = get_xo_game_text(game)
     keyboard = get_xo_board_keyboard(game, user_id)
     await query.edit_message_text(msg, reply_markup=keyboard, parse_mode="Markdown")
     
-    if update.message and update.message.chat.type in ["group", "supergroup"]:
-        await update.message.reply_text(
-            f"🧩 *یک میز بازی XO ساخته شد!*\n\n"
-            f"👤 *میزبان:* {full_name}\n"
-            f"💰 *مبلغ شرط:* {format_number(bet_amount)} 🪙\n\n"
-            f"💡 *برای پیوستن، روی دکمه «🧩 پیوستن به بازی» کلیک کن.*",
-            reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("🧩 پیوستن به بازی", callback_data=f"game_xo_join_{game_id}")]
-            ]),
-            parse_mode="Markdown"
-        )
+    # ارسال پیام دعوت به گروه
+    try:
+        chat_id = query.message.chat.id
+        if query.message.chat.type in ["group", "supergroup"]:
+            invite_msg = (
+                f"🧩 *یک میز بازی XO ساخته شد!*\n\n"
+                f"👤 *میزبان:* {full_name}\n"
+                f"💰 *مبلغ شرط:* {format_number(bet_amount)} 🪙\n\n"
+                f"💡 *برای پیوستن، روی دکمه زیر کلیک کن.*"
+            )
+            
+            await context.bot.send_message(
+                chat_id=chat_id,
+                text=invite_msg,
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton("🧩 پیوستن به بازی", callback_data=f"game_xo_join_{game_id}")]
+                ]),
+                parse_mode="Markdown"
+            )
+    except Exception as e:
+        logger.error(f"Error sending game invite: {e}")
 
 
 async def handle_xo_join(update: Update, context: ContextTypes.DEFAULT_TYPE, game_id: str):
     """پیوستن به بازی XO"""
+    from games import game_manager
+    from bank import format_number
+    
     query = update.callback_query
     await query.answer()
     
@@ -3146,6 +3236,10 @@ async def handle_xo_join(update: Update, context: ContextTypes.DEFAULT_TYPE, gam
 
 async def handle_xo_move(update: Update, context: ContextTypes.DEFAULT_TYPE, game_id: str, row: int, col: int):
     """انجام حرکت در بازی XO"""
+    from games import game_manager
+    from bank import format_number
+    import asyncio
+    
     query = update.callback_query
     await query.answer()
     
@@ -3244,6 +3338,8 @@ async def remove_game_after_delay(game_id: str, delay: int):
 
 async def handle_xo_close(update: Update, context: ContextTypes.DEFAULT_TYPE, game_id: str):
     """بستن بازی XO"""
+    from games import game_manager
+    
     query = update.callback_query
     await query.answer()
     
@@ -3253,6 +3349,8 @@ async def handle_xo_close(update: Update, context: ContextTypes.DEFAULT_TYPE, ga
 
 async def handle_xo_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE, game_id: str):
     """لغو میز بازی XO توسط میزبان"""
+    from games import game_manager
+    
     query = update.callback_query
     await query.answer()
     
@@ -3287,7 +3385,14 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_id = update.effective_user.id
         username = update.effective_user.username
         full_name = update.effective_user.full_name or f"کاربر{user_id}"
-        game = get_game(user_id, username or full_name)
+        display_name = get_user_display_name(user_id, username, full_name)
+        game = get_game(user_id, display_name)
+        
+        # به‌روزرسانی نام کاربر در دیتابیس
+        if game.data.get("player_name", "").startswith("کاربر") and display_name and not display_name.startswith("کاربر"):
+            game.data["player_name"] = display_name
+            game.save_data()
+        
         text = update.message.text.strip()
         text_lower = text.lower()
         is_private = update.message.chat.type == "private"
@@ -3439,7 +3544,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 return
             
             # آکادمی
-            if text_clean in ["آکادمی هاپویی", "اکادمی هاپویی", "اکادمی", "آکادمی"]:
+            if text_clean in ["راهنما", "آکادمی هاپویی", "اکادمی هاپویی", "اکادمی", "آکادمی"]:
                 await show_academy_main(update)
                 return
             
@@ -3748,172 +3853,32 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await handle_xo_cancel(update, context, game_id)
             return
         
-        # ======== هاپو ========
-        if data == "confirm_hapo_name":
-            new_name = context.user_data.get("new_hapo_name", "")
-            if not new_name:
-                await query.edit_message_text("❌ *خطا در تغییر اسم*", parse_mode="Markdown")
-                return
-            
-            hop_point = game._to_int(game.data["hop_point"])
-            if hop_point < 750:
-                await query.answer("❌ پوینت کافی نیست!", show_alert=True)
-                return
-            
-            old_name = game.data["hapo_name"]
-            game.data["hapo_name"] = new_name
-            game.data["hop_point"] = str(hop_point - 750)
-            game.save_data()
-            await query.edit_message_text(f"✅ *اسم هاپو از «{old_name}» به «{new_name}» تغییر یافت*", parse_mode="Markdown")
-            context.user_data["new_hapo_name"] = None
-            await asyncio.sleep(2)
-            msg = get_hapo_menu_text(game)
-            keyboard = get_hapo_menu_keyboard(game)
-            await query.edit_message_text(msg, reply_markup=keyboard, parse_mode="Markdown")
-            return
-        
-        if data == "cancel_hapo_name":
-            await query.edit_message_text("❌ *تغییر اسم هاپو لغو شد*", parse_mode="Markdown")
-            context.user_data["new_hapo_name"] = None
-            return
-        
-        if data == "buy_hapo":
-            result = game.buy_hapo()
-            if result["success"]:
-                await query.edit_message_text(f"✅ *هاپو خریداری شد!*\nاسم هاپو: {result['name']}\n\n💡 *برای دیدن منوی هاپو، کلمه «هاپو» رو بزن*", parse_mode="Markdown")
-            else:
-                await query.answer(f"❌ {result['reason']}", show_alert=True)
-            return
-        
-        if data == "hapo_harvest":
-            hapo_harvest = game._to_int(game.data["hapo_harvest"])
-            if hapo_harvest > 0:
-                hop_point = game._to_int(game.data["hop_point"])
-                game.data["hop_point"] = str(hop_point + hapo_harvest)
-                game.data["hapo_harvest"] = "0"
-                game.save_data()
-                await query.edit_message_text(f"✅ *{format_number(hapo_harvest)} هاپو پوینت برداشت شد*", parse_mode="Markdown")
-                await asyncio.sleep(2)
-                msg = get_hapo_menu_text(game)
-                keyboard = get_hapo_menu_keyboard(game)
-                await query.edit_message_text(msg, reply_markup=keyboard, parse_mode="Markdown")
-            else:
-                await query.answer("❌ هیچ هاپو پوینتی برای برداشت نیست", show_alert=True)
-            return
-        
-        if data == "hapo_level_up":
-            check = game.can_upgrade_level()
-            if not check["success"]:
-                await query.answer(f"❌ {check['reason']}", show_alert=True)
-                return
-            
-            price = game.get_hapo_upgrade_price()
-            hop_point = game._to_int(game.data["hop_point"])
-            
-            if hop_point < price:
-                await query.answer(f"❌ به {format_number(price)} هاپو پوینت نیاز داری", show_alert=True)
-                return
-            
-            result = game.upgrade_hapo_level()
-            if result["success"]:
-                hapo_rank = game._to_int(game.data["hapo_rank"])
-                msg = f"✅ *سطح هاپو به {result['new_level']} ارتقا یافت*"
-                msg += f"\n📊 *سقف سطح فعلی: {result['max_level']}*"
-                
-                if result['new_level'] >= result['max_level']:
-                    msg += f"\n🌟 *هاپو به سطح {result['max_level']} رسید!*"
-                    msg += f"\n🔓 *برای ادامه، مقام خود را ارتقا دهید*"
-                    msg += f"\n💰 *هزینه ارتقا مقام: {format_number(game.get_hapo_rank_up_price())} 🪙*"
-                
-                await query.edit_message_text(msg, parse_mode="Markdown")
-                await asyncio.sleep(2)
-                msg = get_hapo_menu_text(game)
-                keyboard = get_hapo_menu_keyboard(game)
-                await query.edit_message_text(msg, reply_markup=keyboard, parse_mode="Markdown")
-            else:
-                await query.answer(f"❌ {result['reason']}", show_alert=True)
-            return
-        
-        if data == "hapo_rank_up_confirm":
-            check = game.can_rank_up()
-            if not check["success"]:
-                await query.answer(f"❌ {check['reason']}", show_alert=True)
-                return
-            
-            price = game.get_hapo_rank_up_price()
-            hop_point = game._to_int(game.data["hop_point"])
-            
-            if hop_point < price:
-                await query.answer(f"❌ به {format_number(price)} هاپو پوینت نیاز داری", show_alert=True)
-                return
-            
-            hapo_rank = game._to_int(game.data["hapo_rank"])
-            current_max = game.get_hapo_max_level_for_rank(hapo_rank)
-            next_max = game.get_hapo_max_level_for_rank(hapo_rank + 1)
-            
-            msg = f"⚠️ *آیا از ارتقا مقام هاپو مطمئنی؟*\n\n"
-            msg += f"🌟 *مقام فعلی:* {RANK_NAMES[hapo_rank]}\n"
-            msg += f"🌟 *مقام جدید:* {RANK_NAMES[hapo_rank + 1]}\n"
-            msg += f"📊 *سقف سطح فعلی:* {current_max}\n"
-            msg += f"📊 *سقف سطح جدید:* {next_max}\n"
-            msg += f"💰 *هزینه:* {format_number(price)} 🪙\n\n"
-            msg += f"❗️ *با ارتقا مقام:*\n"
-            msg += f"┘─ سطح هاپو به 1 ریست میشود\n"
-            msg += f"┘─ تولیدی هاپو صفر میشود\n"
-            msg += f"┘─ سقف سطح تا {next_max} باز میشود"
-            
-            await query.edit_message_text(msg, reply_markup=get_confirm_keyboard("hapo_rank_up_yes", "hapo_rank_up_no"), parse_mode="Markdown")
-            return
-        
-        if data == "hapo_rank_up_yes":
-            result = game.confirm_rank_up()
-            if result["success"]:
-                await query.edit_message_text(
-                    f"✅ *مقام هاپو به {result['new_rank_name']} ارتقا یافت!*\n\n"
-                    f"🌟 *سطح هاپو به 1 ریست شد*\n"
-                    f"💰 *تولیدی هاپو صفر شد*\n"
-                    f"🔓 *سقف سطح تا {result['new_max_level']} باز شد*",
-                    parse_mode="Markdown"
-                )
-                await asyncio.sleep(2)
-                msg = get_hapo_menu_text(game)
-                keyboard = get_hapo_menu_keyboard(game)
-                await query.edit_message_text(msg, reply_markup=keyboard, parse_mode="Markdown")
-            else:
-                await query.answer(f"❌ {result['reason']}", show_alert=True)
-            return
-        
-        if data == "hapo_rank_up_no":
-            await query.edit_message_text("❌ *ارتقا مقام لغو شد.*", parse_mode="Markdown")
-            return
-        
-        if data == "hapo_rename":
-            hop_point = game._to_int(game.data["hop_point"])
-            if hop_point < 750:
-                await query.answer("❌ به 750 هاپو پوینت نیاز داری", show_alert=True)
-                return
-            await query.edit_message_text("✏️ *اسم جدید هاپو رو وارد کن:*\n\n💡 *فقط اسم جدید رو تایپ کن و ارسال کن.*", parse_mode="Markdown")
-            context.user_data["waiting_for_hapo_name"] = True
-            return
-        
-        if data == "hapo_max":
-            await query.edit_message_text("🏆 *هاپو در بالاترین سطح است (مقام نهایی)*", parse_mode="Markdown")
-            return
-        
-        # ======== پنجه ========
+        # ======== پنجه - ارسال پیام جدید ========
         if data == "buy_claw":
+            await query.answer()
             result = game.buy_claw()
             if result["success"]:
                 await query.message.reply_text("✅ *پنجه خریداری شد!*", parse_mode="Markdown")
                 await asyncio.sleep(1)
-                claw_data = game.get_claw_data(1)
-                next_data = game.get_claw_data(2)
-                msg = f"🦞 *پنجه شما*\n⭐ *سطح:* 1\n⏳ *زمان استراحت:* 60:00\n🍀 *شانس شکار:*\n  ⚪ معمولی: 95%\n  🔵 کمیاب: 5%"
+                
+                claw_level = game._to_int(game.data["claw_level"])
+                claw_data = game.get_claw_data(claw_level)
+                next_level = claw_level + 1
+                next_data = game.get_claw_data(next_level)
+                
+                msg = f"🦞 *پنجه شما*\n⭐ *سطح:* {claw_level}\n⏳ *زمان استراحت:* {claw_data['cooldown']:02d}:00\n🍀 *شانس شکار:*\n  ⚪ معمولی: {claw_data['common']}%\n  🔵 کمیاب: {claw_data['uncommon']}%"
+                
+                if claw_data['epic'] > 0:
+                    msg += f"\n  🟣 حماسی: {claw_data['epic']}%"
+                if claw_data['legendary'] > 0:
+                    msg += f"\n  🟡 افسانه‌ای: {claw_data['legendary']}%"
+                
                 keyboard = []
                 if next_data:
-                    keyboard.append([InlineKeyboardButton(f"⬆️ سطح 2 ({format_number(next_data['cost'])})", callback_data="upgrade_claw")])
+                    keyboard.append([InlineKeyboardButton(f"⬆️ سطح {next_level} ({format_number(next_data['cost'])})", callback_data="upgrade_claw")])
+                
                 try:
-                    await query.message.reply_photo(photo=CLAW_IMAGES[1], caption=msg, reply_markup=InlineKeyboardMarkup(keyboard) if keyboard else None, parse_mode="Markdown")
+                    await query.message.reply_photo(photo=CLAW_IMAGES[claw_level], caption=msg, reply_markup=InlineKeyboardMarkup(keyboard) if keyboard else None, parse_mode="Markdown")
                 except:
                     await query.message.reply_text(msg, reply_markup=InlineKeyboardMarkup(keyboard) if keyboard else None, parse_mode="Markdown")
             else:
@@ -3921,22 +3886,28 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
         
         if data == "upgrade_claw":
+            await query.answer()
             result = game.upgrade_claw()
             if result["success"]:
                 await query.message.reply_text(f"✅ *پنجه به سطح {result['new_level']} ارتقا یافت*", parse_mode="Markdown")
                 await asyncio.sleep(1)
+                
                 claw_level = game._to_int(game.data["claw_level"])
                 claw_data = game.get_claw_data(claw_level)
                 next_level = claw_level + 1
                 next_data = game.get_claw_data(next_level)
+                
                 msg = f"🦞 *پنجه شما*\n⭐ *سطح:* {claw_level}\n⏳ *زمان استراحت:* {claw_data['cooldown']:02d}:00\n🍀 *شانس شکار:*\n  ⚪ معمولی: {claw_data['common']}%\n  🔵 کمیاب: {claw_data['uncommon']}%"
+                
                 if claw_data['epic'] > 0:
                     msg += f"\n  🟣 حماسی: {claw_data['epic']}%"
                 if claw_data['legendary'] > 0:
                     msg += f"\n  🟡 افسانه‌ای: {claw_data['legendary']}%"
+                
                 keyboard = []
                 if next_data:
                     keyboard.append([InlineKeyboardButton(f"⬆️ سطح {next_level} ({format_number(next_data['cost'])})", callback_data="upgrade_claw")])
+                
                 try:
                     await query.message.reply_photo(photo=CLAW_IMAGES[claw_level], caption=msg, reply_markup=InlineKeyboardMarkup(keyboard) if keyboard else None, parse_mode="Markdown")
                 except:
@@ -4137,6 +4108,158 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
         if data == "jail_pay_fine_no":
             await query.edit_message_text("❌ *پرداخت جریمه لغو شد.*", parse_mode="Markdown")
+            return
+        
+        # ======== هاپو ========
+        if data == "confirm_hapo_name":
+            new_name = context.user_data.get("new_hapo_name", "")
+            if not new_name:
+                await query.edit_message_text("❌ *خطا در تغییر اسم*", parse_mode="Markdown")
+                return
+            
+            hop_point = game._to_int(game.data["hop_point"])
+            if hop_point < 750:
+                await query.answer("❌ پوینت کافی نیست!", show_alert=True)
+                return
+            
+            old_name = game.data["hapo_name"]
+            game.data["hapo_name"] = new_name
+            game.data["hop_point"] = str(hop_point - 750)
+            game.save_data()
+            await query.edit_message_text(f"✅ *اسم هاپو از «{old_name}» به «{new_name}» تغییر یافت*", parse_mode="Markdown")
+            context.user_data["new_hapo_name"] = None
+            await asyncio.sleep(2)
+            msg = get_hapo_menu_text(game)
+            keyboard = get_hapo_menu_keyboard(game)
+            await query.edit_message_text(msg, reply_markup=keyboard, parse_mode="Markdown")
+            return
+        
+        if data == "cancel_hapo_name":
+            await query.edit_message_text("❌ *تغییر اسم هاپو لغو شد*", parse_mode="Markdown")
+            context.user_data["new_hapo_name"] = None
+            return
+        
+        if data == "buy_hapo":
+            result = game.buy_hapo()
+            if result["success"]:
+                await query.edit_message_text(f"✅ *هاپو خریداری شد!*\nاسم هاپو: {result['name']}\n\n💡 *برای دیدن منوی هاپو، کلمه «هاپو» رو بزن*", parse_mode="Markdown")
+            else:
+                await query.answer(f"❌ {result['reason']}", show_alert=True)
+            return
+        
+        if data == "hapo_harvest":
+            hapo_harvest = game._to_int(game.data["hapo_harvest"])
+            if hapo_harvest > 0:
+                hop_point = game._to_int(game.data["hop_point"])
+                game.data["hop_point"] = str(hop_point + hapo_harvest)
+                game.data["hapo_harvest"] = "0"
+                game.save_data()
+                await query.edit_message_text(f"✅ *{format_number(hapo_harvest)} هاپو پوینت برداشت شد*", parse_mode="Markdown")
+                await asyncio.sleep(2)
+                msg = get_hapo_menu_text(game)
+                keyboard = get_hapo_menu_keyboard(game)
+                await query.edit_message_text(msg, reply_markup=keyboard, parse_mode="Markdown")
+            else:
+                await query.answer("❌ هیچ هاپو پوینتی برای برداشت نیست", show_alert=True)
+            return
+        
+        if data == "hapo_level_up":
+            check = game.can_upgrade_level()
+            if not check["success"]:
+                await query.answer(f"❌ {check['reason']}", show_alert=True)
+                return
+            
+            price = game.get_hapo_upgrade_price()
+            hop_point = game._to_int(game.data["hop_point"])
+            
+            if hop_point < price:
+                await query.answer(f"❌ به {format_number(price)} هاپو پوینت نیاز داری", show_alert=True)
+                return
+            
+            result = game.upgrade_hapo_level()
+            if result["success"]:
+                hapo_rank = game._to_int(game.data["hapo_rank"])
+                msg = f"✅ *سطح هاپو به {result['new_level']} ارتقا یافت*"
+                msg += f"\n📊 *سقف سطح فعلی: {result['max_level']}*"
+                
+                if result['new_level'] >= result['max_level']:
+                    msg += f"\n🌟 *هاپو به سطح {result['max_level']} رسید!*"
+                    msg += f"\n🔓 *برای ادامه، مقام خود را ارتقا دهید*"
+                    msg += f"\n💰 *هزینه ارتقا مقام: {format_number(game.get_hapo_rank_up_price())} 🪙*"
+                
+                await query.edit_message_text(msg, parse_mode="Markdown")
+                await asyncio.sleep(2)
+                msg = get_hapo_menu_text(game)
+                keyboard = get_hapo_menu_keyboard(game)
+                await query.edit_message_text(msg, reply_markup=keyboard, parse_mode="Markdown")
+            else:
+                await query.answer(f"❌ {result['reason']}", show_alert=True)
+            return
+        
+        if data == "hapo_rank_up_confirm":
+            check = game.can_rank_up()
+            if not check["success"]:
+                await query.answer(f"❌ {check['reason']}", show_alert=True)
+                return
+            
+            price = game.get_hapo_rank_up_price()
+            hop_point = game._to_int(game.data["hop_point"])
+            
+            if hop_point < price:
+                await query.answer(f"❌ به {format_number(price)} هاپو پوینت نیاز داری", show_alert=True)
+                return
+            
+            hapo_rank = game._to_int(game.data["hapo_rank"])
+            current_max = game.get_hapo_max_level_for_rank(hapo_rank)
+            next_max = game.get_hapo_max_level_for_rank(hapo_rank + 1)
+            
+            msg = f"⚠️ *آیا از ارتقا مقام هاپو مطمئنی؟*\n\n"
+            msg += f"🌟 *مقام فعلی:* {RANK_NAMES[hapo_rank]}\n"
+            msg += f"🌟 *مقام جدید:* {RANK_NAMES[hapo_rank + 1]}\n"
+            msg += f"📊 *سقف سطح فعلی:* {current_max}\n"
+            msg += f"📊 *سقف سطح جدید:* {next_max}\n"
+            msg += f"💰 *هزینه:* {format_number(price)} 🪙\n\n"
+            msg += f"❗️ *با ارتقا مقام:*\n"
+            msg += f"┘─ سطح هاپو به 1 ریست میشود\n"
+            msg += f"┘─ تولیدی هاپو صفر میشود\n"
+            msg += f"┘─ سقف سطح تا {next_max} باز میشود"
+            
+            await query.edit_message_text(msg, reply_markup=get_confirm_keyboard("hapo_rank_up_yes", "hapo_rank_up_no"), parse_mode="Markdown")
+            return
+        
+        if data == "hapo_rank_up_yes":
+            result = game.confirm_rank_up()
+            if result["success"]:
+                await query.edit_message_text(
+                    f"✅ *مقام هاپو به {result['new_rank_name']} ارتقا یافت!*\n\n"
+                    f"🌟 *سطح هاپو به 1 ریست شد*\n"
+                    f"💰 *تولیدی هاپو صفر شد*\n"
+                    f"🔓 *سقف سطح تا {result['new_max_level']} باز شد*",
+                    parse_mode="Markdown"
+                )
+                await asyncio.sleep(2)
+                msg = get_hapo_menu_text(game)
+                keyboard = get_hapo_menu_keyboard(game)
+                await query.edit_message_text(msg, reply_markup=keyboard, parse_mode="Markdown")
+            else:
+                await query.answer(f"❌ {result['reason']}", show_alert=True)
+            return
+        
+        if data == "hapo_rank_up_no":
+            await query.edit_message_text("❌ *ارتقا مقام لغو شد.*", parse_mode="Markdown")
+            return
+        
+        if data == "hapo_rename":
+            hop_point = game._to_int(game.data["hop_point"])
+            if hop_point < 750:
+                await query.answer("❌ به 750 هاپو پوینت نیاز داری", show_alert=True)
+                return
+            await query.edit_message_text("✏️ *اسم جدید هاپو رو وارد کن:*\n\n💡 *فقط اسم جدید رو تایپ کن و ارسال کن.*", parse_mode="Markdown")
+            context.user_data["waiting_for_hapo_name"] = True
+            return
+        
+        if data == "hapo_max":
+            await query.edit_message_text("🏆 *هاپو در بالاترین سطح است (مقام نهایی)*", parse_mode="Markdown")
             return
         
     except Exception as e:
