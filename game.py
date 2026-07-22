@@ -1,4 +1,4 @@
-# game.py - کلاس اصلی بازی (نسخه نهایی کامل)
+# game.py - کلاس اصلی بازی (نسخه کامل نهایی)
 
 import random
 import json
@@ -17,6 +17,10 @@ class HopDogGame:
         self.data = self.load_data()
         if not self.data:
             self.reset_data()
+
+    # ============================================================
+    # توابع کمکی تبدیل
+    # ============================================================
 
     def _to_int(self, value):
         if value is None:
@@ -55,6 +59,10 @@ class HopDogGame:
         if isinstance(value, str):
             return value.lower() in ["true", "1", "yes"]
         return bool(value)
+
+    # ============================================================
+    # متدهای اصلی
+    # ============================================================
 
     def load_data(self):
         try:
@@ -182,6 +190,10 @@ class HopDogGame:
             "last_updated": datetime.now().isoformat()
         }
         self.save_data()
+
+    # ============================================================
+    # متدهای سطح و هاپ
+    # ============================================================
 
     def get_level_data(self, level):
         return LEVEL_DATA.get(level, LEVEL_DATA[1])
@@ -1403,6 +1415,10 @@ class HopDogGame:
             "progress": int((elapsed / duration) * 100) if duration > 0 else 0
         }
 
+
+# ================================================================
+# کلاس هاپوی خیابونی
+# ================================================================
 
 class StreetHapo:
     def __init__(self, context=None):
