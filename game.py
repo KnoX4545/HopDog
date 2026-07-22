@@ -1,10 +1,13 @@
-# game.py - کلاس اصلی بازی (نسخه کامل با سیستم مقام‌بندی درست)
+# game.py - کلاس اصلی بازی (نسخه نهایی کامل)
 
 import random
 import json
+import logging
 from datetime import datetime, timedelta
 from config import *
 from database import get_user_data, save_user_data, get_user_by_card, is_card_unique
+
+logger = logging.getLogger(__name__)
 
 
 class HopDogGame:
@@ -65,6 +68,7 @@ class HopDogGame:
         try:
             data = get_user_data(self.user_id)
             if data:
+                # تبدیل JSON فیلدها
                 if "current_hunt_animal" in data and data["current_hunt_animal"]:
                     try:
                         data["current_hunt_animal"] = json.loads(data["current_hunt_animal"])
@@ -92,6 +96,7 @@ class HopDogGame:
                 else:
                     data["fridge_items"] = []
                 
+                # فیلدهای پیش‌فرض
                 defaults = {
                     "bank_card_number": "",
                     "jail_admin_id": None,
@@ -115,6 +120,7 @@ class HopDogGame:
                     if key not in data:
                         data[key] = default
                 
+                # چک کردن خودکار آزادی از زندان
                 if data.get("jailed", False):
                     now = datetime.now().timestamp()
                     jail_until = self._to_float(data.get("jail_until", 0))
@@ -129,7 +135,7 @@ class HopDogGame:
                 return data
             return None
         except Exception as e:
-            print(f"Error loading data: {e}")
+            logger.error(f"Error loading data: {e}")
             return None
 
     def save_data(self):
@@ -283,16 +289,20 @@ class HopDogGame:
         """دریافت هزینه ارتقا سطح هاپو - مستقل از مقام"""
         total = self.get_hapo_total_level()
         
-        # اگر سطح کل >= 20 (یا 25 برای مقام نهایی)
+        # حداکثر سطح 20 هست
         if total >= 20:
             return float('inf')
         
-        # سطح کل + 1 = سطح بعدی (مثلاً سطح 2 → 3 یعنی total+1 = 3)
-        # قیمت فقط به شماره سطح بستگی داره، نه مقام
+        # سطح بعدی برای ارتقا = total + 1
         next_level = total + 1
         
+        logger.info(f"🔍 هاپو - سطح کل: {total}, سطح بعدی: {next_level}")
+        
+        # قیمت رو از دیکشنری بگیر
         if next_level in HAPO_LEVEL_PRICES:
-            return HAPO_LEVEL_PRICES[next_level]
+            price = HAPO_LEVEL_PRICES[next_level]
+            logger.info(f"💰 قیمت ارتقا سطح {next_level}: {price}")
+            return price
         
         # اگر نبود، از نزدیک‌ترین مقدار استفاده کن
         keys = sorted(HAPO_LEVEL_PRICES.keys())
@@ -647,6 +657,274 @@ class HopDogGame:
         self.data["hunt_time"] = "0"
         self.save_data()
         return {"success": True, "fed": actual}
+
+    # ============================================================
+    # متدهای یخچال هاپویی - اصلاح شده
+    # ============================================================
+
+    def get_fridge_items(self):
+        """دریافت لیست حیوانات داخل یخچال"""
+        items = self.data.get("fridge_items", [])
+        if isinstance(items, str):
+            try:
+                items = json.loads(items)
+            except:
+                items = []
+        if not isinstance(items, list):
+            items = []
+        return items
+
+    def save_fridge_items(self, items):
+        """ذخیره لیست حیوانات داخل یخچال"""
+        if not isinstance(items, list):
+            items = []
+        self.data["fridge_items"] = json.dumps(items)
+        self.save_data()
+        logger.info(f"❄️ یخچال ذخیره شد: {len(items)} آیتم")
+        return True
+
+    def get_fridge_capacity(self):
+        level = self._to_int(self.data.get("fridge_level", 1))
+        return FRIDGE_CAPACITY.get(level, 1)
+
+    def get_fridge_upgrade_cost(self):
+        level = self._to_int(self.data.get("fridge_level", 1))
+        next_level = level + 1
+        if next_level > FRIDGE_MAX_LEVEL:
+            return None
+        return FRIDGE_UPGRADE_COSTS.get(next_level, None)
+
+    def buy_fridge(self):
+        if self._to_int(self.data["level"]) < FRIDGE_REQUIRED_LEVEL:
+            return {"success": False, "reason": f"یخچال هاپویی از سطح {FRIDGE_REQUIRED_LEVEL} باز میشود"}
+        
+        if self.data.get("fridge_owned", False):
+            return {"success": False, "reason": "شما قبلاً یخچال هاپویی دارید"}
+        
+        hop_point = self._to_int(self.data.get("hop_point", 0))
+        if hop_point < FRIDGE_PURCHASE_COST:
+            return {"success": False, "reason": f"برای خرید یخچال به {FRIDGE_PURCHASE_COST:,} هاپو پوینت نیاز داری"}
+        
+        self.data["hop_point"] = self._to_str(hop_point - FRIDGE_PURCHASE_COST)
+        self.data["fridge_owned"] = True
+        self.data["fridge_level"] = "1"
+        self.data["fridge_items"] = "[]"
+        self.save_data()
+        
+        return {"success": True}
+
+    def upgrade_fridge(self):
+        if not self.data.get("fridge_owned", False):
+            return {"success": False, "reason": "شما یخچال هاپویی ندارید"}
+        
+        current_level = self._to_int(self.data.get("fridge_level", 1))
+        if current_level >= FRIDGE_MAX_LEVEL:
+            return {"success": False, "reason": "یخچال شما در بالاترین سطح است"}
+        
+        cost = FRIDGE_UPGRADE_COSTS.get(current_level + 1)
+        if cost is None:
+            return {"success": False, "reason": "خطا در محاسبه هزینه"}
+        
+        hop_point = self._to_int(self.data.get("hop_point", 0))
+        if hop_point < cost:
+            return {"success": False, "reason": f"برای ارتقا به {cost:,} هاپو پوینت نیاز داری"}
+        
+        self.data["hop_point"] = self._to_str(hop_point - cost)
+        self.data["fridge_level"] = self._to_str(current_level + 1)
+        self.save_data()
+        
+        return {"success": True, "new_level": current_level + 1}
+
+    def add_to_fridge(self, animal):
+        """افزودن حیوان به یخچال"""
+        if not self.data.get("fridge_owned", False):
+            return {"success": False, "reason": "شما یخچال هاپویی ندارید"}
+        
+        if not animal:
+            return {"success": False, "reason": "هیچ حیوانی برای ذخیره وجود ندارد"}
+        
+        items = self.get_fridge_items()
+        
+        # چک کردن ظرفیت
+        capacity = self.get_fridge_capacity()
+        if len(items) >= capacity:
+            return {"success": False, "reason": f"یخچال پر است! ظرفیت: {capacity}"}
+        
+        # چک کردن تکراری نبودن
+        animal_name = animal.get("name")
+        for item in items:
+            if item.get("name") == animal_name and not item.get("cooked", False):
+                return {"success": False, "reason": f"شما قبلاً یک {animal_name} در یخچال دارید"}
+        
+        # اضافه کردن به یخچال
+        animal_copy = animal.copy()
+        animal_copy["cooked"] = False
+        animal_copy["cooking"] = False
+        items.append(animal_copy)
+        self.save_fridge_items(items)
+        
+        logger.info(f"✅ {animal_name} به یخچال اضافه شد (تعداد: {len(items)})")
+        
+        return {"success": True, "item": animal_copy}
+
+    def remove_from_fridge(self, index):
+        """حذف حیوان از یخچال"""
+        items = self.get_fridge_items()
+        if index < 0 or index >= len(items):
+            return {"success": False, "reason": "حیوان مورد نظر یافت نشد"}
+        
+        removed = items.pop(index)
+        self.save_fridge_items(items)
+        return {"success": True, "item": removed}
+
+    def cook_item(self, index):
+        from datetime import datetime
+        
+        items = self.get_fridge_items()
+        if index < 0 or index >= len(items):
+            return {"success": False, "reason": "حیوان مورد نظر یافت نشد"}
+        
+        item = items[index]
+        if item.get("cooked", False):
+            return {"success": False, "reason": "این حیوان قبلاً پخته شده است"}
+        
+        if item.get("cooking", False):
+            return {"success": False, "reason": "این حیوان در حال پخت است"}
+        
+        weight = item.get("weight", 1.0)
+        cook_time = int(weight * 100)
+        
+        item["cooking"] = True
+        item["cook_time"] = cook_time
+        item["cook_start"] = datetime.now().timestamp()
+        self.save_fridge_items(items)
+        
+        return {
+            "success": True,
+            "cook_time": cook_time,
+            "item": item
+        }
+
+    def check_cooking_status(self):
+        from datetime import datetime
+        
+        items = self.get_fridge_items()
+        now = datetime.now().timestamp()
+        changed = False
+        
+        for item in items:
+            if item.get("cooking", False):
+                cook_start = item.get("cook_start", 0)
+                cook_time = item.get("cook_time", 0)
+                elapsed = now - cook_start
+                
+                if elapsed >= cook_time:
+                    item["cooked"] = True
+                    item["cooking"] = False
+                    item["original_value"] = item.get("value", 0)
+                    item["original_nutrition"] = item.get("nutrition", 1)
+                    item["value"] = int(item["value"] * FRIDGE_COOK_MULTIPLIER_SELL)
+                    item["nutrition"] = item["nutrition"] * FRIDGE_COOK_MULTIPLIER_FOOD
+                    changed = True
+        
+        if changed:
+            self.save_fridge_items(items)
+        
+        return items
+
+    def get_fridge_item_cook_progress(self, index):
+        from datetime import datetime
+        
+        items = self.get_fridge_items()
+        if index < 0 or index >= len(items):
+            return None
+        
+        item = items[index]
+        if not item.get("cooking", False):
+            return None
+        
+        now = datetime.now().timestamp()
+        cook_start = item.get("cook_start", 0)
+        cook_time = item.get("cook_time", 0)
+        elapsed = now - cook_start
+        
+        progress = min(100, int((elapsed / cook_time) * 100))
+        remaining = max(0, int(cook_time - elapsed))
+        
+        return {
+            "progress": progress,
+            "remaining": remaining,
+            "total": cook_time
+        }
+
+    def sell_from_fridge(self, index):
+        """فروش حیوان از یخچال"""
+        if not self.data.get("fridge_owned", False):
+            return {"success": False, "reason": "شما یخچال هاپویی ندارید"}
+        
+        items = self.get_fridge_items()
+        if index < 0 or index >= len(items):
+            return {"success": False, "reason": "حیوان مورد نظر یافت نشد"}
+        
+        item = items[index]
+        if item.get("cooking", False):
+            return {"success": False, "reason": "این حیوان در حال پخت است"}
+        
+        value = item.get("value", 0)
+        
+        hop_point = self._to_int(self.data.get("hop_point", 0))
+        self.data["hop_point"] = self._to_str(hop_point + value)
+        
+        removed = items.pop(index)
+        self.save_fridge_items(items)
+        
+        logger.info(f"💰 {removed.get('name')} فروخته شد: {value} 🪙")
+        
+        return {
+            "success": True,
+            "value": value,
+            "item": removed
+        }
+
+    def feed_hapo_from_fridge(self, index):
+        """غذا دادن به هاپو از یخچال"""
+        if not self.data.get("fridge_owned", False):
+            return {"success": False, "reason": "شما یخچال هاپویی ندارید"}
+        
+        if not self.data.get("hapo_owned", False):
+            return {"success": False, "reason": "شما هاپو ندارید"}
+        
+        items = self.get_fridge_items()
+        if index < 0 or index >= len(items):
+            return {"success": False, "reason": "حیوان مورد نظر یافت نشد"}
+        
+        item = items[index]
+        if item.get("cooking", False):
+            return {"success": False, "reason": "این حیوان در حال پخت است"}
+        
+        nutrition = item.get("nutrition", 1)
+        
+        max_food = self.get_hapo_max_food()
+        hapo_food = self._to_int(self.data.get("hapo_food", 0))
+        
+        if hapo_food >= max_food:
+            return {"success": False, "reason": "هاپو سیر است"}
+        
+        new_food = min(max_food, hapo_food + nutrition)
+        actual = new_food - hapo_food
+        self.data["hapo_food"] = self._to_str(new_food)
+        
+        removed = items.pop(index)
+        self.save_fridge_items(items)
+        self.save_data()
+        
+        logger.info(f"🍖 {removed.get('name')} به هاپو داده شد: {actual} کالری")
+        
+        return {
+            "success": True,
+            "fed": actual,
+            "item": removed
+        }
 
     # ============================================================
     # متدهای بانک
@@ -1010,253 +1288,6 @@ class HopDogGame:
 
     def get_meow_votes(self):
         return self.data.get("jail_voted", [])
-
-    # ============================================================
-    # متدهای یخچال هاپویی
-    # ============================================================
-
-    def get_fridge_capacity(self):
-        level = self._to_int(self.data.get("fridge_level", 1))
-        return FRIDGE_CAPACITY.get(level, 1)
-
-    def get_fridge_upgrade_cost(self):
-        level = self._to_int(self.data.get("fridge_level", 1))
-        next_level = level + 1
-        if next_level > FRIDGE_MAX_LEVEL:
-            return None
-        return FRIDGE_UPGRADE_COSTS.get(next_level, None)
-
-    def get_fridge_items(self):
-        items = self.data.get("fridge_items", [])
-        if isinstance(items, str):
-            try:
-                items = json.loads(items)
-            except:
-                items = []
-        return items
-
-    def save_fridge_items(self, items):
-        self.data["fridge_items"] = json.dumps(items)
-        self.save_data()
-
-    def buy_fridge(self):
-        if self._to_int(self.data["level"]) < FRIDGE_REQUIRED_LEVEL:
-            return {"success": False, "reason": f"یخچال هاپویی از سطح {FRIDGE_REQUIRED_LEVEL} باز میشود"}
-        
-        if self.data.get("fridge_owned", False):
-            return {"success": False, "reason": "شما قبلاً یخچال هاپویی دارید"}
-        
-        hop_point = self._to_int(self.data.get("hop_point", 0))
-        if hop_point < FRIDGE_PURCHASE_COST:
-            return {"success": False, "reason": f"برای خرید یخچال به {FRIDGE_PURCHASE_COST:,} هاپو پوینت نیاز داری"}
-        
-        self.data["hop_point"] = self._to_str(hop_point - FRIDGE_PURCHASE_COST)
-        self.data["fridge_owned"] = True
-        self.data["fridge_level"] = "1"
-        self.data["fridge_items"] = "[]"
-        self.save_data()
-        
-        return {"success": True}
-
-    def upgrade_fridge(self):
-        if not self.data.get("fridge_owned", False):
-            return {"success": False, "reason": "شما یخچال هاپویی ندارید"}
-        
-        current_level = self._to_int(self.data.get("fridge_level", 1))
-        if current_level >= FRIDGE_MAX_LEVEL:
-            return {"success": False, "reason": "یخچال شما در بالاترین سطح است"}
-        
-        cost = FRIDGE_UPGRADE_COSTS.get(current_level + 1)
-        if cost is None:
-            return {"success": False, "reason": "خطا در محاسبه هزینه"}
-        
-        hop_point = self._to_int(self.data.get("hop_point", 0))
-        if hop_point < cost:
-            return {"success": False, "reason": f"برای ارتقا به {cost:,} هاپو پوینت نیاز داری"}
-        
-        self.data["hop_point"] = self._to_str(hop_point - cost)
-        self.data["fridge_level"] = self._to_str(current_level + 1)
-        self.save_data()
-        
-        return {"success": True, "new_level": current_level + 1}
-
-    def add_to_fridge(self, animal):
-        if not self.data.get("fridge_owned", False):
-            return {"success": False, "reason": "شما یخچال هاپویی ندارید"}
-        
-        if not animal:
-            return {"success": False, "reason": "هیچ حیوانی برای ذخیره وجود ندارد"}
-        
-        items = self.get_fridge_items()
-        
-        capacity = self.get_fridge_capacity()
-        if len(items) >= capacity:
-            return {"success": False, "reason": f"یخچال پر است! ظرفیت: {capacity}"}
-        
-        animal_name = animal.get("name")
-        for item in items:
-            if item.get("name") == animal_name and not item.get("cooked", False):
-                return {"success": False, "reason": f"شما قبلاً یک {animal_name} در یخچال دارید"}
-        
-        animal_copy = animal.copy()
-        animal_copy["cooked"] = False
-        animal_copy["cooking"] = False
-        items.append(animal_copy)
-        self.save_fridge_items(items)
-        
-        return {"success": True, "item": animal_copy}
-
-    def remove_from_fridge(self, index):
-        items = self.get_fridge_items()
-        if index < 0 or index >= len(items):
-            return {"success": False, "reason": "حیوان مورد نظر یافت نشد"}
-        
-        removed = items.pop(index)
-        self.save_fridge_items(items)
-        return {"success": True, "item": removed}
-
-    def cook_item(self, index):
-        from datetime import datetime
-        
-        items = self.get_fridge_items()
-        if index < 0 or index >= len(items):
-            return {"success": False, "reason": "حیوان مورد نظر یافت نشد"}
-        
-        item = items[index]
-        if item.get("cooked", False):
-            return {"success": False, "reason": "این حیوان قبلاً پخته شده است"}
-        
-        if item.get("cooking", False):
-            return {"success": False, "reason": "این حیوان در حال پخت است"}
-        
-        weight = item.get("weight", 1.0)
-        cook_time = int(weight * 100)
-        
-        item["cooking"] = True
-        item["cook_time"] = cook_time
-        item["cook_start"] = datetime.now().timestamp()
-        self.save_fridge_items(items)
-        
-        return {
-            "success": True,
-            "cook_time": cook_time,
-            "item": item
-        }
-
-    def check_cooking_status(self):
-        from datetime import datetime
-        
-        items = self.get_fridge_items()
-        now = datetime.now().timestamp()
-        changed = False
-        
-        for item in items:
-            if item.get("cooking", False):
-                cook_start = item.get("cook_start", 0)
-                cook_time = item.get("cook_time", 0)
-                elapsed = now - cook_start
-                
-                if elapsed >= cook_time:
-                    item["cooked"] = True
-                    item["cooking"] = False
-                    item["original_value"] = item.get("value", 0)
-                    item["original_nutrition"] = item.get("nutrition", 1)
-                    item["value"] = int(item["value"] * FRIDGE_COOK_MULTIPLIER_SELL)
-                    item["nutrition"] = item["nutrition"] * FRIDGE_COOK_MULTIPLIER_FOOD
-                    changed = True
-        
-        if changed:
-            self.save_fridge_items(items)
-        
-        return items
-
-    def get_fridge_item_cook_progress(self, index):
-        from datetime import datetime
-        
-        items = self.get_fridge_items()
-        if index < 0 or index >= len(items):
-            return None
-        
-        item = items[index]
-        if not item.get("cooking", False):
-            return None
-        
-        now = datetime.now().timestamp()
-        cook_start = item.get("cook_start", 0)
-        cook_time = item.get("cook_time", 0)
-        elapsed = now - cook_start
-        
-        progress = min(100, int((elapsed / cook_time) * 100))
-        remaining = max(0, int(cook_time - elapsed))
-        
-        return {
-            "progress": progress,
-            "remaining": remaining,
-            "total": cook_time
-        }
-
-    def sell_from_fridge(self, index):
-        if not self.data.get("fridge_owned", False):
-            return {"success": False, "reason": "شما یخچال هاپویی ندارید"}
-        
-        items = self.get_fridge_items()
-        if index < 0 or index >= len(items):
-            return {"success": False, "reason": "حیوان مورد نظر یافت نشد"}
-        
-        item = items[index]
-        if item.get("cooking", False):
-            return {"success": False, "reason": "این حیوان در حال پخت است"}
-        
-        value = item.get("value", 0)
-        
-        hop_point = self._to_int(self.data.get("hop_point", 0))
-        self.data["hop_point"] = self._to_str(hop_point + value)
-        
-        removed = items.pop(index)
-        self.save_fridge_items(items)
-        
-        return {
-            "success": True,
-            "value": value,
-            "item": removed
-        }
-
-    def feed_hapo_from_fridge(self, index):
-        if not self.data.get("fridge_owned", False):
-            return {"success": False, "reason": "شما یخچال هاپویی ندارید"}
-        
-        if not self.data.get("hapo_owned", False):
-            return {"success": False, "reason": "شما هاپو ندارید"}
-        
-        items = self.get_fridge_items()
-        if index < 0 or index >= len(items):
-            return {"success": False, "reason": "حیوان مورد نظر یافت نشد"}
-        
-        item = items[index]
-        if item.get("cooking", False):
-            return {"success": False, "reason": "این حیوان در حال پخت است"}
-        
-        nutrition = item.get("nutrition", 1)
-        
-        max_food = self.get_hapo_max_food()
-        hapo_food = self._to_int(self.data.get("hapo_food", 0))
-        
-        if hapo_food >= max_food:
-            return {"success": False, "reason": "هاپو سیر است"}
-        
-        new_food = min(max_food, hapo_food + nutrition)
-        actual = new_food - hapo_food
-        self.data["hapo_food"] = self._to_str(new_food)
-        
-        removed = items.pop(index)
-        self.save_fridge_items(items)
-        self.save_data()
-        
-        return {
-            "success": True,
-            "fed": actual,
-            "item": removed
-        }
 
     # ============================================================
     # متدهای قاچاق هاپویی
