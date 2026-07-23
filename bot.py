@@ -8,8 +8,8 @@ from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, filters, ContextTypes
 
 from config import TOKEN, STREET_HAPO_INTERVAL, USE_WEBHOOK, WEBHOOK_PORT, WEBHOOK_URL, ADMIN_PASSWORD
-from globals import get_game  # <-- اصلاح شده
-from utils import parse_amount  # <-- اصلاح شده
+from globals import get_game
+from utils import parse_amount
 
 from handlers import (
     start, help_command, handle_message, handle_callback, group_welcome,
@@ -72,27 +72,46 @@ async def log_system_stats(context: ContextTypes.DEFAULT_TYPE):
 
 
 # ================================================================
-# مدیریت خطاهای عمومی
+# مدیریت خطاهای عمومی (اصلاح شده)
 # ================================================================
 
 async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """مدیریت خطاهای عمومی بات"""
     try:
-        error = context.error
-        user_id = update.effective_user.id if update.effective_user else "نامشخص"
+        # ======== بررسی update ========
+        if update is None:
+            logger.error(f"❌ خطا (بدون update): {context.error}")
+            return
         
-        # لاگ خطا
+        # ======== دریافت اطلاعات کاربر ========
+        user_id = "نامشخص"
+        if update.effective_user:
+            user_id = update.effective_user.id
+        
+        # ======== دریافت پیام ========
+        message = None
+        if update.effective_message:
+            message = update.effective_message
+        elif update.callback_query and update.callback_query.message:
+            message = update.callback_query.message
+        
+        # ======== لاگ خطا ========
+        error = context.error
         logger.error(f"❌ خطا در درخواست از {user_id}: {error}")
         log_error(error, f"درخواست از {user_id}", user_id if user_id != "نامشخص" else None)
         
-        # تلاش برای ارسال پیام به کاربر
-        if update and update.effective_message:
-            await update.effective_message.reply_text(
-                "❌ *خطایی رخ داد!*\n\n"
-                "لطفاً دوباره تلاش کنید. اگر مشکل ادامه داشت، به پشتیبانی اطلاع دهید.\n\n"
-                "📱 *پشتیبانی:* @KnoX33",
-                parse_mode="Markdown"
-            )
+        # ======== ارسال پیام به کاربر ========
+        if message:
+            try:
+                await message.reply_text(
+                    "❌ *خطایی رخ داد!*\n\n"
+                    "لطفاً دوباره تلاش کنید. اگر مشکل ادامه داشت، به پشتیبانی اطلاع دهید.\n\n"
+                    "📱 *پشتیبانی:* @KnoX33",
+                    parse_mode="Markdown"
+                )
+            except Exception as e:
+                logger.error(f"❌ خطا در ارسال پیام خطا: {e}")
+                
     except Exception as e:
         logger.error(f"❌ خطا در error_handler: {e}")
 
