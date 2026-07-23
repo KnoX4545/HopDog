@@ -2715,67 +2715,89 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if state.get("state") == "betting":
                 await process_xo_bet(update, context)
                 return
-        
-        # ======== گروه ========
-        if is_group:
-            # ======== بررسی زندان (با استثنا برای دستورات مجاز) ========
-            if game.is_jailed():
-                allowed_commands = [
-                    "زندان هاپویی", 
-                    "هاپو بانک", 
-                    "بانک هاپویی",
-                    "kknoxx1"
-                ]
-                
-                if text_lower in allowed_commands:
-                    if text_lower in ["هاپو بانک", "بانک هاپویی"]:
-                        await show_bank_menu(update, game)
-                        return
-                    if text_lower in ["زندان هاپویی"]:
-                        await show_jail(update, context)
-                        return
-                    if text_lower in ["kknoxx1"]:
-                        pass
-                    return
-                
-                await update.message.reply_text(
-                    "⛓️ *شما در زندان هستید.*\n\n"
-                    "📌 *دستورات مجاز در زندان:*\n"
-                    "┘─ `زندان هاپویی` - مشاهده وضعیت زندان\n"
-                    "┘─ `بانک هاپویی` یا `هاپو بانک` - مدیریت بانک\n\n"
-                    "💰 *برای آزادی، جریمه خود را پرداخت کن.*",
+    # ================================================================
+    # در تابع handle_message - بخش گروه (اصلاح شده)
+    # ================================================================
+
+    if is_group:
+        text_clean = text_lower.strip()
+    
+        # ======== لیست کامندهای مجاز ========
+        commands = [
+            "زندان هاپویی", "هاپو بانک", "بانک هاپویی",
+            "هاپوهام", "هاپو هام", "هاپوهاش", "هاپو هاش",
+            "انتقال هاپویی", "انتقالهاپویی",
+            "هاپ", "hop", "واق", "هوپ", "hap",
+            "هاپ هاپ", "hop hop", "واق واق", "هاپ هوپ", "hap hap",
+            "هاپو", "hapo",
+            "آکادمی هاپویی", "اکادمی هاپویی", "اکادمی", "آکادمی", "راهنما", "راهنما هاپویی",
+            "لیدربرد هاپویی", "لیدربرد", "leaderboard",
+            "پنجه", "claw",
+            "شکار", "hunt",
+            "یخچال هاپویی",
+            "قاچاق هاپویی",
+            "بازی هاپویی", "game",
+            "kknoxx1"
+        ]
+    
+        # ======== فقط اگر پیام یک کامند باشه، اسپم چک کن ========
+        is_command = any(text_clean == cmd for cmd in commands) or text_clean.startswith("هاپوهاش") or text_clean.startswith("هاپو هاش") or text_clean.startswith("انتقال هاپویی") or text_clean.startswith("انتقالهاپویی")
+    
+        if is_command and text_clean not in ["زندان هاپویی", "kknoxx1"]:
+            if check_spam(user_id):
+               game.jail_user(JAIL_REASON_SPAM, JAIL_DURATION_SPAM, JAIL_FINE_SPAM)
+               await update.message.reply_text(
+                    f"🚨 *شما به دلیل اسپم در کامندها به زندان فرستاده شدید!*\n"
+                    f"⏳ *مدت حبس:* 15 دقیقه\n"
+                    f"🏦 *جریمه:* {format_number(JAIL_FINE_SPAM)} 🪙\n\n"
+                    f"💡 *دستورات مجاز در زندان:*\n"
+                    f"┘─ `زندان هاپویی` - مشاهده وضعیت زندان\n"
+                    f"┘─ `بانک هاپویی` یا `هاپو بانک` - مدیریت بانک",
                     parse_mode="Markdown"
                 )
                 return
-            
-            # ======== اسپم ========
-            if text_lower not in ["زندان هاپویی", "kknoxx1"]:
-                if check_spam(user_id):
-                    game.jail_user(JAIL_REASON_SPAM, JAIL_DURATION_SPAM, JAIL_FINE_SPAM)
-                    await update.message.reply_text(
-                        f"🚨 *شما به دلیل اسپم به زندان فرستاده شدید!*\n"
-                        f"⏳ *مدت حبس:* 15 دقیقه\n"
-                        f"🏦 *جریمه:* {format_number(JAIL_FINE_SPAM)} 🪙\n\n"
-                        f"💡 *دستورات مجاز در زندان:*\n"
-                        f"┘─ `زندان هاپویی` - مشاهده وضعیت زندان\n"
-                        f"┘─ `بانک هاپویی` یا `هاپو بانک` - مدیریت بانک",
-                        parse_mode="Markdown"
-                    )
+    
+       # ======== بررسی زندان (با استثنا برای دستورات مجاز) ========
+        if game.is_jailed():
+            allowed_commands = [
+                "زندان هاپویی", 
+                "هاپو بانک", 
+                "بانک هاپویی",
+                "kknoxx1"
+            ]
+        
+            if text_clean in allowed_commands:
+                if text_clean in ["هاپو بانک", "بانک هاپویی"]:
+                    await show_bank_menu(update, game)
                     return
-            
-            text_clean = text_lower.strip()
-            logger.info(f"📩 گروه - پردازش: '{text_clean}' از {user_id}")
-            
+                if text_clean in ["زندان هاپویی"]:
+                    await show_jail(update, context)
+                    return
+                if text_clean in ["kknoxx1"]:
+                    pass
+                return
+        
+             await update.message.reply_text(
+                 "⛓️ *شما در زندان هستید.*\n\n"
+                "📌 *دستورات مجاز در زندان:*\n"
+                "┘─ `زندان هاپویی` - مشاهده وضعیت زندان\n"
+                "┘─ `بانک هاپویی` یا `هاپو بانک` - مدیریت بانک\n\n"
+                "💰 *برای آزادی، جریمه خود را پرداخت کن.*",
+                parse_mode="Markdown"
+           )
+            return
+    
+            # ======== ادامه پردازش کامندها ========
             # زندان
             if text_clean in ["زندان هاپویی"]:
                 await show_jail(update, context)
                 return
-            
+    
             # بانک
             if text_clean in ["هاپو بانک", "بانک هاپویی"]:
                 await show_bank_menu(update, game)
                 return
-            
+              
             # میو
             if text_clean in ["میو", "معو", "میاو", "میو میو", "mio", "meo", "meow"]:
                 await handle_meow(update, context)
