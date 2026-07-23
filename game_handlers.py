@@ -1,4 +1,4 @@
-# game_handlers.py - هندلرهای بازی هاپویی (نسخه کامل با اختصارات)
+# game_handlers.py - هندلرهای بازی هاپویی (نسخه کامل با اصلاحات)
 
 import asyncio
 import logging
@@ -7,46 +7,25 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 
 from config import GAME_REQUIRED_LEVEL, GAME_HOST_REQUIRED_LEVEL
-from game_functions import game_manager, get_xo_board_keyboard, get_xo_game_text
+from game_functions import game_manager, get_xo_board_keyboard, get_xo_game_text, get_xo_invite_text, get_xo_winner_text
 from bank import format_number
-from utils import parse_amount, get_confirm_keyboard, get_game
+from utils import parse_amount, get_confirm_keyboard
+from globals import (
+    get_game, GAME_XO_STATE, GAME_MESSAGES,
+    save_game_message, get_game_message, clear_game_message,
+    set_xo_state, get_xo_state, clear_xo_state
+)
+from logger_config import log_game, log_transaction, log_error
 
 logger = logging.getLogger(__name__)
-
-# ================================================================
-# دیکشنری حالت‌های بازی
-# ================================================================
-
-GAME_XO_STATE = {}
-GAME_MESSAGES = {}  # برای ذخیره message_id بازی‌ها
 
 
 # ================================================================
 # توابع کمکی
 # ================================================================
 
-def save_game_message(chat_id, message_id, game_id):
-    """ذخیره پیام بازی برای ویرایش بعدی"""
-    key = f"{chat_id}_{game_id}"
-    GAME_MESSAGES[key] = message_id
-
-
-def get_game_message(chat_id, game_id):
-    """دریافت پیام ذخیره شده بازی"""
-    key = f"{chat_id}_{game_id}"
-    return GAME_MESSAGES.get(key)
-
-
-def clear_game_message(chat_id, game_id):
-    """پاک کردن پیام ذخیره شده بازی"""
-    key = f"{chat_id}_{game_id}"
-    if key in GAME_MESSAGES:
-        del GAME_MESSAGES[key]
-
-
-async def update_game_message(update, context, game_id: str, user_id: int):
+async def update_game_message(query, game_id: str, user_id: int):
     """به‌روزرسانی پیام بازی (همون پیام رو ویرایش کن)"""
-    query = update.callback_query
     game = game_manager.get_game(game_id)
     
     if not game:
@@ -56,11 +35,40 @@ async def update_game_message(update, context, game_id: str, user_id: int):
     msg = get_xo_game_text(game)
     keyboard = get_xo_board_keyboard(game, user_id)
     
-    await query.edit_message_text(
-        msg,
-        reply_markup=keyboard,
-        parse_mode="Markdown"
-    )
+    try:
+        await query.edit_message_text(
+            msg,
+            reply_markup=keyboard,
+            parse_mode="Markdown"
+        )
+        log_game(game_id, "به‌روزرسانی", f"کاربر {user_id}")
+    except Exception as e:
+        logger.error(f"❌ خطا در به‌روزرسانی پیام بازی {game_id}: {e}")
+        log_error(e, f"به‌روزرسانی پیام بازی {game_id}", user_id)
+
+
+async def send_game_message(chat_id, game_id: str, user_id: int, context: ContextTypes.DEFAULT_TYPE):
+    """ارسال پیام جدید بازی (وقتی ویرایش ممکن نیست)"""
+    game = game_manager.get_game(game_id)
+    
+    if not game:
+        return
+    
+    msg = get_xo_game_text(game)
+    keyboard = get_xo_board_keyboard(game, user_id)
+    
+    try:
+        sent = await context.bot.send_message(
+            chat_id=chat_id,
+            text=msg,
+            reply_markup=keyboard,
+            parse_mode="Markdown"
+        )
+        save_game_message(chat_id, sent.message_id, game_id)
+        log_game(game_id, "ارسال پیام جدید", f"کاربر {user_id}")
+    except Exception as e:
+        logger.error(f"❌ خطا در ارسال پیام بازی {game_id}: {e}")
+        log_error(e, f"ارسال پیام بازی {game_id}", user_id)
 
 
 # ================================================================
@@ -77,7 +85,12 @@ async def show_games_menu(update: Update, game_obj):
     
     level = game_obj._to_int(game_obj.data.get("level", 1))
     if level < GAME_REQUIRED_LEVEL:
-        await update.message.reply_text(f"🕹 *بازی‌های هاپویی از سطح {GAME_REQUIRED_LEVEL} باز میشود*", parse_mode="Markdown")
+        await update.message.reply_text(
+            f"🕹 *بازی‌های هاپویی از سطح {GAME_REQUIRED_LEVEL} باز میشود*\n\n"
+            f"⭐ *سطح شما:* {level}\n"
+            f"📈 *برای رسیدن به سطح {GAME_REQUIRED_LEVEL}، هاپ هاپ کن!*",
+            parse_mode="Markdown"
+        )
         return
     
     # ======== بررسی بازی فعال ========
@@ -93,6 +106,7 @@ async def show_games_menu(update: Update, game_obj):
         )
         
         save_game_message(update.message.chat.id, sent_msg.message_id, user_game.game_id)
+        log_game(user_game.game_id, "نمایش بازی فعال", f"کاربر {user_id}")
         return
     
     # ======== منوی اصلی ========
@@ -103,6 +117,7 @@ async def show_games_menu(update: Update, game_obj):
         reply_markup=InlineKeyboardMarkup(keyboard),
         parse_mode="Markdown"
     )
+    logger.info(f"🎮 منوی بازی برای کاربر {user_id} نمایش داده شد")
 
 
 # ================================================================
@@ -125,11 +140,16 @@ async def show_xo_main(update, query=None, game_obj=None):
     
     level = game_obj._to_int(game_obj.data.get("level", 1))
     if level < GAME_REQUIRED_LEVEL:
-        await query.edit_message_text(f"🕹 *بازی XO از سطح {GAME_REQUIRED_LEVEL} باز میشود*", parse_mode="Markdown")
+        await query.edit_message_text(
+            f"🕹 *بازی XO از سطح {GAME_REQUIRED_LEVEL} باز میشود*\n\n"
+            f"⭐ *سطح شما:* {level}",
+            parse_mode="Markdown"
+        )
         return
     
     user_id = int(game_obj.user_id)
     
+    # ======== بررسی بازی فعال ========
     user_game = game_manager.get_user_game(user_id)
     if user_game:
         msg = get_xo_game_text(user_game)
@@ -142,8 +162,10 @@ async def show_xo_main(update, query=None, game_obj=None):
         )
         
         save_game_message(chat_id, message_id, user_game.game_id)
+        log_game(user_game.game_id, "نمایش در منوی XO", f"کاربر {user_id}")
         return
     
+    # ======== بررسی خنک‌سازی ========
     on_cooldown, remaining = game_manager.is_on_cooldown(user_id)
     if on_cooldown:
         minutes = remaining // 60
@@ -156,14 +178,15 @@ async def show_xo_main(update, query=None, game_obj=None):
         )
         return
     
-    if str(user_id) in GAME_XO_STATE:
-        state = GAME_XO_STATE[str(user_id)]
-        if state.get("state") == "betting":
-            msg = "🕹 *بازی هاپویی XO* 🧩\n\n❗️ لطفا میز بازی را بچینید\n\n"
-            msg += "💰 *مبلغ ورودی : درحال تعیین*\n\n❓ لطفا مبلغ ورودی را در جواب همین پنل وارد کنید\n┘─ مثال : 500\n┘─ مثال : 1k\n┘─ مثال : 1.5m"
-            await query.edit_message_text(msg, parse_mode="Markdown")
-            return
+    # ======== بررسی حالت تعیین شرط ========
+    xo_state = get_xo_state(user_id)
+    if xo_state and xo_state.get("state") == "betting":
+        msg = "🕹 *بازی هاپویی XO* 🧩\n\n❗️ لطفا میز بازی را بچینید\n\n"
+        msg += "💰 *مبلغ ورودی : درحال تعیین*\n\n❓ لطفا مبلغ ورودی را در جواب همین پنل وارد کنید\n┘─ مثال : 500\n┘─ مثال : 1k\n┘─ مثال : 1.5m"
+        await query.edit_message_text(msg, parse_mode="Markdown")
+        return
     
+    # ======== منوی اصلی XO ========
     msg = "🕹 *بازی هاپویی XO* 🧩\n\n❗️ لطفا میز بازی را بچینید\n\n"
     msg += "💰 *مبلغ ورودی : تعیین نشده ❌*"
     keyboard = [[InlineKeyboardButton("💰 تعیین مبلغ ورودی", callback_data="game_xo_set_bet")]]
@@ -172,6 +195,7 @@ async def show_xo_main(update, query=None, game_obj=None):
         reply_markup=InlineKeyboardMarkup(keyboard),
         parse_mode="Markdown"
     )
+    logger.info(f"🎮 منوی XO برای کاربر {user_id} نمایش داده شد")
 
 
 # ================================================================
@@ -192,10 +216,15 @@ async def handle_xo_set_bet(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     level = game_obj._to_int(game_obj.data.get("level", 1))
     if level < GAME_HOST_REQUIRED_LEVEL:
-        await query.edit_message_text(f"❌ *برای ساخت میز بازی به سطح {GAME_HOST_REQUIRED_LEVEL} نیاز داری.*", parse_mode="Markdown")
+        await query.edit_message_text(
+            f"❌ *برای ساخت میز بازی به سطح {GAME_HOST_REQUIRED_LEVEL} نیاز داری.*\n"
+            f"⭐ *سطح شما:* {level}",
+            parse_mode="Markdown"
+        )
         return
     
-    GAME_XO_STATE[str(user_id)] = {"state": "betting"}
+    set_xo_state(user_id, {"state": "betting"})
+    logger.info(f"💰 کاربر {user_id} وارد حالت تعیین شرط شد")
     
     msg = "🕹 *بازی هاپویی XO* 🧩\n\n❗️ لطفا میز بازی را بچینید\n\n"
     msg += "💰 *مبلغ ورودی : درحال تعیین*\n\n❓ لطفا مبلغ ورودی را در جواب همین پنل وارد کنید\n┘─ مثال : 500\n┘─ مثال : 1k\n┘─ مثال : 1.5m"
@@ -209,11 +238,8 @@ async def process_xo_bet(update: Update, context: ContextTypes.DEFAULT_TYPE):
     full_name = update.effective_user.full_name or f"کاربر{user_id}"
     game_obj = get_game(user_id, username or full_name)
     
-    if str(user_id) not in GAME_XO_STATE:
-        return
-    
-    state = GAME_XO_STATE[str(user_id)]
-    if state.get("state") != "betting":
+    xo_state = get_xo_state(user_id)
+    if not xo_state or xo_state.get("state") != "betting":
         return
     
     text = update.message.text.strip()
@@ -237,10 +263,16 @@ async def process_xo_bet(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     hop_point = game_obj._to_int(game_obj.data.get("hop_point", 0))
     if hop_point < bet_amount:
-        await update.message.reply_text(f"❌ *پوینت کافی نیست! شما {format_number(hop_point)} 🪙 داری*", parse_mode="Markdown")
+        await update.message.reply_text(
+            f"❌ *پوینت کافی نیست!*\n"
+            f"💰 *موجودی شما:* {format_number(hop_point)} 🪙\n"
+            f"💰 *نیاز:* {format_number(bet_amount)} 🪙",
+            parse_mode="Markdown"
+        )
         return
     
-    del GAME_XO_STATE[str(user_id)]
+    clear_xo_state(user_id)
+    logger.info(f"💰 کاربر {user_id} مبلغ {bet_amount} رو برای شرط انتخاب کرد")
     
     msg = "🕹 *بازی هاپویی XO* 🧩\n\n❗️ لطفا میز بازی را بچینید\n\n"
     msg += f"💰 *مبلغ ورودی : {format_number(bet_amount)} 🪙*"
@@ -274,21 +306,34 @@ async def handle_xo_create(update: Update, context: ContextTypes.DEFAULT_TYPE, b
     
     level = game_obj._to_int(game_obj.data.get("level", 1))
     if level < GAME_HOST_REQUIRED_LEVEL:
-        await query.edit_message_text(f"❌ *برای ساخت میز بازی به سطح {GAME_HOST_REQUIRED_LEVEL} نیاز داری.*", parse_mode="Markdown")
+        await query.edit_message_text(
+            f"❌ *برای ساخت میز بازی به سطح {GAME_HOST_REQUIRED_LEVEL} نیاز داری.*\n"
+            f"⭐ *سطح شما:* {level}",
+            parse_mode="Markdown"
+        )
         return
     
     hop_point = game_obj._to_int(game_obj.data.get("hop_point", 0))
     if hop_point < bet_amount:
-        await query.edit_message_text(f"❌ *پوینت کافی نیست! شما {format_number(hop_point)} 🪙 داری*", parse_mode="Markdown")
+        await query.edit_message_text(
+            f"❌ *پوینت کافی نیست!*\n"
+            f"💰 *موجودی شما:* {format_number(hop_point)} 🪙\n"
+            f"💰 *نیاز:* {format_number(bet_amount)} 🪙",
+            parse_mode="Markdown"
+        )
         return
     
     success, game_id, game = game_manager.create_game(user_id, full_name, bet_amount)
     if not success:
-        await query.edit_message_text(f"❌ *{game_id}*", parse_mode="Markdown")
+        await query.edit_message_text(f"❌ *{success}*", parse_mode="Markdown")
         return
     
+    # ======== قفل کردن پول میزبان ========
     game_obj.data["hop_point"] = str(hop_point - bet_amount)
     game_obj.save_data()
+    
+    log_game(game_id, "ساخت", f"میزبان: {full_name}, مبلغ: {bet_amount}")
+    log_transaction(user_id, "شرط‌بندی بازی", bet_amount, f"ساخت میز {game_id}")
     
     msg = get_xo_game_text(game)
     keyboard = get_xo_board_keyboard(game, user_id)
@@ -300,23 +345,22 @@ async def handle_xo_create(update: Update, context: ContextTypes.DEFAULT_TYPE, b
     
     save_game_message(chat_id, message_id, game_id)
     
+    # ======== ارسال دعوتنامه به گروه ========
     try:
         if query.message.chat.type in ["group", "supergroup"]:
+            invite_msg = get_xo_invite_text(game)
             await context.bot.send_message(
                 chat_id=chat_id,
-                text=(
-                    f"🧩 *یک میز بازی XO ساخته شد!*\n\n"
-                    f"👤 *میزبان:* {full_name}\n"
-                    f"💰 *مبلغ شرط:* {format_number(bet_amount)} 🪙\n\n"
-                    f"💡 *برای پیوستن، روی دکمه زیر کلیک کن.*"
-                ),
+                text=invite_msg,
                 reply_markup=InlineKeyboardMarkup([
                     [InlineKeyboardButton("🧩 پیوستن به بازی", callback_data=f"game-xo-join-{game_id}")]
                 ]),
                 parse_mode="Markdown"
             )
+            log_game(game_id, "ارسال دعوتنامه", f"به گروه {chat_id}")
     except Exception as e:
-        logger.error(f"Error sending game invite: {e}")
+        logger.error(f"❌ خطا در ارسال دعوتنامه بازی {game_id}: {e}")
+        log_error(e, f"ارسال دعوتنامه بازی {game_id}", user_id)
 
 
 # ================================================================
@@ -341,7 +385,11 @@ async def handle_xo_join(update: Update, context: ContextTypes.DEFAULT_TYPE, gam
     
     level = game_obj._to_int(game_obj.data.get("level", 1))
     if level < GAME_REQUIRED_LEVEL:
-        await query.edit_message_text(f"❌ *برای بازی XO به سطح {GAME_REQUIRED_LEVEL} نیاز داری.*", parse_mode="Markdown")
+        await query.edit_message_text(
+            f"❌ *برای بازی XO به سطح {GAME_REQUIRED_LEVEL} نیاز داری.*\n"
+            f"⭐ *سطح شما:* {level}",
+            parse_mode="Markdown"
+        )
         return
     
     game = game_manager.get_game(game_id)
@@ -350,7 +398,7 @@ async def handle_xo_join(update: Update, context: ContextTypes.DEFAULT_TYPE, gam
         return
     
     if game.status != "waiting":
-        await query.edit_message_text("❌ *این بازی در حال انجام است یا به پایان رسیده*", parse_mode="Markdown")
+        await query.edit_message_text(f"❌ *این بازی در حال انجام است یا به پایان رسیده (وضعیت: {game.status})*", parse_mode="Markdown")
         return
     
     if str(user_id) == game.host_id:
@@ -360,7 +408,9 @@ async def handle_xo_join(update: Update, context: ContextTypes.DEFAULT_TYPE, gam
     hop_point = game_obj._to_int(game_obj.data.get("hop_point", 0))
     if hop_point < game.bet_amount:
         await query.edit_message_text(
-            f"❌ *پوینت کافی نیست! شما {format_number(hop_point)} 🪙 داری، نیاز به {format_number(game.bet_amount)} 🪙*",
+            f"❌ *پوینت کافی نیست!*\n"
+            f"💰 *موجودی شما:* {format_number(hop_point)} 🪙\n"
+            f"💰 *نیاز:* {format_number(game.bet_amount)} 🪙",
             parse_mode="Markdown"
         )
         return
@@ -381,11 +431,16 @@ async def handle_xo_join(update: Update, context: ContextTypes.DEFAULT_TYPE, gam
         await query.edit_message_text(f"❌ *{success}*", parse_mode="Markdown")
         return
     
+    # ======== قفل کردن پول بازیکن دوم ========
     game_obj.data["hop_point"] = str(hop_point - game.bet_amount)
     game_obj.save_data()
     
+    # ======== تنظیم خنک‌سازی برای هر دو بازیکن ========
     game_manager.set_cooldown(user_id)
     game_manager.set_cooldown(int(game.host_id))
+    
+    log_game(game_id, "پیوستن", f"بازیکن: {full_name}")
+    log_transaction(user_id, "شرط‌بندی بازی", game.bet_amount, f"پیوستن به {game_id}")
     
     msg = get_xo_game_text(joined_game)
     keyboard = get_xo_board_keyboard(joined_game, user_id)
@@ -422,7 +477,7 @@ async def handle_xo_move(update: Update, context: ContextTypes.DEFAULT_TYPE, gam
         return
     
     if game.status != "playing":
-        await query.edit_message_text("❌ *این بازی در حال انجام نیست*", parse_mode="Markdown")
+        await query.edit_message_text(f"❌ *این بازی در حال انجام نیست (وضعیت: {game.status})*", parse_mode="Markdown")
         return
     
     user_id_str = str(user_id)
@@ -438,67 +493,99 @@ async def handle_xo_move(update: Update, context: ContextTypes.DEFAULT_TYPE, gam
         await query.answer(f"❌ {result.get('reason', 'خطا')}", show_alert=True)
         return
     
+    log_game(game_id, "حرکت", f"کاربر {user_id} در ({row},{col})")
+    
+    # ======== بررسی پایان بازی ========
     if result.get("winner"):
         winner = result.get("winner")
         is_draw = result.get("is_draw", False)
         
         if not is_draw:
+            # ======== برنده مشخص شده ========
             prize = game.bet_amount * 2
             winner_id = int(game.host_id if winner == "host" else game.player_id)
+            loser_id = int(game.player_id if winner == "host" else game.host_id)
+            
+            # ======== پرداخت جایزه به برنده ========
             winner_game = get_game(winner_id)
             winner_points = winner_game._to_int(winner_game.data.get("hop_point", 0))
             winner_game.data["hop_point"] = str(winner_points + prize)
             winner_game.save_data()
             
+            log_game(game_id, "پایان", f"برنده: {winner_id}, جایزه: {prize}")
+            log_transaction(winner_id, "برنده بازی", prize, f"بازی {game_id}")
+            
+            # ======== پیام به برنده ========
             try:
                 await context.bot.send_message(
                     winner_id,
-                    f"🎉 *شما برنده شدید!*\n💰 *جایزه:* {format_number(prize)} 🪙",
+                    f"🎉 *شما برنده شدید!*\n"
+                    f"🧩 *بازی:* {game_id}\n"
+                    f"💰 *جایزه:* {format_number(prize)} 🪙\n\n"
+                    f"👏 تبریک میگم!",
                     parse_mode="Markdown"
                 )
-            except:
-                pass
+            except Exception as e:
+                logger.error(f"❌ خطا در ارسال پیام برنده {winner_id}: {e}")
             
-            loser_id = int(game.player_id if winner == "host" else game.host_id)
+            # ======== پیام به بازنده ========
             try:
                 await context.bot.send_message(
                     loser_id,
-                    f"😔 *شما بازنده شدید.*\n💰 *مبلغ از دست رفته:* {format_number(game.bet_amount)} 🪙",
+                    f"😔 *شما بازنده شدید.*\n"
+                    f"🧩 *بازی:* {game_id}\n"
+                    f"💰 *مبلغ از دست رفته:* {format_number(game.bet_amount)} 🪙\n\n"
+                    f"💪 دفعه بعد بیشتر تلاش کن!",
                     parse_mode="Markdown"
                 )
-            except:
-                pass
+            except Exception as e:
+                logger.error(f"❌ خطا در ارسال پیام بازنده {loser_id}: {e}")
+        
         else:
+            # ======== بازی مساوی ========
+            log_game(game_id, "مساوی", "بازی مساوی شد")
+            
             for pid in [game.host_id, game.player_id]:
                 if pid:
                     p_game = get_game(int(pid))
                     p_points = p_game._to_int(p_game.data.get("hop_point", 0))
                     p_game.data["hop_point"] = str(p_points + game.bet_amount)
                     p_game.save_data()
+                    
                     try:
                         await context.bot.send_message(
                             int(pid),
-                            f"🤝 *بازی مساوی شد!*\n💰 *{format_number(game.bet_amount)} 🪙 برگشت*",
+                            f"🤝 *بازی مساوی شد!*\n"
+                            f"🧩 *بازی:* {game_id}\n"
+                            f"💰 *{format_number(game.bet_amount)} 🪙 به حساب شما برگشت*",
                             parse_mode="Markdown"
                         )
-                    except:
-                        pass
+                    except Exception as e:
+                        logger.error(f"❌ خطا در ارسال پیام مساوی به {pid}: {e}")
         
+        # ======== پاک کردن پیام ذخیره شده ========
         clear_game_message(chat_id, game_id)
+        
+        # ======== حذف بازی بعد از ۵ دقیقه ========
         asyncio.create_task(remove_game_after_delay(game_id, 300))
     
+    # ======== به‌روزرسانی پیام ========
     updated_game = game_manager.get_game(game_id)
     if updated_game:
         msg = get_xo_game_text(updated_game)
         keyboard = get_xo_board_keyboard(updated_game, user_id)
         
-        await query.edit_message_text(
-            msg,
-            reply_markup=keyboard,
-            parse_mode="Markdown"
-        )
-        
-        save_game_message(chat_id, message_id, game_id)
+        try:
+            await query.edit_message_text(
+                msg,
+                reply_markup=keyboard,
+                parse_mode="Markdown"
+            )
+            log_game(game_id, "به‌روزرسانی پیام", f"کاربر {user_id}")
+        except Exception as e:
+            logger.error(f"❌ خطا در به‌روزرسانی پیام بازی {game_id}: {e}")
+            # اگر نتونست ویرایش کنه، پیام جدید بفرست
+            await send_game_message(chat_id, game_id, user_id, context)
 
 
 # ================================================================
@@ -511,18 +598,23 @@ async def handle_xo_close(update: Update, context: ContextTypes.DEFAULT_TYPE, ga
     await query.answer()
     
     chat_id = query.message.chat.id
+    user_id = query.from_user.id
     
     clear_game_message(chat_id, game_id)
     game_manager.remove_game(game_id)
     
+    log_game(game_id, "بسته شدن", f"کاربر {user_id}")
+    logger.info(f"🗑️ بازی {game_id} توسط کاربر {user_id} بسته شد")
+    
     await query.edit_message_text(
-        "🔙 *بازی بسته شد.*\n\nبرای شروع بازی جدید، دوباره «بازی هاپویی» رو بزن.",
+        "🔙 *بازی بسته شد.*\n\n"
+        "برای شروع بازی جدید، دوباره «بازی هاپویی» رو بزن.",
         parse_mode="Markdown"
     )
 
 
 async def handle_xo_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE, game_id: str):
-    """هندلر لغو میز بازی"""
+    """هندلر لغو میز بازی (فقط میزبان)"""
     query = update.callback_query
     await query.answer()
     
@@ -539,19 +631,62 @@ async def handle_xo_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE, g
         await query.edit_message_text("❌ *فقط میزبان می‌تواند میز را لغو کند*", parse_mode="Markdown")
         return
     
+    # ======== برگشت پول به میزبان ========
     game_obj.data["hop_point"] = str(game_obj._to_int(game_obj.data.get("hop_point", 0)) + game.bet_amount)
     game_obj.save_data()
+    
+    log_game(game_id, "لغو میز", f"میزبان {user_id}")
+    log_transaction(user_id, "لغو میز بازی", game.bet_amount, f"بازگشت پول {game_id}")
+    logger.info(f"🗑️ بازی {game_id} توسط میزبان {user_id} لغو شد - پول برگشت")
     
     clear_game_message(chat_id, game_id)
     game_manager.remove_game(game_id)
     
     await query.edit_message_text(
-        "🗑️ *میز بازی لغو شد و پول شما برگشت.*\n\nبرای شروع بازی جدید، دوباره «بازی هاپویی» رو بزن.",
+        "🗑️ *میز بازی لغو شد و پول شما برگشت.*\n\n"
+        "برای شروع بازی جدید، دوباره «بازی هاپویی» رو بزن.",
         parse_mode="Markdown"
     )
 
+
+# ================================================================
+# تابع کمکی حذف بازی بعد از تاخیر
+# ================================================================
 
 async def remove_game_after_delay(game_id: str, delay: int):
     """حذف بازی بعد از تاخیر"""
     await asyncio.sleep(delay)
     game_manager.remove_game(game_id)
+    logger.info(f"🗑️ بازی {game_id} بعد از {delay} ثانیه حذف شد")
+
+
+# ================================================================
+# تابع بازیابی پیام بازی (برای ری‌استارت)
+# ================================================================
+
+async def restore_game_message(chat_id: int, game_id: str, context: ContextTypes.DEFAULT_TYPE):
+    """بازیابی پیام بازی (برای زمانی که بات ری‌استارت شده)"""
+    message_id = get_game_message(chat_id, game_id)
+    if not message_id:
+        return
+    
+    game = game_manager.get_game(game_id)
+    if not game:
+        clear_game_message(chat_id, game_id)
+        return
+    
+    try:
+        msg = get_xo_game_text(game)
+        keyboard = get_xo_board_keyboard(game, int(game.host_id))
+        
+        await context.bot.edit_message_text(
+            chat_id=chat_id,
+            message_id=message_id,
+            text=msg,
+            reply_markup=keyboard,
+            parse_mode="Markdown"
+        )
+        logger.info(f"♻️ پیام بازی {game_id} بازیابی شد")
+    except Exception as e:
+        logger.error(f"❌ خطا در بازیابی پیام بازی {game_id}: {e}")
+        clear_game_message(chat_id, game_id)
