@@ -1,4 +1,4 @@
-# game.py - کلاس اصلی بازی (نسخه کامل نهایی با اصلاحات)
+# game.py - کلاس اصلی بازی (نسخه کامل نهایی با اصلاحات یخچال)
 
 import random
 import json
@@ -89,7 +89,10 @@ class HopDogGame:
                     data["jail_voted"] = []
                 if "fridge_items" in data and data["fridge_items"]:
                     try:
-                        data["fridge_items"] = json.loads(data["fridge_items"])
+                        if isinstance(data["fridge_items"], str):
+                            data["fridge_items"] = json.loads(data["fridge_items"])
+                        elif not isinstance(data["fridge_items"], list):
+                            data["fridge_items"] = []
                     except:
                         data["fridge_items"] = []
                 else:
@@ -136,11 +139,11 @@ class HopDogGame:
             return None
 
     def save_data(self):
-        """ذخیره داده‌ها - اصلاح شده با self.user_id"""
+        """ذخیره داده‌ها"""
         return save_user_data(self.user_id, self.data)
 
     def reset_data(self):
-        """ریست کردن داده‌ها - اصلاح شده با self.user_id"""
+        """ریست کردن داده‌ها"""
         self.data = {
             "user_id": self.user_id,
             "player_name": self.username or f"کاربر{self.user_id}",
@@ -181,7 +184,7 @@ class HopDogGame:
             "street_hapo_rescued": "0",
             "fridge_owned": False,
             "fridge_level": "1",
-            "fridge_items": "[]",
+            "fridge_items": [],
             "smuggling": False,
             "smuggle_count": "0",
             "smuggle_start": "0",
@@ -359,7 +362,11 @@ class HopDogGame:
         
         self.data["hop_point"] = self._to_str(hop_point - 300)
         self.data["hapo_owned"] = True
-        self.data["hapo_name"] = random.choice(HAPO_NAMES)
+        
+        # پاک‌سازی اسم هنگام خرید
+        name = random.choice(HAPO_NAMES)
+        self.data["hapo_name"] = name.strip()
+        
         self.data["hapo_rank"] = "0"
         self.data["hapo_level"] = "1"
         self.data["hapo_food"] = self._to_str(self.get_hapo_max_food())
@@ -647,26 +654,40 @@ class HopDogGame:
         return {"success": True, "fed": actual}
 
     # ============================================================
-    # متدهای یخچال هاپویی
+    # متدهای یخچال هاپویی (اصلاح شده)
     # ============================================================
 
     def get_fridge_items(self):
+        """دریافت لیست آیتم‌های یخچال"""
         items = self.data.get("fridge_items", [])
+        
+        # اگر string هست، تبدیل به لیست کن
         if isinstance(items, str):
             try:
                 items = json.loads(items)
             except:
                 items = []
+        
+        # اگر لیست نیست، تبدیل به لیست کن
         if not isinstance(items, list):
             items = []
+        
         return items
 
     def save_fridge_items(self, items):
+        """ذخیره لیست آیتم‌های یخچال"""
         if not isinstance(items, list):
             items = []
-        self.data["fridge_items"] = json.dumps(items)
-        self.save_data()
-        return True
+        
+        # ذخیره به صورت JSON
+        try:
+            self.data["fridge_items"] = json.dumps(items, ensure_ascii=False)
+            self.save_data()
+            logger.info(f"✅ یخچال ذخیره شد: {len(items)} آیتم")
+            return True
+        except Exception as e:
+            logger.error(f"❌ خطا در ذخیره یخچال: {e}")
+            return False
 
     def get_fridge_capacity(self):
         level = self._to_int(self.data.get("fridge_level", 1))
@@ -1219,7 +1240,7 @@ class HopDogGame:
         hop_point = self._to_int(self.data["hop_point"])
         
         if hop_point < fine:
-            return {"success": False, "reason": f"پوینت کافی نیست. نیاز به {fine:,} هاپو پوینت"}
+            return {"success": False, "reason": f"پوینت کافی نیست. نیاز به {fine:,} هاپو پوینت داری و {hop_point:,} داری"}
         
         self.data["hop_point"] = self._to_str(hop_point - fine)
         self.data["jailed"] = False
