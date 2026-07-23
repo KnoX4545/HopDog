@@ -56,7 +56,7 @@ from academy import (
 # Import بازی‌ها (با GAME_XO_STATE)
 # ================================================================
 
-from utils import parse_amount, get_confirm_keyboard
+from utils import parse_amount, get_confirm_keyboard, get_game
 from game_functions import game_manager
 from game_handlers import (
     show_games_menu, show_xo_main, handle_xo_set_bet, process_xo_bet,
@@ -86,12 +86,6 @@ logger = logging.getLogger(__name__)
 # ================================================================
 # توابع کمکی
 # ================================================================
-
-def get_game(user_id, username=""):
-    if user_id not in user_games:
-        user_games[user_id] = HopDogGame(user_id, username)
-    return user_games[user_id]
-
 
 def get_street_hapo():
     global street_hapo_instance
