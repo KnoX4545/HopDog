@@ -146,15 +146,6 @@ def main():
     logger.info("🚀 بات آماده اجرا است!")
     logger.info("=" * 50)
     
-    if USE_WEBHOOK and WEBHOOK_URL:
-        logger.info(f"🌐 استفاده از Webhook: {WEBHOOK_URL}")
-        app.run_webhook(
-            listen="0.0.0.0",
-            port=WEBHOOK_PORT,
-            webhook_url=f"{WEBHOOK_URL}/webhook",
-            allowed_updates=Update.ALL_TYPES
-        )
-    else:
         logger.info("🔄 استفاده از Polling")
         app.run_polling(
             allowed_updates=Update.ALL_TYPES,
