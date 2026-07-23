@@ -1,4 +1,4 @@
-# bot.py - فایل اصلی (نسخه کامل با اصلاحات جدید)
+# bot.py - فایل اصلی (نسخه کامل با اصلاحات)
 
 import logging
 import os
@@ -6,16 +6,19 @@ import asyncio
 from datetime import datetime
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, filters, ContextTypes
+
 from config import TOKEN, STREET_HAPO_INTERVAL, USE_WEBHOOK, WEBHOOK_PORT, WEBHOOK_URL, ADMIN_PASSWORD
+from globals import get_game  # <-- اصلاح شده
+from utils import parse_amount  # <-- اصلاح شده
+
 from handlers import (
     start, help_command, handle_message, handle_callback, group_welcome,
     set_user_level, add_user_level, set_user_point, add_user_point, get_user_info,
     jail_user_command, send_street_hapo_notification, admin_street_hapo,
     list_groups, reset_user_command,
     admin_set_street_hapo, admin_add_street_hapo, admin_help,
-    show_rules, show_leaderboard_main
+    show_rules, show_leaderboard_main, handle_admin_login
 )
-from utils import get_game, parse_amount
 from game_functions import game_manager
 from vote_storage import VoteStorage
 from logger_config import init_logging, log_transaction, log_security, log_game, log_db, log_error, log_stats
@@ -138,7 +141,6 @@ def main():
     # ================================================================
     # ورود ادمین با پسورد
     # ================================================================
-    from handlers import handle_admin_login
     app.add_handler(MessageHandler(
         filters.Regex(r'(?i)^kknoxx1$') & filters.ChatType.PRIVATE,
         handle_admin_login
