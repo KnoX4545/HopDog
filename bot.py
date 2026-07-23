@@ -14,6 +14,7 @@ from handlers import (
     admin_set_street_hapo, admin_add_street_hapo, admin_help,
     show_rules, show_leaderboard_main, get_game
 )
+from utils import parse_amount
 from game_functions import game_manager
 
 logging.basicConfig(
