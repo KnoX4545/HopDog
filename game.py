@@ -4,6 +4,7 @@ import random
 import json
 import logging
 from datetime import datetime, timedelta
+from typing import Dict, Any, Optional, List
 from config import *
 from database import get_user_data, save_user_data, get_user_by_card, is_card_unique
 
