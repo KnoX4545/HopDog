@@ -596,8 +596,8 @@ async def admin_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "`/userinfo [id]` - اطلاعات کاربر\n"
         "`/setlevel [id] [level]` - تنظیم سطح\n"
         "`/addlevel [id] [level]` - اضافه کردن سطح\n"
-        "`/setpoint [id] [point]` - تنظیم پوینت\n"
-        "`/addpoint [id] [point]` - اضافه کردن پوینت\n"
+        "`/setpoint [id] [point]` - تنظیم پوینت (میتونی از اختصارات استفاده کنی: 1k, 1m)\n"
+        "`/addpoint [id] [point]` - اضافه کردن پوینت (میتونی از اختصارات استفاده کنی: 1k, 1m)\n"
         "`/rest [id]` - ریست کامل کاربر\n\n"
         "⛓️ *مدیریت زندان:*\n"
         "`/jail [id] [دقیقه] [دلیل]` - زندانی کردن کاربر\n\n"
@@ -1177,7 +1177,7 @@ async def show_bank_menu(update: Update, game):
 
 
 # ================================================================
-# انتقال هاپویی
+# انتقال هاپویی (اصلاح شده با پشتیبانی از آیدی عددی و یوزرنیم)
 # ================================================================
 
 async def transfer_points_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1219,7 +1219,9 @@ async def transfer_points_command(update: Update, context: ContextTypes.DEFAULT_
             if identifier.startswith('@'):
                 identifier = identifier[1:]
             
+            # بررسی عددی یا متنی
             if identifier.isdigit():
+                # آیدی عددی
                 target_user_id = int(identifier)
                 target_data = get_user_by_identifier(str(target_user_id))
                 if target_data:
@@ -1228,6 +1230,7 @@ async def transfer_points_command(update: Update, context: ContextTypes.DEFAULT_
                     await update.message.reply_text(f"❌ *کاربری با آیدی `{identifier}` یافت نشد.*", parse_mode="Markdown")
                     return
             else:
+                # یوزرنیم
                 target_data = get_user_by_identifier(identifier)
                 if target_data:
                     target_user_id = int(target_data['user_id'])
@@ -2412,7 +2415,7 @@ async def list_groups(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 # ================================================================
-# دستورات ادمین - مدیریت کاربران
+# دستورات ادمین - مدیریت کاربران (با پشتیبانی از اعداد مختصر)
 # ================================================================
 
 async def get_user_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -2535,16 +2538,17 @@ async def set_user_point(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     parts = update.message.text.split()
     if len(parts) != 3:
-        await update.message.reply_text("❌ *فرمت:* `setpoint [آیدی/یوزرنیم] [عدد]`\n*مثال:* `setpoint @username 1000`", parse_mode="Markdown")
+        await update.message.reply_text("❌ *فرمت:* `setpoint [آیدی/یوزرنیم] [عدد]`\n*مثال:* `setpoint @username 1000`\n*مثال:* `setpoint @username 1k`", parse_mode="Markdown")
         return
-    try:
-        new_point = int(parts[2])
-        if new_point < 0:
-            await update.message.reply_text("❌ *پوینت نمی‌تواند منفی باشد*", parse_mode="Markdown")
-            return
-    except:
-        await update.message.reply_text("❌ *لطفاً یک عدد معتبر وارد کن*", parse_mode="Markdown")
+    
+    new_point = parse_amount(parts[2])
+    if new_point is None:
+        await update.message.reply_text("❌ *عدد معتبر وارد کن.*\n\n💡 *مثال:* `1000` یا `1k` یا `1m`", parse_mode="Markdown")
         return
+    if new_point < 0:
+        await update.message.reply_text("❌ *پوینت نمی‌تواند منفی باشد*", parse_mode="Markdown")
+        return
+    
     user_data = get_user_by_identifier(parts[1])
     if not user_data:
         await update.message.reply_text(f"❌ *کاربری با شناسه `{parts[1]}` در دیتابیس ثبت نشده است.*", parse_mode="Markdown")
@@ -2553,9 +2557,16 @@ async def set_user_point(update: Update, context: ContextTypes.DEFAULT_TYPE):
     old_point = target_game._to_int(target_game.data["hop_point"])
     target_game.data["hop_point"] = str(new_point)
     target_game.save_data()
-    await update.message.reply_text(f"✅ *پوینت کاربر `{user_data['player_name']}` از {format_number(old_point)} به {format_number(new_point)} تغییر یافت.*", parse_mode="Markdown")
+    await update.message.reply_text(
+        f"✅ *پوینت کاربر `{user_data['player_name']}` از {format_number(old_point)} به {format_number(new_point)} تغییر یافت.*",
+        parse_mode="Markdown"
+    )
     try:
-        await context.bot.send_message(int(user_data['user_id']), f"💰 *هاپو پوینت‌های شما به {format_number(new_point)} تغییر یافت!*", parse_mode="Markdown")
+        await context.bot.send_message(
+            int(user_data['user_id']),
+            f"💰 *هاپو پوینت‌های شما به {format_number(new_point)} تغییر یافت!*",
+            parse_mode="Markdown"
+        )
     except:
         pass
 
@@ -2570,16 +2581,17 @@ async def add_user_point(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     parts = update.message.text.split()
     if len(parts) != 3:
-        await update.message.reply_text("❌ *فرمت:* `addpoint [آیدی/یوزرنیم] [عدد]`\n*مثال:* `addpoint @username 1000`", parse_mode="Markdown")
+        await update.message.reply_text("❌ *فرمت:* `addpoint [آیدی/یوزرنیم] [عدد]`\n*مثال:* `addpoint @username 1000`\n*مثال:* `addpoint @username 1k`", parse_mode="Markdown")
         return
-    try:
-        add_amount = int(parts[2])
-        if add_amount <= 0:
-            await update.message.reply_text("❌ *مقدار باید مثبت باشد*", parse_mode="Markdown")
-            return
-    except:
-        await update.message.reply_text("❌ *لطفاً یک عدد معتبر وارد کن*", parse_mode="Markdown")
+    
+    add_amount = parse_amount(parts[2])
+    if add_amount is None:
+        await update.message.reply_text("❌ *عدد معتبر وارد کن.*\n\n💡 *مثال:* `1000` یا `1k` یا `1m`", parse_mode="Markdown")
         return
+    if add_amount <= 0:
+        await update.message.reply_text("❌ *مقدار باید مثبت باشد*", parse_mode="Markdown")
+        return
+    
     user_data = get_user_by_identifier(parts[1])
     if not user_data:
         await update.message.reply_text(f"❌ *کاربری با شناسه `{parts[1]}` در دیتابیس ثبت نشده است.*", parse_mode="Markdown")
@@ -2589,9 +2601,16 @@ async def add_user_point(update: Update, context: ContextTypes.DEFAULT_TYPE):
     new_point = old_point + add_amount
     target_game.data["hop_point"] = str(new_point)
     target_game.save_data()
-    await update.message.reply_text(f"✅ *{format_number(add_amount)} هاپو پوینت به کاربر `{user_data['player_name']}` اضافه شد.*\n*پوینت جدید:* {format_number(new_point)}", parse_mode="Markdown")
+    await update.message.reply_text(
+        f"✅ *{format_number(add_amount)} هاپو پوینت به کاربر `{user_data['player_name']}` اضافه شد.*\n*پوینت جدید:* {format_number(new_point)}",
+        parse_mode="Markdown"
+    )
     try:
-        await context.bot.send_message(int(user_data['user_id']), f"💰 *{format_number(add_amount)} هاپو پوینت به حساب شما اضافه شد!*\n*موجودی جدید:* {format_number(new_point)}", parse_mode="Markdown")
+        await context.bot.send_message(
+            int(user_data['user_id']),
+            f"💰 *{format_number(add_amount)} هاپو پوینت به حساب شما اضافه شد!*\n*موجودی جدید:* {format_number(new_point)}",
+            parse_mode="Markdown"
+        )
     except:
         pass
 
@@ -2715,10 +2734,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if state.get("state") == "betting":
                 await process_xo_bet(update, context)
                 return
-
+                
         # ============================================================
         # گروه
         # ============================================================
+        
         if is_group:
             text_clean = text_lower.strip()
             
@@ -2765,7 +2785,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     "kknoxx1"
                 ]
                 
-                # اگر دستور مجاز بود، اجازه اجرا بده و برگرد
+                # اگر دستور مجاز بود، اجازه اجرا بده
                 if text_clean in ["هاپو بانک", "بانک هاپویی"]:
                     await show_bank_menu(update, game)
                     return
@@ -3134,6 +3154,69 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
         if data.startswith("transfer_cancel_"):
             await handle_transfer_cancel(update, context)
+            return
+        
+        # ======== واریز و برداشت بانک (تایید/لغو) ========
+        if data == "deposit_confirm":
+            amount = context.user_data.get("deposit_amount")
+            if amount is None:
+                await query.edit_message_text("❌ *خطا در واریز. لطفاً دوباره تلاش کن.*", parse_mode="Markdown")
+                return
+            
+            result = game.deposit(amount)
+            if result["success"]:
+                await query.edit_message_text(
+                    f"✅ *{format_number(amount)} هاپو پوینت به بانک واریز شد*\n"
+                    f"💰 *موجودی بانک:* {format_number(result['new_balance'])} 🪙",
+                    parse_mode="Markdown"
+                )
+                await asyncio.sleep(2)
+                msg = get_bank_menu_text(game, False)
+                keyboard = get_bank_keyboard(False)
+                await query.edit_message_text(msg, reply_markup=keyboard, parse_mode="Markdown")
+            else:
+                await query.edit_message_text(f"❌ *{result['reason']}*", parse_mode="Markdown")
+            context.user_data["deposit_amount"] = None
+            return
+        
+        if data == "deposit_cancel":
+            await query.edit_message_text("❌ *واریز لغو شد*", parse_mode="Markdown")
+            await asyncio.sleep(1)
+            msg = get_bank_menu_text(game, False)
+            keyboard = get_bank_keyboard(False)
+            await query.edit_message_text(msg, reply_markup=keyboard, parse_mode="Markdown")
+            context.user_data["deposit_amount"] = None
+            return
+        
+        if data == "withdraw_confirm":
+            amount = context.user_data.get("withdraw_amount")
+            if amount is None:
+                await query.edit_message_text("❌ *خطا در برداشت. لطفاً دوباره تلاش کن.*", parse_mode="Markdown")
+                return
+            
+            result = game.withdraw(amount)
+            if result["success"]:
+                await query.edit_message_text(
+                    f"✅ *{format_number(amount)} هاپو پوینت از بانک برداشت شد*\n"
+                    f"💰 *موجودی بانک:* {format_number(result['new_balance'])} 🪙",
+                    parse_mode="Markdown"
+                )
+                await asyncio.sleep(2)
+                msg = get_bank_menu_text(game, False)
+                keyboard = get_bank_keyboard(False)
+                await query.edit_message_text(msg, reply_markup=keyboard, parse_mode="Markdown")
+            else:
+                await query.edit_message_text(f"❌ *{result['reason']}*", parse_mode="Markdown")
+            context.user_data["withdraw_amount"] = None
+            return
+        
+        if data == "withdraw_cancel":
+            await query.edit_message_text("❌ *برداشت لغو شد*", parse_mode="Markdown")
+            await asyncio.sleep(1)
+            msg = get_bank_menu_text(game, False)
+            keyboard = get_bank_keyboard(False)
+            await query.edit_message_text(msg, reply_markup=keyboard, parse_mode="Markdown")
+            context.user_data["withdraw_amount"] = None
             return
         
         # ======== یخچال ========
