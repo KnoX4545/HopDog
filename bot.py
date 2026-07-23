@@ -1,4 +1,4 @@
-# bot.py - فایل اصلی (نسخه کامل با اصلاحات)
+# bot.py - فایل اصلی (نسخه کامل با اصلاح Conflict)
 
 import logging
 import os
@@ -72,7 +72,7 @@ async def log_system_stats(context: ContextTypes.DEFAULT_TYPE):
 
 
 # ================================================================
-# مدیریت خطاهای عمومی (اصلاح شده)
+# مدیریت خطاهای عمومی
 # ================================================================
 
 async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -230,13 +230,23 @@ def main():
         logger.warning("⚠️ JobQueue در دسترس نیست!")
     
     # ================================================================
+    # پاک‌سازی کانکشن‌های قبلی (رفع Conflict)
+    # ================================================================
+    logger.info("🧹 پاک‌سازی کانکشن‌های قبلی...")
+    try:
+        app.bot.delete_webhook(drop_pending_updates=True)
+        logger.info("✅ Webhook پاک شد")
+    except Exception as e:
+        logger.warning(f"⚠️ خطا در پاک‌سازی webhook: {e}")
+    
+    # ================================================================
     # راه‌اندازی و اجرا
     # ================================================================
     logger.info("=" * 60)
     logger.info("✅ بات آماده اجرا است!")
     logger.info("=" * 60)
     
-    # ======== فقط از Polling استفاده کن (برای رفع Conflict 409) ========
+    # ======== فقط از Polling استفاده کن ========
     logger.info("🔄 استفاده از Polling")
     
     try:
