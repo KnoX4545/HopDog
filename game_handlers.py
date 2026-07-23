@@ -1,4 +1,4 @@
-# game_handlers.py - هندلرهای بازی هاپویی (نسخه اصلاح شده با پنل واحد)
+# game_handlers.py - هندلرهای بازی هاپویی (نسخه کامل با اختصارات)
 
 import asyncio
 import logging
@@ -9,6 +9,7 @@ from telegram.ext import ContextTypes
 from config import GAME_REQUIRED_LEVEL, GAME_HOST_REQUIRED_LEVEL
 from game_functions import game_manager, get_xo_board_keyboard, get_xo_game_text
 from bank import format_number
+from handlers import parse_amount, get_game, get_confirm_keyboard
 
 logger = logging.getLogger(__name__)
 
@@ -23,12 +24,6 @@ GAME_MESSAGES = {}  # برای ذخیره message_id بازی‌ها
 # ================================================================
 # توابع کمکی
 # ================================================================
-
-def get_game(user_id, username=""):
-    """دریافت یا ایجاد نمونه بازی برای کاربر"""
-    from handlers import get_game as get_game_handler
-    return get_game_handler(user_id, username)
-
 
 def save_game_message(chat_id, message_id, game_id):
     """ذخیره پیام بازی برای ویرایش بعدی"""
@@ -165,7 +160,7 @@ async def show_xo_main(update, query=None, game_obj=None):
         state = GAME_XO_STATE[str(user_id)]
         if state.get("state") == "betting":
             msg = "🕹 *بازی هاپویی XO* 🧩\n\n❗️ لطفا میز بازی را بچینید\n\n"
-            msg += "💰 *مبلغ ورودی : درحال تعیین*\n\n❓ لطفا مبلغ ورودی را در جواب همین پنل وارد کنید\n┘─ مثال : 500"
+            msg += "💰 *مبلغ ورودی : درحال تعیین*\n\n❓ لطفا مبلغ ورودی را در جواب همین پنل وارد کنید\n┘─ مثال : 500\n┘─ مثال : 1k\n┘─ مثال : 1.5m"
             await query.edit_message_text(msg, parse_mode="Markdown")
             return
     
@@ -203,12 +198,12 @@ async def handle_xo_set_bet(update: Update, context: ContextTypes.DEFAULT_TYPE):
     GAME_XO_STATE[str(user_id)] = {"state": "betting"}
     
     msg = "🕹 *بازی هاپویی XO* 🧩\n\n❗️ لطفا میز بازی را بچینید\n\n"
-    msg += "💰 *مبلغ ورودی : درحال تعیین*\n\n❓ لطفا مبلغ ورودی را در جواب همین پنل وارد کنید\n┘─ مثال : 500"
+    msg += "💰 *مبلغ ورودی : درحال تعیین*\n\n❓ لطفا مبلغ ورودی را در جواب همین پنل وارد کنید\n┘─ مثال : 500\n┘─ مثال : 1k\n┘─ مثال : 1.5m"
     await query.edit_message_text(msg, parse_mode="Markdown")
 
 
 async def process_xo_bet(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """پردازش مبلغ شرط وارد شده"""
+    """پردازش مبلغ شرط وارد شده - با پشتیبانی از اختصارات"""
     user_id = update.effective_user.id
     username = update.effective_user.username
     full_name = update.effective_user.full_name or f"کاربر{user_id}"
@@ -221,11 +216,16 @@ async def process_xo_bet(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if state.get("state") != "betting":
         return
     
-    text = update.message.text.strip().replace(",", "").replace(" ", "")
-    try:
-        bet_amount = int(text)
-    except ValueError:
-        await update.message.reply_text("❌ *عدد معتبر وارد کن*", parse_mode="Markdown")
+    text = update.message.text.strip()
+    
+    # ======== تبدیل اختصارات به عدد ========
+    bet_amount = parse_amount(text)
+    if bet_amount is None:
+        await update.message.reply_text(
+            "❌ *عدد معتبر وارد کن.*\n\n"
+            "💡 *مثال:* `500` یا `1k` یا `1.5k` یا `1m`",
+            parse_mode="Markdown"
+        )
         return
     
     if bet_amount < 50:
