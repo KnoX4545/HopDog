@@ -1,4 +1,4 @@
-# bot.py - فایل اصلی (نسخه کامل با اصلاح Conflict)
+# bot.py - فایل اصلی (نسخه نهایی)
 
 import logging
 import os
@@ -78,29 +78,24 @@ async def log_system_stats(context: ContextTypes.DEFAULT_TYPE):
 async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """مدیریت خطاهای عمومی بات"""
     try:
-        # ======== بررسی update ========
         if update is None:
             logger.error(f"❌ خطا (بدون update): {context.error}")
             return
         
-        # ======== دریافت اطلاعات کاربر ========
         user_id = "نامشخص"
         if update.effective_user:
             user_id = update.effective_user.id
         
-        # ======== دریافت پیام ========
         message = None
         if update.effective_message:
             message = update.effective_message
         elif update.callback_query and update.callback_query.message:
             message = update.callback_query.message
         
-        # ======== لاگ خطا ========
         error = context.error
         logger.error(f"❌ خطا در درخواست از {user_id}: {error}")
         log_error(error, f"درخواست از {user_id}", user_id if user_id != "نامشخص" else None)
         
-        # ======== ارسال پیام به کاربر ========
         if message:
             try:
                 await message.reply_text(
@@ -127,7 +122,6 @@ def main():
     logger.info(f"🤖 نام بات: @HopDogQ")
     logger.info("=" * 60)
     
-    # ======== ایجاد اپلیکیشن ========
     app = Application.builder().token(TOKEN).build()
     
     # ================================================================
@@ -206,7 +200,6 @@ def main():
     if job_queue:
         logger.info("⏰ تنظیم Job Queue...")
         
-        # ======== هاپوی خیابونی (هر ۶ ساعت) ========
         job_queue.run_repeating(
             send_street_hapo_notification, 
             interval=STREET_HAPO_INTERVAL, 
@@ -214,30 +207,17 @@ def main():
         )
         logger.info(f"✅ هاپوی خیابونی فعال شد (هر {STREET_HAPO_INTERVAL//3600} ساعت)")
         
-        # ======== پاک‌سازی بازی‌ها (هر ۳۰ ثانیه) ========
         job_queue.run_repeating(cleanup_games, interval=30, first=5)
         logger.info("✅ پاک‌سازی خودکار بازی‌ها فعال شد (هر ۳۰ ثانیه)")
         
-        # ======== پاک‌سازی رای‌ها (هر ۱ ساعت) ========
         job_queue.run_repeating(cleanup_votes, interval=3600, first=10)
         logger.info("✅ پاک‌سازی خودکار رای‌ها فعال شد (هر ۱ ساعت)")
         
-        # ======== لاگ آمار سیستم (هر ۱ ساعت) ========
         job_queue.run_repeating(log_system_stats, interval=3600, first=60)
         logger.info("✅ لاگ آمار سیستم فعال شد (هر ۱ ساعت)")
         
     else:
         logger.warning("⚠️ JobQueue در دسترس نیست!")
-    
-    # ================================================================
-    # پاک‌سازی کانکشن‌های قبلی (رفع Conflict)
-    # ================================================================
-    logger.info("🧹 پاک‌سازی کانکشن‌های قبلی...")
-    try:
-        app.bot.delete_webhook(drop_pending_updates=True)
-        logger.info("✅ Webhook پاک شد")
-    except Exception as e:
-        logger.warning(f"⚠️ خطا در پاک‌سازی webhook: {e}")
     
     # ================================================================
     # راه‌اندازی و اجرا
@@ -246,7 +226,6 @@ def main():
     logger.info("✅ بات آماده اجرا است!")
     logger.info("=" * 60)
     
-    # ======== فقط از Polling استفاده کن ========
     logger.info("🔄 استفاده از Polling")
     
     try:
