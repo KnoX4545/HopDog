@@ -1,4 +1,4 @@
-# handlers.py - هندلرهای پیام و کالبک (نسخه کامل نهایی)
+# handlers.py - هندلرهای پیام و کالبک (نسخه نهایی کامل)
 
 import os
 import json
@@ -214,8 +214,6 @@ RULES_PAGE2 = """🐶 *قوانین هاپویی* 📚 *(2 / 2)*
 ✨ ما هیچگونه مسئولیتی در قبال قرض دادن آیتم های هاپویی مانند (هاپو پوینت) یا دزدیده شدن آیتم های شما در صورتی که با رضایت خودتون و با آگاهی خودتون انجام شده باشد نداریم.
 
 ❤️ در صورت همکاری و گزارش مشکلات , باگ ها , متخلفین , پیشنهادات , انتقادات و .. از سمت مدیریت هدیه دریافت میکنید.
-
-📣 لطفا در چنل رسمی هاپویی که در توضیحات ربات قرار دارد عضو شوید تا از اطلاع رسانی ها , آپدیت های مهم و ایونت های جذاب ربات جا نمونید. @HopDogQ
 
 ©️ *کپی برداری از هاپویی کاملا ممنوع بوده و پیگرد قانونی دارد.*
 ‏┘─ ᴄᴏᴘʏʀɪɢʜᴛ | ᴀʟʟ ʀɪɢʜᴛ ʀᴇꜱᴇʀᴠᴇᴅ | 2026 HopDoG
@@ -2657,15 +2655,22 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await update.message.reply_text("❌ *پوینت کافی نیست*", parse_mode="Markdown")
                 context.user_data["waiting_for_hapo_name"] = False
                 return
-            if len(text) > 15:
+            
+            # ======== پاک‌سازی اسم وارد شده ========
+            new_name = text.strip()
+            new_name = " ".join(new_name.split())  # حذف فضاهای اضافی
+            
+            if len(new_name) > 15:
                 await update.message.reply_text("❌ *اسم نباید بیشتر از 15 کاراکتر باشد*", parse_mode="Markdown")
                 context.user_data["waiting_for_hapo_name"] = False
                 return
+            
             old_name = game.data["hapo_name"]
-            context.user_data["new_hapo_name"] = text
+            context.user_data["new_hapo_name"] = new_name
             context.user_data["waiting_for_hapo_name"] = False
+            
             await update.message.reply_text(
-                f"⚠️ *آیا از تغییر اسم هاپو از «{old_name}» به «{text}» مطمئنی؟*\n💰 *هزینه:* 750 هاپو پوینت",
+                f"⚠️ *آیا از تغییر اسم هاپو از «{old_name}» به «{new_name}» مطمئنی؟*\n💰 *هزینه:* 750 هاپو پوینت",
                 reply_markup=get_confirm_keyboard("confirm_hapo_name", "cancel_hapo_name"),
                 parse_mode="Markdown"
             )
@@ -2867,9 +2872,23 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await do_hop(update, game)
                 return
             
-            # هاپو
-            hapo_name_lower = game.data.get("hapo_name", "").lower().strip()
-            if text_clean in ["هاپو", "hapo"] or (hapo_name_lower and text_clean == hapo_name_lower):
+            # ======== تشخیص اسم هاپو (نسخه نهایی با پاک‌سازی) ========
+            hapo_name = game.data.get("hapo_name", "").strip()
+            hapo_name_lower = hapo_name.lower()
+            hapo_name_clean = "".join(hapo_name_lower.split())  # حذف همه فاصله‌ها
+            text_clean_normalized = "".join(text_clean.split())  # حذف همه فاصله‌های پیام
+            
+            logger.info(f"🔍 اسم هاپو در دیتابیس: '{hapo_name}' (پاک شده: '{hapo_name_clean}')")
+            logger.info(f"🔍 پیام کاربر: '{text_clean}' (پاک شده: '{text_clean_normalized}')")
+            
+            is_hapo_command = (
+                text_clean in ["هاپو", "hapo"] or 
+                text_clean == hapo_name or 
+                text_clean_normalized == hapo_name_clean or
+                text_clean == hapo_name.strip()
+            )
+            
+            if is_hapo_command:
                 await show_hapo_menu(update, game)
                 return
             
@@ -3221,6 +3240,81 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             context.user_data["withdraw_amount"] = None
             return
         
+        # ======== بانک ========
+        if data == "buy_bank":
+            result = game.open_bank()
+            if result["success"]:
+                await query.edit_message_text(f"🏦 *بانک هاپویی خریداری شد!*\n💳 *شماره کارت شما:* {result['card_number']}", parse_mode="Markdown")
+                await asyncio.sleep(2)
+                msg = get_bank_menu_text(game, False)
+                keyboard = get_bank_keyboard(False)
+                await query.edit_message_text(msg, reply_markup=keyboard, parse_mode="Markdown")
+            else:
+                await query.answer(f"❌ {result['reason']}", show_alert=True)
+            return
+        
+        if data == "bank_deposit":
+            await query.edit_message_text(
+                "💰 *مبلغ واریزی رو بنویس:*\n\n"
+                "💡 *میتونی از اختصارات استفاده کنی:*\n"
+                "┘─ `1k` = 1,000 | `1.5k` = 1,500\n"
+                "┘─ `1m` = 1,000,000 | `1.5m` = 1,500,000\n"
+                "┘─ `1کا` = 1,000 | `1میل` = 1,000,000",
+                parse_mode="Markdown"
+            )
+            context.user_data["waiting_for_deposit"] = True
+            return
+        
+        if data == "bank_withdraw":
+            await query.edit_message_text(
+                "💰 *مبلغ برداشت رو بنویس:*\n\n"
+                "💡 *میتونی از اختصارات استفاده کنی:*\n"
+                "┘─ `1k` = 1,000 | `1.5k` = 1,500\n"
+                "┘─ `1m` = 1,000,000 | `1.5m` = 1,500,000\n"
+                "┘─ `1کا` = 1,000 | `1میل` = 1,000,000",
+                parse_mode="Markdown"
+            )
+            context.user_data["waiting_for_withdraw"] = True
+            return
+        
+        if data == "bank_card_to_card":
+            await query.edit_message_text(get_card_to_card_text())
+            context.user_data["waiting_for_card_to_card"] = True
+            return
+        
+        if data == "bank_transactions":
+            msg = get_bank_menu_text(game, True)
+            keyboard = get_bank_keyboard(True)
+            await query.edit_message_text(msg, reply_markup=keyboard, parse_mode="Markdown")
+            return
+        
+        if data == "bank_change_card":
+            if not game.data["bank_opened"]:
+                await query.answer("❌ شما بانک ندارید", show_alert=True)
+                return
+            msg = get_change_card_confirm_text(game)
+            await query.edit_message_text(msg, reply_markup=get_confirm_keyboard("bank_change_card_yes", "bank_change_card_no"), parse_mode="Markdown")
+            return
+        
+        if data == "bank_change_card_yes":
+            result = game.change_card_number()
+            if result["success"]:
+                await query.edit_message_text(f"✅ *شماره حساب شما تغییر کرد!*\n🔄 *شماره جدید:* {result['new_card']}", parse_mode="Markdown")
+                await asyncio.sleep(2)
+                msg = get_bank_menu_text(game, False)
+                keyboard = get_bank_keyboard(False)
+                await query.edit_message_text(msg, reply_markup=keyboard, parse_mode="Markdown")
+            else:
+                await query.answer(f"❌ {result['reason']}", show_alert=True)
+            return
+        if data == "bank_change_card_no":
+            await query.edit_message_text("❌ *تغییر شماره حساب لغو شد*", parse_mode="Markdown")
+            await asyncio.sleep(1)
+            msg = get_bank_menu_text(game, False)
+            keyboard = get_bank_keyboard(False)
+            await query.edit_message_text(msg, reply_markup=keyboard, parse_mode="Markdown")
+            return
+        
         # ======== یخچال ========
         if data == "buy_fridge":
             await handle_fridge_buy(update, context, query)
@@ -3349,81 +3443,6 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             game.save_data()
             await query.edit_message_text("✅ *پروفایل شما باز شد*", parse_mode="Markdown")
             await my_profile_from_callback(query, game)
-            return
-        
-        # ======== بانک ========
-        if data == "buy_bank":
-            result = game.open_bank()
-            if result["success"]:
-                await query.edit_message_text(f"🏦 *بانک هاپویی خریداری شد!*\n💳 *شماره کارت شما:* {result['card_number']}", parse_mode="Markdown")
-                await asyncio.sleep(2)
-                msg = get_bank_menu_text(game, False)
-                keyboard = get_bank_keyboard(False)
-                await query.edit_message_text(msg, reply_markup=keyboard, parse_mode="Markdown")
-            else:
-                await query.answer(f"❌ {result['reason']}", show_alert=True)
-            return
-        
-        if data == "bank_deposit":
-            await query.edit_message_text(
-                "💰 *مبلغ واریزی رو بنویس:*\n\n"
-                "💡 *میتونی از اختصارات استفاده کنی:*\n"
-                "┘─ `1k` = 1,000 | `1.5k` = 1,500\n"
-                "┘─ `1m` = 1,000,000 | `1.5m` = 1,500,000\n"
-                "┘─ `1کا` = 1,000 | `1میل` = 1,000,000",
-                parse_mode="Markdown"
-            )
-            context.user_data["waiting_for_deposit"] = True
-            return
-        
-        if data == "bank_withdraw":
-            await query.edit_message_text(
-                "💰 *مبلغ برداشت رو بنویس:*\n\n"
-                "💡 *میتونی از اختصارات استفاده کنی:*\n"
-                "┘─ `1k` = 1,000 | `1.5k` = 1,500\n"
-                "┘─ `1m` = 1,000,000 | `1.5m` = 1,500,000\n"
-                "┘─ `1کا` = 1,000 | `1میل` = 1,000,000",
-                parse_mode="Markdown"
-            )
-            context.user_data["waiting_for_withdraw"] = True
-            return
-        
-        if data == "bank_card_to_card":
-            await query.edit_message_text(get_card_to_card_text())
-            context.user_data["waiting_for_card_to_card"] = True
-            return
-        
-        if data == "bank_transactions":
-            msg = get_bank_menu_text(game, True)
-            keyboard = get_bank_keyboard(True)
-            await query.edit_message_text(msg, reply_markup=keyboard, parse_mode="Markdown")
-            return
-        
-        if data == "bank_change_card":
-            if not game.data["bank_opened"]:
-                await query.answer("❌ شما بانک ندارید", show_alert=True)
-                return
-            msg = get_change_card_confirm_text(game)
-            await query.edit_message_text(msg, reply_markup=get_confirm_keyboard("bank_change_card_yes", "bank_change_card_no"), parse_mode="Markdown")
-            return
-        
-        if data == "bank_change_card_yes":
-            result = game.change_card_number()
-            if result["success"]:
-                await query.edit_message_text(f"✅ *شماره حساب شما تغییر کرد!*\n🔄 *شماره جدید:* {result['new_card']}", parse_mode="Markdown")
-                await asyncio.sleep(2)
-                msg = get_bank_menu_text(game, False)
-                keyboard = get_bank_keyboard(False)
-                await query.edit_message_text(msg, reply_markup=keyboard, parse_mode="Markdown")
-            else:
-                await query.answer(f"❌ {result['reason']}", show_alert=True)
-            return
-        if data == "bank_change_card_no":
-            await query.edit_message_text("❌ *تغییر شماره حساب لغو شد*", parse_mode="Markdown")
-            await asyncio.sleep(1)
-            msg = get_bank_menu_text(game, False)
-            keyboard = get_bank_keyboard(False)
-            await query.edit_message_text(msg, reply_markup=keyboard, parse_mode="Markdown")
             return
         
         # ======== میو و زندان ========
@@ -3557,6 +3576,12 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not new_name:
                 await query.edit_message_text("❌ *خطا در تغییر اسم*", parse_mode="Markdown")
                 return
+            
+            # ======== پاک‌سازی اسم ========
+            new_name = new_name.strip()
+            new_name = " ".join(new_name.split())
+            logger.info(f"📝 اسم جدید هاپو (پاک شده): '{new_name}'")
+            
             hop_point = game._to_int(game.data["hop_point"])
             if hop_point < 750:
                 msg = get_hapo_menu_text(game)
@@ -3568,11 +3593,18 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 )
                 context.user_data["new_hapo_name"] = None
                 return
+            
             old_name = game.data["hapo_name"]
             game.data["hapo_name"] = new_name
             game.data["hop_point"] = str(hop_point - 750)
             game.save_data()
-            await query.edit_message_text(f"✅ *اسم هاپو از «{old_name}» به «{new_name}» تغییر یافت*", parse_mode="Markdown")
+            
+            logger.info(f"✅ اسم هاپو از '{old_name}' به '{new_name}' تغییر کرد")
+            
+            await query.edit_message_text(
+                f"✅ *اسم هاپو از «{old_name}» به «{new_name}» تغییر یافت*",
+                parse_mode="Markdown"
+            )
             context.user_data["new_hapo_name"] = None
             await asyncio.sleep(2)
             msg = get_hapo_menu_text(game)
