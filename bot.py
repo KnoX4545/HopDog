@@ -12,9 +12,9 @@ from handlers import (
     jail_user_command, send_street_hapo_notification, admin_street_hapo,
     list_groups, reset_user_command,
     admin_set_street_hapo, admin_add_street_hapo, admin_help,
-    show_rules, show_leaderboard_main, get_game
+    show_rules, show_leaderboard_main
 )
-from utils import parse_amount
+from utils import parse_amount, get_game
 from game_functions import game_manager
 
 logging.basicConfig(
