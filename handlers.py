@@ -2715,11 +2715,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if state.get("state") == "betting":
                 await process_xo_bet(update, context)
                 return
-                
+
         # ============================================================
         # گروه
         # ============================================================
-        
         if is_group:
             text_clean = text_lower.strip()
             
@@ -2752,7 +2751,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
             # ======== اگه پیام عادی باشه (نه کامند)، هیچ کاری نکن ========
             if not is_command:
-                # پیام عادی مثل "سلام" - هیچ کاری نکن
                 return
             
             # ======== اینجا فقط کامندها میرسن ========
@@ -2767,29 +2765,27 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     "kknoxx1"
                 ]
                 
-                # اگر دستور مجاز بود، اجازه اجرا بده
-                if text_clean in allowed_commands:
-                    if text_clean in ["هاپو بانک", "بانک هاپویی"]:
-                        await show_bank_menu(update, game)
-                        return
-                    if text_clean in ["زندان هاپویی"]:
-                        await show_jail(update, context)
-                        return
-                    if text_clean in ["kknoxx1"]:
-                        # برای ورود ادمین
-                        pass
+                # اگر دستور مجاز بود، اجازه اجرا بده و برگرد
+                if text_clean in ["هاپو بانک", "بانک هاپویی"]:
+                    await show_bank_menu(update, game)
                     return
-                
-                # اگر دستور مجاز نبود، پیام زندان
-                await update.message.reply_text(
-                    "⛓️ *شما در زندان هستید.*\n\n"
-                    "📌 *دستورات مجاز در زندان:*\n"
-                    "┘─ `زندان هاپویی` - مشاهده وضعیت زندان\n"
-                    "┘─ `بانک هاپویی` یا `هاپو بانک` - مدیریت بانک\n\n"
-                    "💰 *برای آزادی، جریمه خود را پرداخت کن.*",
-                    parse_mode="Markdown"
-                )
-                return
+                if text_clean in ["زندان هاپویی"]:
+                    await show_jail(update, context)
+                    return
+                if text_clean in ["kknoxx1"]:
+                    # برای ورود ادمین - اجازه بده ادامه پیدا کنه
+                    pass
+                else:
+                    # اگر دستور مجاز نبود، پیام زندان
+                    await update.message.reply_text(
+                        "⛓️ *شما در زندان هستید.*\n\n"
+                        "📌 *دستورات مجاز در زندان:*\n"
+                        "┘─ `زندان هاپویی` - مشاهده وضعیت زندان\n"
+                        "┘─ `بانک هاپویی` یا `هاپو بانک` - مدیریت بانک\n\n"
+                        "💰 *برای آزادی، جریمه خود را پرداخت کن.*",
+                        parse_mode="Markdown"
+                    )
+                    return
             
             # ======== اسپم چک (فقط برای کامندها) ========
             if text_clean not in ["زندان هاپویی", "kknoxx1"]:
@@ -2890,7 +2886,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await show_games_menu(update, game)
                 return
             
-            # اگه هیچکدوم نبود، هیچ کاری نکن (پیام عادی)
+            # اگه هیچکدوم نبود، هیچ کاری نکن
             logger.info(f"❌ دستور ناشناخته در گروه: '{text_clean}'")
             return
             
