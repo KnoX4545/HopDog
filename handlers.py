@@ -2715,10 +2715,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if state.get("state") == "betting":
                 await process_xo_bet(update, context)
                 return
-        
+                
         # ============================================================
         # گروه
         # ============================================================
+        
         if is_group:
             text_clean = text_lower.strip()
             
@@ -2749,23 +2750,14 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 text_clean.startswith("انتقالهاپویی")
             )
             
-            # ======== فقط اگر پیام یک کامند باشه، اسپم چک کن ========
-            # (اگه پیام عادی باشه، اسپم چک نمیشه)
-            if is_command and text_clean not in ["زندان هاپویی", "kknoxx1"]:
-                if check_spam(user_id):
-                    game.jail_user(JAIL_REASON_SPAM, JAIL_DURATION_SPAM, JAIL_FINE_SPAM)
-                    await update.message.reply_text(
-                        f"🚨 *شما به دلیل اسپم در کامندها به زندان فرستاده شدید!*\n"
-                        f"⏳ *مدت حبس:* 15 دقیقه\n"
-                        f"🏦 *جریمه:* {format_number(JAIL_FINE_SPAM)} 🪙\n\n"
-                        f"💡 *دستورات مجاز در زندان:*\n"
-                        f"┘─ `زندان هاپویی` - مشاهده وضعیت زندان\n"
-                        f"┘─ `بانک هاپویی` یا `هاپو بانک` - مدیریت بانک",
-                        parse_mode="Markdown"
-                    )
-                    return
+            # ======== اگه پیام عادی باشه (نه کامند)، هیچ کاری نکن ========
+            if not is_command:
+                # پیام عادی مثل "سلام" - هیچ کاری نکن
+                return
             
-            # ======== بررسی زندان (با استثنا برای دستورات مجاز) ========
+            # ======== اینجا فقط کامندها میرسن ========
+            
+            # ======== بررسی زندان برای کامندها ========
             if game.is_jailed():
                 # دستوراتی که حتی در زندان هم کار میکنن
                 allowed_commands = [
@@ -2799,8 +2791,23 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 )
                 return
             
+            # ======== اسپم چک (فقط برای کامندها) ========
+            if text_clean not in ["زندان هاپویی", "kknoxx1"]:
+                if check_spam(user_id):
+                    game.jail_user(JAIL_REASON_SPAM, JAIL_DURATION_SPAM, JAIL_FINE_SPAM)
+                    await update.message.reply_text(
+                        f"🚨 *شما به دلیل اسپم در کامندها به زندان فرستاده شدید!*\n"
+                        f"⏳ *مدت حبس:* 15 دقیقه\n"
+                        f"🏦 *جریمه:* {format_number(JAIL_FINE_SPAM)} 🪙\n\n"
+                        f"💡 *دستورات مجاز در زندان:*\n"
+                        f"┘─ `زندان هاپویی` - مشاهده وضعیت زندان\n"
+                        f"┘─ `بانک هاپویی` یا `هاپو بانک` - مدیریت بانک",
+                        parse_mode="Markdown"
+                    )
+                    return
+            
             # ======== ادامه پردازش کامندها ========
-            logger.info(f"📩 گروه - پردازش: '{text_clean}' از {user_id}")
+            logger.info(f"📩 گروه - پردازش کامند: '{text_clean}' از {user_id}")
             
             # زندان
             if text_clean in ["زندان هاپویی"]:
@@ -2886,7 +2893,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             # اگه هیچکدوم نبود، هیچ کاری نکن (پیام عادی)
             logger.info(f"❌ دستور ناشناخته در گروه: '{text_clean}'")
             return
-        
+            
         # ======== پیوی ========
         if is_private:
             if text_lower in ["start", "/start"]:
