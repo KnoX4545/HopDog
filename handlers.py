@@ -45,7 +45,7 @@ from academy import (
     ACADEMY_HAPO, ACADEMY_HUNT, ACADEMY_BANK, ACADEMY_TRANSFER, ACADEMY_JAIL, ACADEMY_STREET_HAPO,
     ACADEMY_HOP, ACADEMY_POINTS, ACADEMY_EXP, ACADEMY_PROFILE,
     ACADEMY_FRIDGE, ACADEMY_SMUGGLE, ACADEMY_LEADERBOARD,
-    ACADEMY_GAMES, ACADEMY_GAMES_XO, ACADEMY_GAMES_MENU,
+    ACADEMY_GAMES_XO, ACADEMY_GAMES_MENU,
     show_academy_main, show_academy_system_menu, show_academy_features_menu,
     show_academy_adventure_menu, show_academy_games_menu, show_academy_game_xo,
     show_academy_system_pages, show_academy_animals_pages, show_academy_claw_pages,
