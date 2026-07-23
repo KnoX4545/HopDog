@@ -1,6 +1,25 @@
 # utils.py - توابع کمکی عمومی
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+from game import HopDogGame
+
+
+# ================================================================
+# دیکشنری user_games (برای ذخیره نمونه‌های بازی)
+# ================================================================
+
+user_games = {}
+
+
+# ================================================================
+# توابع کمکی
+# ================================================================
+
+def get_game(user_id, username=""):
+    """دریافت یا ایجاد نمونه بازی برای کاربر"""
+    if user_id not in user_games:
+        user_games[user_id] = HopDogGame(user_id, username)
+    return user_games[user_id]
 
 
 def parse_amount(text):
