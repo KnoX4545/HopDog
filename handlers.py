@@ -56,6 +56,7 @@ from academy import (
 # Import بازی‌ها (با GAME_XO_STATE)
 # ================================================================
 
+from utils import parse_amount, get_confirm_keyboard
 from game_functions import game_manager
 from game_handlers import (
     show_games_menu, show_xo_main, handle_xo_set_bet, process_xo_bet,
@@ -81,51 +82,6 @@ logging.basicConfig(
     level=logging.INFO
 )
 logger = logging.getLogger(__name__)
-
-
-# ================================================================
-# تابع parse_amount - تبدیل اختصارات اعداد
-# ================================================================
-
-def parse_amount(text):
-    """تبدیل اختصارات اعداد به عدد واقعی
-    مثال: 1k → 1000, 1m → 1000000, 1.5k → 1500
-    عدد عادی مثل 1000 هم کار میکنه
-    """
-    text = str(text).strip().lower().replace(",", "").replace(" ", "")
-    
-    # تشخیص اختصارات
-    if text.endswith("k"):
-        try:
-            num = float(text[:-1])
-            return int(num * 1000)
-        except:
-            return None
-    elif text.endswith("m"):
-        try:
-            num = float(text[:-1])
-            return int(num * 1000000)
-        except:
-            return None
-    elif text.endswith("کا"):
-        try:
-            num = float(text.replace("کا", ""))
-            return int(num * 1000)
-        except:
-            return None
-    elif text.endswith("میل"):
-        try:
-            num = float(text.replace("میل", ""))
-            return int(num * 1000000)
-        except:
-            return None
-    else:
-        # عدد عادی
-        try:
-            return int(float(text))
-        except:
-            return None
-
 
 # ================================================================
 # توابع کمکی
@@ -158,13 +114,6 @@ def get_user_link(user_id, username, full_name):
         return f"@{username}"
     else:
         return f"[{display_name}](tg://user?id={user_id})"
-
-
-def get_confirm_keyboard(callback_data_yes, callback_data_no):
-    return InlineKeyboardMarkup([
-        [InlineKeyboardButton("✅ بله", callback_data=callback_data_yes),
-         InlineKeyboardButton("❌ نه", callback_data=callback_data_no)]
-    ])
 
 
 def get_hapo_menu_keyboard(game):
