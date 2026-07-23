@@ -1,4 +1,4 @@
-# database.py - نسخه کامل با ستون‌های یخچال، قاچاق، لیدربرد و آمار گروه
+# database.py - نسخه کامل با اصلاح یخچال
 
 import json
 import logging
@@ -26,7 +26,7 @@ def get_user_data(user_id):
         if response.data and len(response.data) > 0:
             data = response.data[0]
             
-            # تبدیل JSON فیلدها با try/except
+            # ======== تبدیل JSON فیلدها ========
             json_fields = [
                 "current_hunt_animal", 
                 "bank_transactions", 
@@ -39,15 +39,33 @@ def get_user_data(user_id):
                     try:
                         if isinstance(data[field], str):
                             data[field] = json.loads(data[field])
-                    except:
-                        if field in ["bank_transactions", "jail_voted", "fridge_items"]:
-                            data[field] = []
+                        elif isinstance(data[field], (list, dict)):
+                            pass  # قبلاً JSON هست
                         else:
+                            if field == "fridge_items":
+                                data[field] = []
+                            elif field == "current_hunt_animal":
+                                data[field] = None
+                            else:
+                                data[field] = []
+                    except Exception as e:
+                        logger.warning(f"Error parsing {field}: {e}")
+                        if field == "fridge_items":
+                            data[field] = []
+                        elif field == "current_hunt_animal":
                             data[field] = None
-                elif field in ["bank_transactions", "jail_voted", "fridge_items"]:
-                    data[field] = []
+                        else:
+                            data[field] = []
+                else:
+                    # فیلد خالی یا وجود نداره
+                    if field == "fridge_items":
+                        data[field] = []
+                    elif field == "current_hunt_animal":
+                        data[field] = None
+                    else:
+                        data[field] = []
             
-            # فیلدهای پیش‌فرض
+            # ======== فیلدهای پیش‌فرض ========
             defaults = {
                 "bank_card_number": "",
                 "jail_admin_id": None,
@@ -72,7 +90,7 @@ def get_user_data(user_id):
                 if key not in data:
                     data[key] = default
             
-            # چک کردن خودکار آزادی از زندان
+            # ======== چک خودکار آزادی از زندان ========
             if data.get("jailed", False):
                 now = datetime.now().timestamp()
                 try:
@@ -100,13 +118,13 @@ def save_user_data(user_id, data):
     try:
         data_to_save = {**data}
         
-        # حذف فیلدهای اضافی
+        # ======== حذف فیلدهای اضافی ========
         if "created_at" in data_to_save:
             del data_to_save["created_at"]
         if "last_updated" in data_to_save:
             del data_to_save["last_updated"]
         
-        # تبدیل JSON فیلدها به string
+        # ======== تبدیل JSON فیلدها به string ========
         json_fields = ["current_hunt_animal", "bank_transactions", "jail_voted", "fridge_items"]
         for field in json_fields:
             if field in data_to_save:
@@ -116,9 +134,21 @@ def save_user_data(user_id, data):
                     else:
                         data_to_save[field] = "[]"
                 elif isinstance(data_to_save[field], (dict, list)):
-                    data_to_save[field] = json.dumps(data_to_save[field])
+                    # ======== تبدیل به JSON string ========
+                    try:
+                        data_to_save[field] = json.dumps(data_to_save[field], ensure_ascii=False)
+                    except Exception as e:
+                        logger.error(f"Error serializing {field}: {e}")
+                        if field == "current_hunt_animal":
+                            data_to_save[field] = None
+                        else:
+                            data_to_save[field] = "[]"
                 elif isinstance(data_to_save[field], str):
-                    pass
+                    # اگه قبلاً string هست، بررسی کن که JSON معتبر هست یا نه
+                    if field == "fridge_items" and data_to_save[field] == "":
+                        data_to_save[field] = "[]"
+                    elif field == "current_hunt_animal" and data_to_save[field] == "":
+                        data_to_save[field] = None
                 else:
                     if field == "current_hunt_animal":
                         data_to_save[field] = None
@@ -163,13 +193,15 @@ def save_user_data(user_id, data):
         data_to_save["last_updated"] = datetime.now().isoformat()
         data_to_save["user_id"] = str(user_id)
         
-        logger.info(f"💾 Saving user {user_id}")
+        logger.info(f"💾 Saving user {user_id} - fridge_items: {data_to_save.get('fridge_items', '[]')[:100]}")
         
         response = supabase.table("users").upsert(data_to_save).execute()
         return True
         
     except Exception as e:
         logger.error(f"❌ Error saving user {user_id}: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
         return False
 
 
@@ -215,7 +247,7 @@ def is_card_unique(card_number):
 
 
 # ================================================================
-# توابع گروه - کامل با ستون‌های جدید
+# توابع گروه
 # ================================================================
 
 def add_group(chat_id, title):
