@@ -2,34 +2,45 @@
 
 import os
 from datetime import timedelta
+from typing import Dict, Any
 
 # ================================================================
-# تنظیمات اولیه
+# تنظیمات اولیه (از متغیرهای محیطی)
 # ================================================================
 
 TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "9061")
 
 if not TOKEN:
-    raise ValueError("TELEGRAM_BOT_TOKEN not set")
+    raise ValueError("❌ TELEGRAM_BOT_TOKEN not set")
 if not SUPABASE_URL or not SUPABASE_KEY:
-    raise ValueError("SUPABASE_URL and SUPABASE_KEY must be set")
+    raise ValueError("❌ SUPABASE_URL and SUPABASE_KEY must be set")
 
 # ================================================================
-# تنظیمات Webhook (برای Railway)
+# تنظیمات Webhook (برای Railway/Heroku)
 # ================================================================
 
 WEBHOOK_PORT = int(os.environ.get("PORT", 8443))
 WEBHOOK_URL = os.environ.get("RAILWAY_STATIC_URL", "")
-
 USE_WEBHOOK = bool(WEBHOOK_URL)
+
+# ================================================================
+# تنظیمات بات
+# ================================================================
+
+BOT_NAME = "هاپویی"
+BOT_USERNAME = "HopDogQ"
+BOT_VERSION = "2.0.0"
+BOT_SUPPORT = "@KnoX33"
+BOT_CHANNEL = "@HopDogQ"
 
 # ================================================================
 # داده‌های ثابت سطح کاربران
 # ================================================================
 
-LEVEL_DATA = {
+LEVEL_DATA: Dict[int, Dict[str, Any]] = {
     1: {"required": 0, "minPoints": 5, "maxPoints": 15, "cooldown": 300, "reward": 0, "features": ["شروع ماجراجویی"]},
     2: {"required": 5, "minPoints": 10, "maxPoints": 20, "cooldown": 300, "reward": 50, "features": ["پنجه", "شکار", "دریافت هاپو پوینت"]},
     3: {"required": 15, "minPoints": 15, "maxPoints": 25, "cooldown": 300, "reward": 225, "features": ["هاپو", "انتقال هاپویی"]},
@@ -51,16 +62,23 @@ LEVEL_DATA = {
     19: {"required": 2550, "minPoints": 350, "maxPoints": 625, "cooldown": 285, "reward": 27250, "features": ["ارتقا بیشتر"]},
     20: {"required": 2900, "minPoints": 375, "maxPoints": 675, "cooldown": 280, "reward": 30500, "features": ["نهایی"]},
 }
+
 MAX_LEVEL = 20
+MIN_LEVEL = 1
 
 # ================================================================
-# سیستم هاپو - کامل
+# سیستم هاپو
 # ================================================================
 
-# اسامی هاپو (تصادفی)
-HAPO_NAMES = ['رکس', 'لوسی', 'بارنی', 'مکس', 'بلا', 'چارلی', 'راکی', 'مولی', 'تدی', 'لونا', 'سیمبا', 'نلا', 'بادی', 'مایلو', 'کوکو', 'روبی', 'اسکار', 'جک', 'دِیزی', 'تایسون']
+# اسامی تصادفی هاپو
+HAPO_NAMES = [
+    'رکس', 'لوسی', 'بارنی', 'مکس', 'بلا', 'چارلی', 'راکی', 'مولی', 
+    'تدی', 'لونا', 'سیمبا', 'نلا', 'بادی', 'مایلو', 'کوکو', 'روبی', 
+    'اسکار', 'جک', 'دِیزی', 'تایسون', 'برونو', 'زئوس', 'آتنا', 
+    'هرکول', 'آپولو', 'آرتمیس', 'هستیا', 'دمیتر', 'آفرودیت'
+]
 
-# اسامی مقام‌ها با عدد داخل پرانتز
+# اسامی مقام‌ها
 RANK_NAMES = [
     "تازه‌وارد (0)",   # Rank 0 - سقف سطح 5
     "حرفه‌ای (1)",     # Rank 1 - سقف سطح 10
@@ -69,11 +87,13 @@ RANK_NAMES = [
     "بی‌نهایت (4)"     # Rank 4 - سقف سطح 25
 ]
 
+MAX_RANK = 4
+
 # هزینه ارتقا مقام (از مقام 0 به 1، 1 به 2، 2 به 3، 3 به 4)
 RANK_UP_PRICES = [15000, 150000, 1500000, 15000000]
 
 # ظرفیت هاپو بر اساس سطح کل (1 تا 25)
-HAPO_CAPACITY = {
+HAPO_CAPACITY: Dict[int, int] = {
     1: 500, 2: 5000, 3: 10000, 4: 15000, 5: 20000,
     6: 25000, 7: 30000, 8: 35000, 9: 40000, 10: 50000,
     11: 70000, 12: 90000, 13: 110000, 14: 130000, 15: 150000,
@@ -82,7 +102,7 @@ HAPO_CAPACITY = {
 }
 
 # تولید هاپو در ثانیه بر اساس سطح کل (1 تا 25)
-HAPO_PRODUCTION = {
+HAPO_PRODUCTION: Dict[int, float] = {
     1: 0.1, 2: 0.2, 3: 1.0, 4: 1.5, 5: 2.0,
     6: 2.5, 7: 3.0, 8: 3.5, 9: 4.0, 10: 4.5,
     11: 5.0, 12: 5.5, 13: 6.0, 14: 6.5, 15: 7.0,
@@ -90,11 +110,8 @@ HAPO_PRODUCTION = {
     21: 10.0, 22: 10.5, 23: 11.0, 24: 11.5, 25: 12.0
 }
 
-# ================================================================
-# هزینه ارتقا سطح هاپو (مستقل از مقام) - فقط 1 تا 20
-# ================================================================
-
-HAPO_LEVEL_PRICES = {
+# هزینه ارتقا سطح هاپو (سطح 1 → 2, 2 → 3, ...)
+HAPO_LEVEL_PRICES: Dict[int, int] = {
     1: 250,      # سطح 1 → 2
     2: 500,      # سطح 2 → 3
     3: 5000,     # سطح 3 → 4
@@ -116,11 +133,15 @@ HAPO_LEVEL_PRICES = {
     19: 20000000, # سطح 19 → 20
 }
 
+HAPO_PURCHASE_COST = 300
+HAPO_RENAME_COST = 750
+HAPO_MAX_TOTAL_LEVEL = 20
+
 # ================================================================
 # سیستم پنجه و شکار
 # ================================================================
 
-CLAW_DATA = {
+CLAW_DATA: Dict[int, Dict[str, Any]] = {
     1: {"cost": 500, "cooldown": 60, "common": 95, "uncommon": 5, "epic": 0, "legendary": 0},
     2: {"cost": 5000, "cooldown": 55, "common": 80, "uncommon": 15, "epic": 5, "legendary": 0},
     3: {"cost": 25000, "cooldown": 50, "common": 60, "uncommon": 25, "epic": 10, "legendary": 5},
@@ -129,13 +150,13 @@ CLAW_DATA = {
     6: {"cost": 1000000, "cooldown": 35, "common": 10, "uncommon": 30, "epic": 40, "legendary": 20},
     7: {"cost": 3250000, "cooldown": 30, "common": 5, "uncommon": 25, "epic": 45, "legendary": 25},
 }
+
 MAX_CLAW_LEVEL = 7
+CLAW_REQUIRED_LEVEL = 2
+HUNT_REQUIRED_LEVEL = 2
 
-# ================================================================
 # عکس‌های پنجه (هر سطح)
-# ================================================================
-
-CLAW_IMAGES = {
+CLAW_IMAGES: Dict[int, str] = {
     1: "https://raw.githubusercontent.com/KnoX4545/HopDog/main/claw_1.jpg",
     2: "https://raw.githubusercontent.com/KnoX4545/HopDog/main/claw_2.jpg",
     3: "https://raw.githubusercontent.com/KnoX4545/HopDog/main/claw_3.jpg",
@@ -149,7 +170,7 @@ CLAW_IMAGES = {
 # حیوانات شکار
 # ================================================================
 
-ANIMALS = {
+ANIMALS: Dict[str, List[Dict[str, Any]]] = {
     "common": [
         {"name": "خرگوش", "emoji": "🐇", "weightMin": 0.25, "weightMax": 0.50, "multiplier": 80, "nutrition": 1},
         {"name": "سنجاب", "emoji": "🐿️", "weightMin": 0.50, "weightMax": 0.99, "multiplier": 60, "nutrition": 1},
@@ -176,6 +197,9 @@ ANIMALS = {
 
 RARITY_NAMES = {"common": "معمولی", "uncommon": "کمیاب", "epic": "حماسی", "legendary": "افسانه‌ای"}
 RARITY_COLORS = {"common": "⚪", "uncommon": "🔵", "epic": "🟣", "legendary": "🟡"}
+RARITY_EMOJIS = {"common": "⬜", "uncommon": "🟦", "epic": "🟪", "legendary": "⭐"}
+
+HUNT_DECISION_TIMER = 60
 
 # ================================================================
 # تنظیمات بانک
@@ -183,10 +207,12 @@ RARITY_COLORS = {"common": "⚪", "uncommon": "🔵", "epic": "🟣", "legendary
 
 BANK_REQUIRED_LEVEL = 4
 BANK_PURCHASE_COST = 5000
-BANK_INTEREST_RATE = 0.03
+BANK_INTEREST_RATE = 0.03  # 3%
 BANK_MAX_DAILY_INTEREST = 350000
-BANK_INTEREST_HOUR = 6
+BANK_INTEREST_HOUR = 6  # ساعت 6 صبح
 BANK_ACCOUNT_CHANGE_COST = 1250
+BANK_MIN_TRANSFER = 100
+BANK_MAX_TRANSFER = 1000000
 
 # ================================================================
 # تنظیمات انتقال هاپویی
@@ -194,9 +220,10 @@ BANK_ACCOUNT_CHANGE_COST = 1250
 
 TRANSFER_MIN_AMOUNT = 50
 TRANSFER_MAX_AMOUNT = 500000
-TRANSFER_COOLDOWN = 30
+TRANSFER_COOLDOWN = 300  # 5 دقیقه به ثانیه
 TRANSFER_MIN_LEVEL_SENDER = 3
 TRANSFER_MIN_LEVEL_RECEIVER = 2
+TRANSFER_MAX_DAILY = 10  # حداکثر ۱۰ انتقال در روز
 
 # ================================================================
 # تنظیمات زندان
@@ -205,26 +232,30 @@ TRANSFER_MIN_LEVEL_RECEIVER = 2
 JAIL_REASON_SPAM = "اسپم"
 JAIL_REASON_MEOW = "میو میو (گربه بی ادب)"
 JAIL_REASON_SMUGGLE = "قاچاق هاپویی ناموفق"
-JAIL_DURATION_SPAM = 15 * 60
-JAIL_DURATION_MEOW = 5 * 60
-JAIL_DURATION_SMUGGLE = 40 * 60
+JAIL_REASON_ADMIN = "توسط ادمین"
+
+JAIL_DURATION_SPAM = 15 * 60  # 15 دقیقه
+JAIL_DURATION_MEOW = 5 * 60   # 5 دقیقه
+JAIL_DURATION_SMUGGLE = 40 * 60  # 40 دقیقه
+
 JAIL_FINE_SPAM = 3750
 JAIL_FINE_MEOW = 1250
 JAIL_FINE_SMUGGLE = 5000
+
 JAIL_MAX_SPAM_COMMANDS = 5
-JAIL_SPAM_WINDOW = 10
-JAIL_VOTE_DURATION = 60
+JAIL_SPAM_WINDOW = 10  # 10 ثانیه
+JAIL_VOTE_DURATION = 60  # 60 ثانیه
 JAIL_VOTE_NEEDED = 3
-JAIL_MEOW_COOLDOWN = 60
+JAIL_MEOW_COOLDOWN = 60  # 60 ثانیه بین هر میو
 
 # ================================================================
 # تنظیمات هاپوی خیابونی
 # ================================================================
 
-STREET_HAPO_INTERVAL = 6 * 3600
-STREET_HAPO_DECISION_TIME = 60
+STREET_HAPO_INTERVAL = 6 * 3600  # هر ۶ ساعت
+STREET_HAPO_DECISION_TIME = 60  # ۶۰ ثانیه
 STREET_HAPO_MAX_ATTEMPTS = 3
-STREET_HAPO_SUCCESS_CHANCE = 0.30
+STREET_HAPO_SUCCESS_CHANCE = 0.30  # ۳۰٪
 
 STREET_HAPO_COSTS = [50, 75, 100]
 
@@ -236,7 +267,9 @@ STREET_HAPO_FAIL_MESSAGES = [
     "{name} باعث شد هاپوی خیابونی زیر برف از سرما یخ بزنه ❄️",
     "{name} هاپوی خیابونی رو ترسوند و باعث شد بمیره 😱",
     "هاپوی خیابونی مرد، فقط مرد بدون هیچ دلیلی 🖤",
-    "{name} باعث شد با یک گربه وحشی درگیر بشه و بمیره 🐱⚔️"
+    "{name} باعث شد با یک گربه وحشی درگیر بشه و بمیره 🐱⚔️",
+    "{name} هاپوی خیابونی رو با سرعت زیاد ترسوند 🏃‍♂️💨",
+    "هاپوی خیابونی با نگاه {name} ترسید و قلبش ایستاد 💀"
 ]
 
 STREET_HAPO_IMAGE_URL = "https://raw.githubusercontent.com/KnoX4545/HopDog/main/street_hapo.jpg"
@@ -248,22 +281,26 @@ STREET_HAPO_IMAGE_URL = "https://raw.githubusercontent.com/KnoX4545/HopDog/main/
 FRIDGE_REQUIRED_LEVEL = 5
 FRIDGE_PURCHASE_COST = 32000
 FRIDGE_MAX_LEVEL = 5
-FRIDGE_CAPACITY = {
+FRIDGE_COOK_TIME_MULTIPLIER = 100  # وزن * 100 = زمان پخت به ثانیه
+
+FRIDGE_CAPACITY: Dict[int, int] = {
     1: 1,
     2: 2,
     3: 3,
     4: 4,
     5: 5
 }
-FRIDGE_UPGRADE_COSTS = {
-    1: 0,
-    2: 195000,
-    3: 415000,
-    4: 750000,
-    5: 1200000
+
+FRIDGE_UPGRADE_COSTS: Dict[int, int] = {
+    1: 0,        # سطح 1 (خرید)
+    2: 195000,   # سطح 1 → 2
+    3: 415000,   # سطح 2 → 3
+    4: 750000,   # سطح 3 → 4
+    5: 1200000,  # سطح 4 → 5
 }
-FRIDGE_COOK_MULTIPLIER_SELL = 10
-FRIDGE_COOK_MULTIPLIER_FOOD = 2
+
+FRIDGE_COOK_MULTIPLIER_SELL = 10   # ۱۰ برابر قیمت فروش
+FRIDGE_COOK_MULTIPLIER_FOOD = 2    # ۲ برابر ارزش غذایی
 
 # ================================================================
 # تنظیمات قاچاق هاپویی
@@ -272,27 +309,27 @@ FRIDGE_COOK_MULTIPLIER_FOOD = 2
 SMUGGLE_REQUIRED_LEVEL = 6
 SMUGGLE_MIN_HAPO = 3
 SMUGGLE_MAX_HAPO = 15
-SMUGGLE_TIME_PER_HAPO = 1200  # 20 دقیقه به ثانیه
+SMUGGLE_TIME_PER_HAPO = 1200  # ۲۰ دقیقه به ثانیه
 SMUGGLE_REWARD_MIN = 12500
 SMUGGLE_REWARD_MAX = 24000
-SMUGGLE_JAIL_DURATION = 40 * 60
+SMUGGLE_JAIL_DURATION = 40 * 60  # ۴۰ دقیقه
 SMUGGLE_JAIL_FINE = 5000
-SMUGGLE_SUCCESS_CHANCE = 0.60
-SMUGGLE_FAIL_CHANCE = 0.40
+SMUGGLE_SUCCESS_CHANCE = 0.60  # ۶۰٪
+SMUGGLE_FAIL_CHANCE = 0.40  # ۴۰٪
 
 # ================================================================
-# تنظیمات بازی‌ها (جدید)
+# تنظیمات بازی‌ها
 # ================================================================
 
 GAME_REQUIRED_LEVEL = 2
 GAME_HOST_REQUIRED_LEVEL = 3
 GAME_XO_MIN_BET = 50
 GAME_XO_MAX_BET = 1000000
-GAME_TURN_TIMEOUT = 60  # 60 ثانیه
-GAME_COOLDOWN = 120  # 2 دقیقه بین بازی‌ها
+GAME_TURN_TIMEOUT = 60  # ۶۰ ثانیه
+GAME_COOLDOWN = 120  # ۲ دقیقه بین بازی‌ها
 GAME_XO_BOARD_SIZE = 3
 GAME_MAX_ACTIVE_GAMES = 50
-GAME_CLEANUP_DELAY = 300  # 5 دقیقه بعد از پایان بازی
+GAME_CLEANUP_DELAY = 300  # ۵ دقیقه بعد از پایان بازی
 
 # ================================================================
 # تنظیمات لیدربرد
@@ -300,11 +337,111 @@ GAME_CLEANUP_DELAY = 300  # 5 دقیقه بعد از پایان بازی
 
 LEADERBOARD_MAX_USERS = 250
 LEADERBOARD_MAX_GROUPS = 5
+LEADERBOARD_CACHE_TIME = 300  # ۵ دقیقه کش
 
 # ================================================================
-# سایر تنظیمات
+# تنظیمات گروه
 # ================================================================
 
-ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "9061")
-HUNT_DECISION_TIMER = 60
-MIN_MEMBERS_TO_STAY = 5
+MIN_MEMBERS_TO_STAY = 5  # حداقل اعضای گروه برای ماندن بات
+MAX_GROUPS_PER_USER = 10  # حداکثر گروه‌های یک کاربر
+
+# ================================================================
+# تنظیمات دیگر
+# ================================================================
+
+DEFAULT_LANGUAGE = "fa"
+TIMEZONE = "Asia/Tehran"
+
+# محدودیت‌های هاپ
+HOP_MIN_POINTS = 1
+HOP_MAX_POINTS = 1000
+
+# محدودیت‌های تایمر
+MAX_HUNT_TIMER = 300  # ۵ دقیقه
+MAX_COOK_TIMER = 3600  # ۱ ساعت
+MAX_SMUGGLE_TIMER = 4 * 3600  # ۴ ساعت
+
+# ================================================================
+# تنظیمات پیام‌ها
+# ================================================================
+
+MESSAGES = {
+    "welcome": "🐾 *به هاپویی خوش اومدی!* 🐶\n\nبرای شروع، کافیه «هاپ هاپ» بزنی تا هاپو پوینت بگیری!",
+    "help": "📚 *راهنمای هاپویی*\n\nدستورات:\n🐾 هاپ هاپ - گرفتن هاپو پوینت\n📊 هاپوهام - مشاهده پروفایل\n📚 آکادمی - راهنمای کامل",
+    "error": "❌ *خطایی رخ داد!*\nلطفاً دوباره تلاش کنید.",
+    "cooldown": "⏳ *به جیبت استراحت بده!*",
+    "jailed": "⛓️ *شما در زندان هستید!*",
+    "not_enough_points": "❌ *پوینت کافی نیست!*",
+}
+
+# ================================================================
+# تابع بررسی تنظیمات
+# ================================================================
+
+def check_config() -> Dict[str, Any]:
+    """
+    بررسی سلامت تنظیمات
+    
+    Returns:
+        Dict: نتیجه بررسی
+    """
+    issues = []
+    warnings = []
+    
+    # بررسی توکن
+    if not TOKEN or TOKEN == "YOUR_BOT_TOKEN_HERE":
+        issues.append("❌ توکن بات تنظیم نشده است")
+    
+    # بررسی Supabase
+    if not SUPABASE_URL or not SUPABASE_KEY:
+        issues.append("❌ تنظیمات Supabase کامل نیست")
+    
+    # بررسی سطح‌ها
+    if MAX_LEVEL != len(LEVEL_DATA):
+        warnings.append(f"⚠️ MAX_LEVEL ({MAX_LEVEL}) با تعداد سطح‌ها ({len(LEVEL_DATA)}) همخوانی ندارد")
+    
+    # بررسی هزینه‌های هاپو
+    if len(HAPO_LEVEL_PRICES) != MAX_LEVEL - 1:
+        warnings.append(f"⚠️ تعداد هزینه‌های هاپو ({len(HAPO_LEVEL_PRICES)}) با سطح‌ها ({MAX_LEVEL-1}) همخوانی ندارد")
+    
+    # بررسی ظرفیت هاپو
+    if len(HAPO_CAPACITY) != 25:
+        warnings.append(f"⚠️ ظرفیت هاپو فقط برای {len(HAPO_CAPACITY)} سطح تعریف شده (نیاز به 25 سطح)")
+    
+    return {
+        "status": "✅ تنظیمات سالم است" if not issues else "❌ تنظیمات مشکل دارد",
+        "issues": issues,
+        "warnings": warnings,
+        "version": BOT_VERSION,
+        "bot_name": BOT_NAME,
+        "bot_username": BOT_USERNAME
+    }
+
+
+# ================================================================
+# اجرای تست
+# ================================================================
+
+if __name__ == "__main__":
+    print("=" * 60)
+    print("🧪 بررسی تنظیمات هاپویی")
+    print("=" * 60)
+    
+    result = check_config()
+    
+    print(f"\n📊 {result['status']}")
+    print(f"🤖 نام بات: {result['bot_name']}")
+    print(f"🔖 ورژن: {result['version']}")
+    
+    if result['issues']:
+        print("\n❌ خطاها:")
+        for issue in result['issues']:
+            print(f"  {issue}")
+    
+    if result['warnings']:
+        print("\n⚠️ هشدارها:")
+        for warning in result['warnings']:
+            print(f"  {warning}")
+    
+    print("\n✅ همه تنظیمات بارگذاری شدند!")
