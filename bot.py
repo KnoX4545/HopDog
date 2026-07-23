@@ -1,4 +1,4 @@
-# bot.py - فایل اصلی (نسخه کامل با هندلرهای ادمین و بازی‌ها)
+# bot.py - فایل اصلی (نسخه کامل با اصلاحات)
 
 import logging
 import os
@@ -14,7 +14,7 @@ from handlers import (
     admin_set_street_hapo, admin_add_street_hapo, admin_help,
     show_rules, show_leaderboard_main
 )
-from utils import parse_amount, get_game
+from utils import get_game, parse_amount
 from game_functions import game_manager
 
 logging.basicConfig(
@@ -146,11 +146,14 @@ def main():
     logger.info("🚀 بات آماده اجرا است!")
     logger.info("=" * 50)
     
-        logger.info("🔄 استفاده از Polling")
-        app.run_polling(
-            allowed_updates=Update.ALL_TYPES,
-            drop_pending_updates=True
-        )
+    # ============================================================
+    # فقط از Polling استفاده کن (برای رفع Conflict 409)
+    # ============================================================
+    logger.info("🔄 استفاده از Polling")
+    app.run_polling(
+        allowed_updates=Update.ALL_TYPES,
+        drop_pending_updates=True
+    )
 
 
 if __name__ == "__main__":
