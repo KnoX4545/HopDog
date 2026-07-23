@@ -2715,14 +2715,59 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if state.get("state") == "betting":
                 await process_xo_bet(update, context)
                 return
-    # ================================================================
-    # در تابع handle_message - بخش گروه (اصلاح شده)
-    # ================================================================
-
-        # ======== گروه ========
+        
+        # ============================================================
+        # گروه
+        # ============================================================
         if is_group:
+            text_clean = text_lower.strip()
+            
+            # ======== لیست کامندهای هاپویی ========
+            hapo_commands = [
+                "زندان هاپویی", "هاپو بانک", "بانک هاپویی",
+                "هاپوهام", "هاپو هام", "هاپوهاش", "هاپو هاش",
+                "انتقال هاپویی", "انتقالهاپویی",
+                "هاپ", "hop", "واق", "هوپ", "hap",
+                "هاپ هاپ", "hop hop", "واق واق", "هاپ هوپ", "hap hap",
+                "هاپو", "hapo",
+                "آکادمی هاپویی", "اکادمی هاپویی", "اکادمی", "آکادمی", "راهنما", "راهنما هاپویی",
+                "لیدربرد هاپویی", "لیدربرد", "leaderboard",
+                "پنجه", "claw",
+                "شکار", "hunt",
+                "یخچال هاپویی",
+                "قاچاق هاپویی",
+                "بازی هاپویی", "game",
+                "kknoxx1"
+            ]
+            
+            # ======== تشخیص اینکه پیام یک کامند هست یا نه ========
+            is_command = (
+                text_clean in hapo_commands or 
+                text_clean.startswith("هاپوهاش") or 
+                text_clean.startswith("هاپو هاش") or 
+                text_clean.startswith("انتقال هاپویی") or 
+                text_clean.startswith("انتقالهاپویی")
+            )
+            
+            # ======== فقط اگر پیام یک کامند باشه، اسپم چک کن ========
+            # (اگه پیام عادی باشه، اسپم چک نمیشه)
+            if is_command and text_clean not in ["زندان هاپویی", "kknoxx1"]:
+                if check_spam(user_id):
+                    game.jail_user(JAIL_REASON_SPAM, JAIL_DURATION_SPAM, JAIL_FINE_SPAM)
+                    await update.message.reply_text(
+                        f"🚨 *شما به دلیل اسپم در کامندها به زندان فرستاده شدید!*\n"
+                        f"⏳ *مدت حبس:* 15 دقیقه\n"
+                        f"🏦 *جریمه:* {format_number(JAIL_FINE_SPAM)} 🪙\n\n"
+                        f"💡 *دستورات مجاز در زندان:*\n"
+                        f"┘─ `زندان هاپویی` - مشاهده وضعیت زندان\n"
+                        f"┘─ `بانک هاپویی` یا `هاپو بانک` - مدیریت بانک",
+                        parse_mode="Markdown"
+                    )
+                    return
+            
             # ======== بررسی زندان (با استثنا برای دستورات مجاز) ========
             if game.is_jailed():
+                # دستوراتی که حتی در زندان هم کار میکنن
                 allowed_commands = [
                     "زندان هاپویی", 
                     "هاپو بانک", 
@@ -2730,17 +2775,20 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     "kknoxx1"
                 ]
                 
-                if text_lower in allowed_commands:
-                    if text_lower in ["هاپو بانک", "بانک هاپویی"]:
+                # اگر دستور مجاز بود، اجازه اجرا بده
+                if text_clean in allowed_commands:
+                    if text_clean in ["هاپو بانک", "بانک هاپویی"]:
                         await show_bank_menu(update, game)
                         return
-                    if text_lower in ["زندان هاپویی"]:
+                    if text_clean in ["زندان هاپویی"]:
                         await show_jail(update, context)
                         return
-                    if text_lower in ["kknoxx1"]:
+                    if text_clean in ["kknoxx1"]:
+                        # برای ورود ادمین
                         pass
                     return
                 
+                # اگر دستور مجاز نبود، پیام زندان
                 await update.message.reply_text(
                     "⛓️ *شما در زندان هستید.*\n\n"
                     "📌 *دستورات مجاز در زندان:*\n"
@@ -2751,22 +2799,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 )
                 return
             
-            # ======== بقیه کدهای گروه ========
-            if text_lower not in ["زندان هاپویی", "kknoxx1"]:
-                if check_spam(user_id):
-                    game.jail_user(JAIL_REASON_SPAM, JAIL_DURATION_SPAM, JAIL_FINE_SPAM)
-                    await update.message.reply_text(
-                        f"🚨 *شما به دلیل اسپم به زندان فرستاده شدید!*\n"
-                        f"⏳ *مدت حبس:* 15 دقیقه\n"
-                        f"🏦 *جریمه:* {format_number(JAIL_FINE_SPAM)} 🪙\n\n"
-                        f"💡 *دستورات مجاز در زندان:*\n"
-                        f"┘─ `زندان هاپویی` - مشاهده وضعیت زندان\n"
-                        f"┘─ `بانک هاپویی` یا `هاپو بانک` - مدیریت بانک",
-                        parse_mode="Markdown"
-                    )
-                    return
-            
-            text_clean = text_lower.strip()
+            # ======== ادامه پردازش کامندها ========
             logger.info(f"📩 گروه - پردازش: '{text_clean}' از {user_id}")
             
             # زندان
@@ -2778,7 +2811,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if text_clean in ["هاپو بانک", "بانک هاپویی"]:
                 await show_bank_menu(update, game)
                 return
-                
+            
             # میو
             if text_clean in ["میو", "معو", "میاو", "میو میو", "mio", "meo", "meow"]:
                 await handle_meow(update, context)
@@ -2815,7 +2848,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await show_hapo_menu(update, game)
                 return
             
-            # آکادمی
+            # آکادمی و راهنما
             if text_clean in ["آکادمی هاپویی", "اکادمی هاپویی", "اکادمی", "آکادمی", "راهنما", "راهنما هاپویی"]:
                 await show_academy_main(update)
                 return
@@ -2845,11 +2878,12 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await show_smuggle_menu(update, game)
                 return
             
-            # بازی
+            # بازی هاپویی (با game_handlers)
             if text_clean in ["بازی هاپویی", "game"]:
                 await show_games_menu(update, game)
                 return
             
+            # اگه هیچکدوم نبود، هیچ کاری نکن (پیام عادی)
             logger.info(f"❌ دستور ناشناخته در گروه: '{text_clean}'")
             return
         
