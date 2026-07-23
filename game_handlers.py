@@ -9,7 +9,8 @@ from telegram.ext import ContextTypes
 from config import GAME_REQUIRED_LEVEL, GAME_HOST_REQUIRED_LEVEL
 from game_functions import game_manager, get_xo_board_keyboard, get_xo_game_text
 from bank import format_number
-from handlers import parse_amount, get_game, get_confirm_keyboard
+from utils import parse_amount, get_confirm_keyboard 
+from handlers import get_game
 
 logger = logging.getLogger(__name__)
 
