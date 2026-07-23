@@ -1,8 +1,8 @@
-# config.py - تنظیمات و ثابت‌های اصلی (نسخه نهایی کامل)
+# config.py - تنظیمات و ثابت‌های اصلی (نسخه نهایی کامل با اصلاح import)
 
 import os
 from datetime import timedelta
-from typing import Dict, Any
+from typing import Dict, Any, List  # <-- اصلاح شده
 
 # ================================================================
 # تنظیمات اولیه (از متغیرهای محیطی)
@@ -71,7 +71,7 @@ MIN_LEVEL = 1
 # ================================================================
 
 # اسامی تصادفی هاپو
-HAPO_NAMES = [
+HAPO_NAMES: List[str] = [
     'رکس', 'لوسی', 'بارنی', 'مکس', 'بلا', 'چارلی', 'راکی', 'مولی', 
     'تدی', 'لونا', 'سیمبا', 'نلا', 'بادی', 'مایلو', 'کوکو', 'روبی', 
     'اسکار', 'جک', 'دِیزی', 'تایسون', 'برونو', 'زئوس', 'آتنا', 
@@ -79,7 +79,7 @@ HAPO_NAMES = [
 ]
 
 # اسامی مقام‌ها
-RANK_NAMES = [
+RANK_NAMES: List[str] = [
     "تازه‌وارد (0)",   # Rank 0 - سقف سطح 5
     "حرفه‌ای (1)",     # Rank 1 - سقف سطح 10
     "استاد (2)",       # Rank 2 - سقف سطح 15
@@ -90,7 +90,7 @@ RANK_NAMES = [
 MAX_RANK = 4
 
 # هزینه ارتقا مقام (از مقام 0 به 1، 1 به 2، 2 به 3، 3 به 4)
-RANK_UP_PRICES = [15000, 150000, 1500000, 15000000]
+RANK_UP_PRICES: List[int] = [15000, 150000, 1500000, 15000000]
 
 # ظرفیت هاپو بر اساس سطح کل (1 تا 25)
 HAPO_CAPACITY: Dict[int, int] = {
@@ -195,9 +195,9 @@ ANIMALS: Dict[str, List[Dict[str, Any]]] = {
     ]
 }
 
-RARITY_NAMES = {"common": "معمولی", "uncommon": "کمیاب", "epic": "حماسی", "legendary": "افسانه‌ای"}
-RARITY_COLORS = {"common": "⚪", "uncommon": "🔵", "epic": "🟣", "legendary": "🟡"}
-RARITY_EMOJIS = {"common": "⬜", "uncommon": "🟦", "epic": "🟪", "legendary": "⭐"}
+RARITY_NAMES: Dict[str, str] = {"common": "معمولی", "uncommon": "کمیاب", "epic": "حماسی", "legendary": "افسانه‌ای"}
+RARITY_COLORS: Dict[str, str] = {"common": "⚪", "uncommon": "🔵", "epic": "🟣", "legendary": "🟡"}
+RARITY_EMOJIS: Dict[str, str] = {"common": "⬜", "uncommon": "🟦", "epic": "🟪", "legendary": "⭐"}
 
 HUNT_DECISION_TIMER = 60
 
@@ -257,12 +257,12 @@ STREET_HAPO_DECISION_TIME = 60  # ۶۰ ثانیه
 STREET_HAPO_MAX_ATTEMPTS = 3
 STREET_HAPO_SUCCESS_CHANCE = 0.30  # ۳۰٪
 
-STREET_HAPO_COSTS = [50, 75, 100]
+STREET_HAPO_COSTS: List[int] = [50, 75, 100]
 
 STREET_HAPO_REWARD_MIN = 500
 STREET_HAPO_REWARD_MAX = 999
 
-STREET_HAPO_FAIL_MESSAGES = [
+STREET_HAPO_FAIL_MESSAGES: List[str] = [
     "{name} باعث شد هاپوی خیابونی از ترس سکته کنه 💔",
     "{name} باعث شد هاپوی خیابونی زیر برف از سرما یخ بزنه ❄️",
     "{name} هاپوی خیابونی رو ترسوند و باعث شد بمیره 😱",
@@ -366,7 +366,7 @@ MAX_SMUGGLE_TIMER = 4 * 3600  # ۴ ساعت
 # تنظیمات پیام‌ها
 # ================================================================
 
-MESSAGES = {
+MESSAGES: Dict[str, str] = {
     "welcome": "🐾 *به هاپویی خوش اومدی!* 🐶\n\nبرای شروع، کافیه «هاپ هاپ» بزنی تا هاپو پوینت بگیری!",
     "help": "📚 *راهنمای هاپویی*\n\nدستورات:\n🐾 هاپ هاپ - گرفتن هاپو پوینت\n📊 هاپوهام - مشاهده پروفایل\n📚 آکادمی - راهنمای کامل",
     "error": "❌ *خطایی رخ داد!*\nلطفاً دوباره تلاش کنید.",
@@ -386,8 +386,8 @@ def check_config() -> Dict[str, Any]:
     Returns:
         Dict: نتیجه بررسی
     """
-    issues = []
-    warnings = []
+    issues: List[str] = []
+    warnings: List[str] = []
     
     # بررسی توکن
     if not TOKEN or TOKEN == "YOUR_BOT_TOKEN_HERE":
