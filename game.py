@@ -1,10 +1,11 @@
-# game.py - کلاس اصلی بازی (نسخه کامل نهایی با اصلاحات یخچال)
+# game.py - کلاس اصلی بازی (نسخه کامل با اصلاحات)
 
 import random
 import json
 import logging
 from datetime import datetime, timedelta
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, Union
+
 from config import *
 from database import get_user_data, save_user_data, get_user_by_card, is_card_unique
 
@@ -23,7 +24,7 @@ class HopDogGame:
     # توابع کمکی تبدیل
     # ============================================================
 
-    def _to_int(self, value):
+    def _to_int(self, value) -> int:
         if value is None:
             return 0
         if isinstance(value, (int, float)):
@@ -35,7 +36,7 @@ class HopDogGame:
                 return 0
         return 0
 
-    def _to_float(self, value):
+    def _to_float(self, value) -> float:
         if value is None:
             return 0.0
         if isinstance(value, (int, float)):
@@ -47,18 +48,18 @@ class HopDogGame:
                 return 0.0
         return 0.0
 
-    def _to_str(self, value):
+    def _to_str(self, value) -> str:
         if value is None:
             return "0"
         return str(value)
 
-    def _to_bool(self, value):
+    def _to_bool(self, value) -> bool:
         if value is None:
             return False
         if isinstance(value, bool):
             return value
         if isinstance(value, str):
-            return value.lower() in ["true", "1", "yes"]
+            return value.lower() in ["true", "1", "yes", "on"]
         return bool(value)
 
     # ============================================================
@@ -69,11 +70,15 @@ class HopDogGame:
         try:
             data = get_user_data(self.user_id)
             if data:
+                # تبدیل فیلدهای JSON
                 if "current_hunt_animal" in data and data["current_hunt_animal"]:
                     try:
                         data["current_hunt_animal"] = json.loads(data["current_hunt_animal"])
                     except:
                         data["current_hunt_animal"] = None
+                else:
+                    data["current_hunt_animal"] = None
+                
                 if "bank_transactions" in data and data["bank_transactions"]:
                     try:
                         data["bank_transactions"] = json.loads(data["bank_transactions"])
@@ -81,6 +86,7 @@ class HopDogGame:
                         data["bank_transactions"] = []
                 else:
                     data["bank_transactions"] = []
+                
                 if "jail_voted" in data and data["jail_voted"]:
                     try:
                         data["jail_voted"] = json.loads(data["jail_voted"])
@@ -88,6 +94,7 @@ class HopDogGame:
                         data["jail_voted"] = []
                 else:
                     data["jail_voted"] = []
+                
                 if "fridge_items" in data and data["fridge_items"]:
                     try:
                         if isinstance(data["fridge_items"], str):
@@ -99,6 +106,7 @@ class HopDogGame:
                 else:
                     data["fridge_items"] = []
                 
+                # فیلدهای پیش‌فرض
                 defaults = {
                     "bank_card_number": "",
                     "jail_admin_id": None,
@@ -122,6 +130,7 @@ class HopDogGame:
                     if key not in data:
                         data[key] = default
                 
+                # چک خودکار آزادی از زندان
                 if data.get("jailed", False):
                     now = datetime.now().timestamp()
                     jail_until = self._to_float(data.get("jail_until", 0))
@@ -140,11 +149,9 @@ class HopDogGame:
             return None
 
     def save_data(self):
-        """ذخیره داده‌ها"""
         return save_user_data(self.user_id, self.data)
 
     def reset_data(self):
-        """ریست کردن داده‌ها"""
         self.data = {
             "user_id": self.user_id,
             "player_name": self.username or f"کاربر{self.user_id}",
@@ -234,19 +241,24 @@ class HopDogGame:
         
         level = self._to_int(self.data["level"])
         required = self.get_required_for_level(level)
+        
         if level < MAX_LEVEL and hop_count + 1 >= required:
             self.data["hop_count"] = "0"
-            self.data["level"] = self._to_str(level + 1)
-            reward = self.get_level_data(level + 1)["reward"]
+            new_level = level + 1
+            self.data["level"] = self._to_str(new_level)
+            reward = self.get_level_data(new_level)["reward"]
             hop_point = self._to_int(self.data["hop_point"])
             self.data["hop_point"] = self._to_str(hop_point + reward)
             self.save_data()
+            
             return {
                 "success": True, 
                 "earned": earned, 
                 "level_up": True, 
-                "new_level": level + 1,
-                "reward": reward
+                "new_level": new_level,
+                "reward": reward,
+                "old_level": level,
+                "features": self.get_level_data(new_level)["features"]
             }
         
         self.save_data()
@@ -364,7 +376,6 @@ class HopDogGame:
         self.data["hop_point"] = self._to_str(hop_point - 300)
         self.data["hapo_owned"] = True
         
-        # پاک‌سازی اسم هنگام خرید
         name = random.choice(HAPO_NAMES)
         self.data["hapo_name"] = name.strip()
         
@@ -655,40 +666,26 @@ class HopDogGame:
         return {"success": True, "fed": actual}
 
     # ============================================================
-    # متدهای یخچال هاپویی (اصلاح شده)
+    # متدهای یخچال هاپویی
     # ============================================================
 
     def get_fridge_items(self):
-        """دریافت لیست آیتم‌های یخچال"""
         items = self.data.get("fridge_items", [])
-        
-        # اگر string هست، تبدیل به لیست کن
         if isinstance(items, str):
             try:
                 items = json.loads(items)
             except:
                 items = []
-        
-        # اگر لیست نیست، تبدیل به لیست کن
         if not isinstance(items, list):
             items = []
-        
         return items
 
     def save_fridge_items(self, items):
-        """ذخیره لیست آیتم‌های یخچال"""
         if not isinstance(items, list):
             items = []
-        
-        # ذخیره به صورت JSON
-        try:
-            self.data["fridge_items"] = json.dumps(items, ensure_ascii=False)
-            self.save_data()
-            logger.info(f"✅ یخچال ذخیره شد: {len(items)} آیتم")
-            return True
-        except Exception as e:
-            logger.error(f"❌ خطا در ذخیره یخچال: {e}")
-            return False
+        self.data["fridge_items"] = items
+        self.save_data()
+        return True
 
     def get_fridge_capacity(self):
         level = self._to_int(self.data.get("fridge_level", 1))
@@ -715,9 +712,8 @@ class HopDogGame:
         self.data["hop_point"] = self._to_str(hop_point - FRIDGE_PURCHASE_COST)
         self.data["fridge_owned"] = True
         self.data["fridge_level"] = "1"
-        self.data["fridge_items"] = "[]"
+        self.data["fridge_items"] = []
         self.save_data()
-        
         return {"success": True}
 
     def upgrade_fridge(self):
@@ -739,7 +735,6 @@ class HopDogGame:
         self.data["hop_point"] = self._to_str(hop_point - cost)
         self.data["fridge_level"] = self._to_str(current_level + 1)
         self.save_data()
-        
         return {"success": True, "new_level": current_level + 1}
 
     def add_to_fridge(self, animal):
@@ -750,29 +745,29 @@ class HopDogGame:
             return {"success": False, "reason": "هیچ حیوانی برای ذخیره وجود ندارد"}
         
         items = self.get_fridge_items()
-        
         capacity = self.get_fridge_capacity()
+        
         if len(items) >= capacity:
             return {"success": False, "reason": f"یخچال پر است! ظرفیت: {capacity}"}
         
         animal_name = animal.get("name")
+        
+        # بررسی تکراری بودن (صرف‌نظر از پخته یا نپخته)
         for item in items:
-            if item.get("name") == animal_name and not item.get("cooked", False):
-                return {"success": False, "reason": f"شما قبلاً یک {animal_name} در یخچال دارید"}
+            if item.get("name") == animal_name:
+                return {"success": False, "reason": f"شما قبلاً یک {animal_name} در یخچال دارید (پخته یا نپخته)"}
         
         animal_copy = animal.copy()
         animal_copy["cooked"] = False
         animal_copy["cooking"] = False
         items.append(animal_copy)
         self.save_fridge_items(items)
-        
         return {"success": True, "item": animal_copy}
 
     def remove_from_fridge(self, index):
         items = self.get_fridge_items()
         if index < 0 or index >= len(items):
             return {"success": False, "reason": "حیوان مورد نظر یافت نشد"}
-        
         removed = items.pop(index)
         self.save_fridge_items(items)
         return {"success": True, "item": removed}
@@ -793,11 +788,14 @@ class HopDogGame:
         
         weight = item.get("weight", 1.0)
         cook_time = int(weight * 100)
+        cook_time = max(30, cook_time)
         
         item["cooking"] = True
         item["cook_time"] = cook_time
         item["cook_start"] = datetime.now().timestamp()
         self.save_fridge_items(items)
+        
+        logger.info(f"🔥 شروع پخت {item['name']} - زمان: {cook_time} ثانیه")
         
         return {
             "success": True,
@@ -826,6 +824,7 @@ class HopDogGame:
                     item["value"] = int(item["value"] * FRIDGE_COOK_MULTIPLIER_SELL)
                     item["nutrition"] = item["nutrition"] * FRIDGE_COOK_MULTIPLIER_FOOD
                     changed = True
+                    logger.info(f"✅ پخت {item['name']} کامل شد")
         
         if changed:
             self.save_fridge_items(items)
@@ -925,9 +924,6 @@ class HopDogGame:
     # ============================================================
 
     def generate_card_number(self):
-        import random
-        from database import is_card_unique
-        
         for _ in range(100):
             first = str(random.randint(1000, 9999))
             second = str(random.randint(1000, 9999))
@@ -1115,17 +1111,32 @@ class HopDogGame:
 
     def can_transfer(self):
         if self.data.get("is_transferring", False):
-            return {"success": False, "reason": "⏳ شما در حال حاضر در حال انتقال هستید. لطفاً صبر کنید."}
+            return {
+                "success": False, 
+                "reason": "⏳ شما در حال حاضر در حال انتقال هستید. لطفاً صبر کنید."
+            }
         if self._to_int(self.data["level"]) < TRANSFER_MIN_LEVEL_SENDER:
-            return {"success": False, "reason": f"برای انتقال هاپو پوینت باید سطح {TRANSFER_MIN_LEVEL_SENDER} باشی"}
+            return {
+                "success": False, 
+                "reason": f"❌ برای انتقال هاپو پوینت باید سطح {TRANSFER_MIN_LEVEL_SENDER} باشی"
+            }
         if self.data.get("profile_locked", False):
-            return {"success": False, "reason": "پروفایل شما قفل است. ابتدا آن را باز کن"}
+            return {
+                "success": False, 
+                "reason": "🔒 پروفایل شما قفل است. ابتدا آن را باز کن"
+            }
         
         now = datetime.now().timestamp()
         last_transfer = self._to_float(self.data.get("last_transfer_time", 0))
+        
         if last_transfer > 0 and (now - last_transfer) < TRANSFER_COOLDOWN:
             remaining = TRANSFER_COOLDOWN - (now - last_transfer)
-            return {"success": False, "reason": f"بین انتقال‌ها باید {TRANSFER_COOLDOWN} ثانیه صبر کنی. {int(remaining)} ثانیه مونده"}
+            minutes = int(remaining // 60)
+            seconds = int(remaining % 60)
+            return {
+                "success": False, 
+                "reason": f"⏳ *به جیبت استراحت بده!*\n\n💤 {minutes} دقیقه و {seconds} ثانیه دیگه میتونی انتقال بدی"
+            }
         
         return {"success": True}
 
@@ -1135,21 +1146,36 @@ class HopDogGame:
             return can
         
         if amount < TRANSFER_MIN_AMOUNT:
-            return {"success": False, "reason": f"حداقل مبلغ انتقال {TRANSFER_MIN_AMOUNT} هاپو پوینت است"}
+            return {
+                "success": False, 
+                "reason": f"❌ حداقل مبلغ انتقال {TRANSFER_MIN_AMOUNT} هاپو پوینت است"
+            }
         if amount > TRANSFER_MAX_AMOUNT:
-            return {"success": False, "reason": f"حداکثر مبلغ انتقال {TRANSFER_MAX_AMOUNT:,} هاپو پوینت است"}
+            return {
+                "success": False, 
+                "reason": f"❌ حداکثر مبلغ انتقال {TRANSFER_MAX_AMOUNT:,} هاپو پوینت است"
+            }
         
         hop_point = self._to_int(self.data["hop_point"])
         if hop_point < amount:
-            return {"success": False, "reason": f"موجودی کافی نیست. شما {hop_point:,} هاپو پوینت داری"}
+            return {
+                "success": False, 
+                "reason": f"❌ موجودی کافی نیست. شما {hop_point:,} هاپو پوینت داری"
+            }
         
         target_game = HopDogGame(int(target_user_id))
         target_data = target_game.data
         
         if self._to_int(target_data["level"]) < TRANSFER_MIN_LEVEL_RECEIVER:
-            return {"success": False, "reason": f"کاربر مقصد باید حداقل سطح {TRANSFER_MIN_LEVEL_RECEIVER} داشته باشد"}
+            return {
+                "success": False, 
+                "reason": f"❌ کاربر مقصد باید حداقل سطح {TRANSFER_MIN_LEVEL_RECEIVER} داشته باشد"
+            }
         if target_data.get("profile_locked", False):
-            return {"success": False, "reason": "پروفایل کاربر مقصد قفل است"}
+            return {
+                "success": False, 
+                "reason": "🔒 پروفایل کاربر مقصد قفل است"
+            }
         
         self.data["is_transferring"] = True
         target_game.data["is_transferring"] = True
@@ -1288,10 +1314,6 @@ class HopDogGame:
     # ============================================================
 
     def start_smuggle(self, count):
-        from config import (
-            SMUGGLE_REQUIRED_LEVEL, SMUGGLE_MIN_HAPO, SMUGGLE_MAX_HAPO,
-            SMUGGLE_TIME_PER_HAPO, SMUGGLE_SUCCESS_CHANCE
-        )
         from datetime import datetime
         import random
         
