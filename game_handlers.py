@@ -501,7 +501,7 @@ async def handle_xo_move(update: Update, context: ContextTypes.DEFAULT_TYPE, gam
         is_draw = result.get("is_draw", False)
         
         if not is_draw:
-            # ======== برنده مشخص شده ========
+            # ======== ✅ برنده مشخص شده - پرداخت جایزه ========
             prize = game.bet_amount * 2
             winner_id = int(game.host_id if winner == "host" else game.player_id)
             loser_id = int(game.player_id if winner == "host" else game.host_id)
@@ -542,8 +542,8 @@ async def handle_xo_move(update: Update, context: ContextTypes.DEFAULT_TYPE, gam
                 logger.error(f"❌ خطا در ارسال پیام بازنده {loser_id}: {e}")
         
         else:
-            # ======== بازی مساوی ========
-            log_game(game_id, "مساوی", "بازی مساوی شد")
+            # ======== ✅ بازی مساوی - برگشت پول ========
+            log_game(game_id, "مساوی", "بازی مساوی شد - برگشت پول")
             
             for pid in [game.host_id, game.player_id]:
                 if pid:
@@ -614,7 +614,7 @@ async def handle_xo_close(update: Update, context: ContextTypes.DEFAULT_TYPE, ga
 
 
 async def handle_xo_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE, game_id: str):
-    """هندلر لغو میز بازی (فقط میزبان)"""
+    """هندلر لغو میز بازی - ✅ برگشت پول به میزبان"""
     query = update.callback_query
     await query.answer()
     
@@ -631,19 +631,21 @@ async def handle_xo_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE, g
         await query.edit_message_text("❌ *فقط میزبان می‌تواند میز را لغو کند*", parse_mode="Markdown")
         return
     
-    # ======== برگشت پول به میزبان ========
-    game_obj.data["hop_point"] = str(game_obj._to_int(game_obj.data.get("hop_point", 0)) + game.bet_amount)
+    # ======== ✅ برگشت پول به میزبان ========
+    current_points = game_obj._to_int(game_obj.data.get("hop_point", 0))
+    game_obj.data["hop_point"] = str(current_points + game.bet_amount)
     game_obj.save_data()
     
-    log_game(game_id, "لغو میز", f"میزبان {user_id}")
+    log_game(game_id, "لغو میز", f"میزبان {user_id} - پول برگشت: {game.bet_amount}")
     log_transaction(user_id, "لغو میز بازی", game.bet_amount, f"بازگشت پول {game_id}")
-    logger.info(f"🗑️ بازی {game_id} توسط میزبان {user_id} لغو شد - پول برگشت")
+    logger.info(f"🗑️ بازی {game_id} توسط میزبان {user_id} لغو شد - پول برگشت: {game.bet_amount}")
     
     clear_game_message(chat_id, game_id)
     game_manager.remove_game(game_id)
     
     await query.edit_message_text(
         "🗑️ *میز بازی لغو شد و پول شما برگشت.*\n\n"
+        f"💰 *مبلغ برگشتی:* {format_number(game.bet_amount)} 🪙\n\n"
         "برای شروع بازی جدید، دوباره «بازی هاپویی» رو بزن.",
         parse_mode="Markdown"
     )
@@ -690,3 +692,15 @@ async def restore_game_message(chat_id: int, game_id: str, context: ContextTypes
     except Exception as e:
         logger.error(f"❌ خطا در بازیابی پیام بازی {game_id}: {e}")
         clear_game_message(chat_id, game_id)
+
+
+# ================================================================
+# تست
+# ================================================================
+
+if __name__ == "__main__":
+    print("=" * 60)
+    print("🧪 game_handlers.py - تست اولیه")
+    print("=" * 60)
+    print("✅ فایل آماده استفاده است!")
+    print("=" * 60)
