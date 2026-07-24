@@ -1,4 +1,4 @@
-# handlers.py - هندلرهای پیام و کالبک (نسخه نهایی کامل ۱۰۰٪)
+# handlers.py - هندلرهای پیام و کالبک (نسخه نهایی کامل ۱۰۰٪ با تمام اصلاحات)
 
 import os
 import json
@@ -1249,6 +1249,8 @@ async def do_hunt(update: Update, context: ContextTypes.DEFAULT_TYPE, game):
     await asyncio.sleep(2)
     
     animal = result["animal"]
+    animal_name = animal.get("name", "")
+    
     msg = f"*شما با موفقیت {animal['emoji']} گرفتید…*\n⭐️ *سطح :* {animal['rarity_name']}\n⚖️ *وزن :* {animal['weight']} کیلو\n💰 *ارزش :* {format_number(animal['value'])} 🪙\n🍖 *ارزش غذایی :* {animal['nutrition']} کالری\n\n⏳ *60 ثانیه فرصت انتخاب داری*"
     
     keyboard = [
@@ -1257,7 +1259,7 @@ async def do_hunt(update: Update, context: ContextTypes.DEFAULT_TYPE, game):
     if game.data["hapo_owned"]:
         keyboard.append([InlineKeyboardButton(f"🍖 به هاپو بده", callback_data="hunt_feed")])
     if game.data.get("fridge_owned", False):
-        keyboard.append([InlineKeyboardButton("❄️ بندازش تو یخچال", callback_data="hunt_fridge")])
+        keyboard.append([InlineKeyboardButton("❄️ بندازش تو یخچال", callback_data=f"hunt_fridge_{animal_name}")])
     
     try:
         await hunt_msg.edit_text(msg, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
@@ -3013,21 +3015,46 @@ async def handle_fridge_feed(update: Update, context: ContextTypes.DEFAULT_TYPE,
         await query.edit_message_text(f"❌ *{result['reason']}*", parse_mode="Markdown")
 
 
+# ================================================================
+# تابع اصلی ذخیره در یخچال (اصلاح شده با نام حیوان)
+# ================================================================
+
 async def handle_hunt_to_fridge(update: Update, context: ContextTypes.DEFAULT_TYPE, query, animal_name):
+    """ذخیره حیوان شکار شده در یخچال"""
     user_id = update.effective_user.id
     username = update.effective_user.username
     full_name = update.effective_user.full_name or f"کاربر{user_id}"
     game = get_game(user_id, username or full_name)
     
+    # ======== دریافت حیوان از دیتابیس ========
     animal = game.data.get("current_hunt_animal")
+    
+    # ======== لاگ برای دیباگ ========
+    logger.info(f"🔍 handle_hunt_to_fridge - animal_name: '{animal_name}'")
+    logger.info(f"🔍 handle_hunt_to_fridge - animal from data: {animal}")
+    
     if not animal:
         await query.edit_message_text("❌ *هیچ حیوانی برای ذخیره وجود ندارد*", parse_mode="Markdown")
         return
     
-    if animal.get("name") != animal_name:
-        await query.edit_message_text("❌ *خطا در شناسایی حیوان*", parse_mode="Markdown")
-        return
+    # ======== بررسی نام حیوان (با انعطاف بیشتر) ========
+    animal_data_name = animal.get("name", "")
     
+    # اگر animal_name خالی بود (از دکمه‌ها)، از نام حیوان استفاده کن
+    if not animal_name:
+        animal_name = animal_data_name
+        logger.info(f"🔍 animal_name was empty, using: '{animal_name}'")
+    
+    # مقایسه با حذف فاصله‌ها
+    if animal_data_name.replace(" ", "") != animal_name.replace(" ", ""):
+        # اگر مساوی نبودند، لاگ کن ولی ادامه بده
+        logger.warning(f"⚠️ Animal name mismatch: '{animal_data_name}' vs '{animal_name}'")
+        # اگر یکی از نام‌ها داخل دیگری بود، قبول کن
+        if animal_data_name not in animal_name and animal_name not in animal_data_name:
+            await query.edit_message_text("❌ *خطا در شناسایی حیوان*", parse_mode="Markdown")
+            return
+    
+    # ======== بررسی زمان ========
     hunt_time = game._to_float(game.data.get("hunt_time", 0))
     if hunt_time > 0:
         now = datetime.now().timestamp()
@@ -3038,14 +3065,17 @@ async def handle_hunt_to_fridge(update: Update, context: ContextTypes.DEFAULT_TY
             await query.edit_message_text("🦌 *حیوان فرار کرد! وقتت تموم شد.*", parse_mode="Markdown")
             return
     
+    # ======== بررسی وجود یخچال ========
     if not game.data.get("fridge_owned", False):
         await query.edit_message_text("❌ *شما یخچال هاپویی ندارید! با دستور «یخچال هاپویی» بخر.*", parse_mode="Markdown")
         return
     
+    # ======== بررسی ظرفیت یخچال ========
     items = game.get_fridge_items()
     capacity = game.get_fridge_capacity()
     
     if len(items) >= capacity:
+        # ======== اگر یخچال پر است، گزینه‌های دیگه رو نشون بده ========
         msg = f"❌ *یخچال شما پر است!* 📦\n\n"
         msg += f"📊 *ظرفیت:* {len(items)}/{capacity}\n"
         msg += f"{animal['emoji']} *{animal['name']}*\n"
@@ -3063,6 +3093,7 @@ async def handle_hunt_to_fridge(update: Update, context: ContextTypes.DEFAULT_TY
         await query.edit_message_text(msg, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
         return
     
+    # ======== ذخیره در یخچال ========
     result = game.add_to_fridge(animal)
     if result["success"]:
         game.data["current_hunt_animal"] = None
@@ -3103,12 +3134,12 @@ async def handle_hunt_release(update: Update, context: ContextTypes.DEFAULT_TYPE
 
 
 # ================================================================
-# هندلر اصلی پیام‌ها (نسخه نهایی با لاگ کامل)
+# هندلر اصلی پیام‌ها
 # ================================================================
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
-        # ======== لاگ اولیه برای دیباگ (با print برای اطمینان) ========
+        # ======== لاگ اولیه برای دیباگ ========
         print("=" * 60)
         print("🔥 handle_message CALLED!")
         print("=" * 60)
@@ -3153,27 +3184,22 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # ================================================================
         
         if context.user_data.get("waiting_for_transfer_amount"):
-            print("⏳ Waiting for transfer amount")
             await process_transfer_amount(update, context)
             return
         
         if context.user_data.get("waiting_for_hapo_name"):
-            print("⏳ Waiting for hapo name")
             # ... کد مربوطه ...
             return
         
         if context.user_data.get("waiting_for_deposit"):
-            print("⏳ Waiting for deposit")
             # ... کد مربوطه ...
             return
         
         if context.user_data.get("waiting_for_withdraw"):
-            print("⏳ Waiting for withdraw")
             # ... کد مربوطه ...
             return
         
         if context.user_data.get("waiting_for_admin"):
-            print("⏳ Waiting for admin")
             # ... کد مربوطه ...
             return
         
@@ -3183,7 +3209,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         xo_state = get_xo_state(user_id)
         if xo_state and xo_state.get("state") == "betting":
-            print("🎮 XO betting state")
             await process_xo_bet(update, context)
             return
         
@@ -3200,11 +3225,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 
                 if text_lower in allowed_commands:
                     if text_lower in ["هاپو بانک", "بانک هاپویی"]:
-                        print("🏦 Bank from jail")
                         await show_bank_menu(update, game)
                         return
                     if text_lower in ["زندان هاپویی"]:
-                        print("⛓️ Jail from jail")
                         await show_jail(update, context)
                         return
                 else:
@@ -3237,14 +3260,14 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             # ======== تشخیص دستورات اصلی ========
             # ================================================================
             
-            # ======== 1. میو (گربه بی ادب) - اول از همه ========
+            # ======== 1. میو (گربه بی ادب) ========
             meow_words = ["میو", "معو", "میاو", "میو میو", "mio", "meo", "meow", "میوو", "میووو", "mew"]
             if text_lower in meow_words:
                 print("✅✅✅ MEOW DETECTED! ✅✅✅")
                 await handle_meow(update, context)
                 return
             
-            # ======== 2. اسم هاپو - دوم ========
+            # ======== 2. اسم هاپو ========
             hapo_name = game.data.get("hapo_name", "").strip()
             print(f"🔍 Hapo name: '{hapo_name}'")
             print(f"🔍 Hapo owned: {game.data.get('hapo_owned', False)}")
@@ -3461,7 +3484,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 # ================================================================
-# ادامه handle_callback
+# ادامه handle_callback (بخش اصلی)
 # ================================================================
 
 async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -3857,9 +3880,16 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             index = int(data.replace("fridge_feed_", ""))
             await handle_fridge_feed(update, context, query, index)
             return
+        
+        # ======== شکار - ذخیره در یخچال ========
         if data == "hunt_fridge":
             await handle_hunt_to_fridge(update, context, query, "")
             return
+        if data.startswith("hunt_fridge_"):
+            animal_name = data.replace("hunt_fridge_", "")
+            await handle_hunt_to_fridge(update, context, query, animal_name)
+            return
+        
         if data == "hunt_release":
             await handle_hunt_release(update, context, query)
             return
@@ -3873,7 +3903,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await show_smuggle_menu(update, game)
             return
         
-        # ======== شکار ========
+        # ======== شکار (فروش و غذا) ========
         if data == "hunt_sell":
             result = game.sell_animal()
             if result["success"]:
@@ -3913,7 +3943,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     [InlineKeyboardButton(f"💰 فروش ({format_number(animal['value'])})", callback_data="hunt_sell")]
                 ]
                 if game.data.get("fridge_owned", False):
-                    keyboard.append([InlineKeyboardButton("❄️ بندازش تو یخچال", callback_data="hunt_fridge")])
+                    keyboard.append([InlineKeyboardButton("❄️ بندازش تو یخچال", callback_data=f"hunt_fridge_{animal.get('name', '')}")])
                 await query.message.reply_text(msg, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
                 return
             await query.answer(f"❌ {error_msg}", show_alert=True)
