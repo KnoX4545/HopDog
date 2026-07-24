@@ -7,7 +7,7 @@ from datetime import datetime
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, filters, ContextTypes
 
-from config import TOKEN, STREET_HAPO_INTERVAL, USE_WEBHOOK, WEBHOOK_PORT, WEBHOOK_URL, ADMIN_PASSWORD
+from config import TOKEN, STREET_HAPO_INTERVAL, ADMIN_PASSWORD
 from globals import get_game
 from utils import parse_amount
 
@@ -33,7 +33,7 @@ logger = root_logger
 
 
 # ================================================================
-# توابع پاک‌سازی خودکار (با زمان‌بندی دقیق‌تر)
+# توابع پاک‌سازی خودکار
 # ================================================================
 
 async def cleanup_games(context: ContextTypes.DEFAULT_TYPE):
@@ -234,7 +234,7 @@ def main():
     logger.info("✅ هندلر خطاها ثبت شد")
     
     # ================================================================
-    # Job Queue (کارهای زمان‌بندی شده) - با زمان‌بندی دقیق‌تر
+    # Job Queue (کارهای زمان‌بندی شده)
     # ================================================================
     job_queue = app.job_queue
     if job_queue:
@@ -248,7 +248,7 @@ def main():
         )
         logger.info(f"✅ هاپوی خیابونی فعال شد (هر {STREET_HAPO_INTERVAL//3600} ساعت)")
         
-        # ======== پاک‌سازی بازی‌ها (هر ۱۰ ثانیه) - برای تشخیص سریع‌تر ========
+        # ======== پاک‌سازی بازی‌ها (هر ۱۰ ثانیه) ========
         job_queue.run_repeating(cleanup_games, interval=10, first=5)
         logger.info("✅ پاک‌سازی خودکار بازی‌ها فعال شد (هر ۱۰ ثانیه)")
         
