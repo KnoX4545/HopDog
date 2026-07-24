@@ -1,4 +1,4 @@
-# game_hapo_extras.py - توابع هاپو، پنجه، شکار، یخچال، قاچاق
+# game_hapo_extras.py - توابع هاپو، پنجه، شکار، یخچال، قاچاق و کلاس StreetHapo
 
 import random
 import json
@@ -787,6 +787,198 @@ def get_smuggle_info(self):
 
 
 # ============================================================
+# کلاس هاپوی خیابونی (StreetHapo)
+# ============================================================
+
+class StreetHapo:
+    def __init__(self, context=None):
+        self.context = context
+        self.active = False
+        self.data = {}
+        self.load_status()
+    
+    def load_status(self):
+        from database import get_street_hapo_status
+        status = get_street_hapo_status()
+        self.active = status.get("active", False)
+        self.data = status.get("data", {})
+        if "attempts" not in self.data:
+            self.data["attempts"] = 0
+        if "failed_attempts" not in self.data:
+            self.data["failed_attempts"] = []
+        if "rescued" not in self.data:
+            self.data["rescued"] = False
+        if "status" not in self.data:
+            self.data["status"] = "waiting"
+    
+    def save_status(self):
+        from database import set_street_hapo_status
+        return set_street_hapo_status(self.active, self.data)
+    
+    def start_event(self, chat_id):
+        if self.active:
+            return False, "هم اکنون یک هاپوی خیابونی در حال نجات است!"
+        self.active = True
+        self.data = {
+            "chat_id": chat_id,
+            "started_at": datetime.now().timestamp(),
+            "expires_at": datetime.now().timestamp() + STREET_HAPO_DECISION_TIME,
+            "attempts": 0,
+            "rescued": False,
+            "failed_attempts": [],
+            "rescued_by": None,
+            "rescued_by_name": None,
+            "reward": 0,
+            "message_id": None,
+            "status": "waiting"
+        }
+        self.save_status()
+        return True, "هاپوی خیابونی پیدا شد!"
+    
+    def is_expired(self):
+        if not self.active:
+            return True
+        if self.data.get("rescued", False):
+            return False
+        now = datetime.now().timestamp()
+        expires_at = self.data.get("expires_at", 0)
+        return now >= expires_at
+    
+    def get_attempt_cost(self):
+        attempts = self.data.get("attempts", 0)
+        if attempts >= STREET_HAPO_MAX_ATTEMPTS:
+            return None
+        return STREET_HAPO_COSTS[attempts]
+    
+    def get_remaining_time(self):
+        if not self.active or self.data.get("rescued", False):
+            return 0
+        now = datetime.now().timestamp()
+        expires_at = self.data.get("expires_at", 0)
+        remaining = expires_at - now
+        return max(0, int(remaining))
+    
+    def _to_int(self, value):
+        if value is None:
+            return 0
+        if isinstance(value, (int, float)):
+            return int(value)
+        if isinstance(value, str):
+            try:
+                return int(float(value))
+            except:
+                return 0
+        return 0
+    
+    def attempt_rescue(self, user_id, user_name, game):
+        if not self.active:
+            return {"success": False, "reason": "هیچ هاپوی خیابونی در دسترس نیست!"}
+        if self.data.get("rescued", False):
+            return {"success": False, "reason": "این هاپوی خیابونی قبلاً نجات پیدا کرده!"}
+        if self.is_expired():
+            self.active = False
+            self.save_status()
+            return {"success": False, "reason": "⏰ هاپوی خیابونی فرار کرد!"}
+        attempts = self.data.get("attempts", 0)
+        if attempts >= STREET_HAPO_MAX_ATTEMPTS:
+            return {"success": False, "reason": "همه شانس‌ها از دست رفته!"}
+        cost = STREET_HAPO_COSTS[attempts]
+        hop_point = game._to_int(game.data["hop_point"])
+        if hop_point < cost:
+            return {"success": False, "reason": f"پوینت کافی نیست! نیاز به {cost} 🪙"}
+        game.data["hop_point"] = game._to_str(hop_point - cost)
+        game.save_data()
+        current_attempt = attempts + 1
+        self.data["attempts"] = current_attempt
+        if "failed_attempts" not in self.data:
+            self.data["failed_attempts"] = []
+        self.data["failed_attempts"].append({
+            "user_id": user_id,
+            "user_name": user_name,
+            "attempt": current_attempt,
+            "cost": cost,
+            "time": datetime.now().timestamp(),
+            "success": False
+        })
+        if random.random() < STREET_HAPO_SUCCESS_CHANCE:
+            reward = random.randint(STREET_HAPO_REWARD_MIN, STREET_HAPO_REWARD_MAX)
+            self.data["rescued"] = True
+            self.data["rescued_by"] = user_id
+            self.data["rescued_by_name"] = user_name
+            self.data["reward"] = reward
+            self.data["status"] = "rescued"
+            if self.data["failed_attempts"]:
+                self.data["failed_attempts"][-1]["success"] = True
+            game.data["hop_point"] = game._to_str(game._to_int(game.data["hop_point"]) + reward)
+            street_rescued = game._to_int(game.data.get("street_hapo_rescued", 0))
+            game.data["street_hapo_rescued"] = game._to_str(street_rescued + 1)
+            game.save_data()
+            self.active = False
+            self.save_status()
+            return {
+                "success": True,
+                "rescued": True,
+                "reward": reward,
+                "attempt": current_attempt,
+                "cost": cost,
+                "message": f"🎉 {user_name} هاپوی خیابونی رو نجات داد و {reward} 🪙 جایزه گرفت!"
+            }
+        else:
+            fail_msg = random.choice(STREET_HAPO_FAIL_MESSAGES).format(name=user_name)
+            if current_attempt >= STREET_HAPO_MAX_ATTEMPTS:
+                self.data["status"] = "died"
+                self.active = False
+                self.save_status()
+                return {
+                    "success": False,
+                    "rescued": False,
+                    "died": True,
+                    "message": f"💀 {fail_msg}\n\nهاپوی خیابونی مرد... 😢",
+                    "attempt": current_attempt,
+                    "cost": cost,
+                    "remaining_attempts": 0
+                }
+            self.save_status()
+            return {
+                "success": False,
+                "rescued": False,
+                "died": False,
+                "message": fail_msg,
+                "attempt": current_attempt,
+                "cost": cost,
+                "remaining_attempts": STREET_HAPO_MAX_ATTEMPTS - current_attempt
+            }
+    
+    def get_status_text(self):
+        if not self.active:
+            if self.data.get("rescued", False):
+                return f"🎉 هاپوی خیابونی توسط {self.data.get('rescued_by_name', 'نامشخص')} نجات پیدا کرد!"
+            elif self.data.get("status") == "died":
+                return "💀 هاپوی خیابونی مرد... 😢"
+            elif self.data.get("status") == "expired":
+                return "⏰ هاپوی خیابونی فرار کرد!"
+            else:
+                return "🐶 هیچ هاپوی خیابونی در دسترس نیست."
+        if self.is_expired():
+            self.active = False
+            self.save_status()
+            return "⏰ هاپوی خیابونی فرار کرد!"
+        remaining = self.get_remaining_time()
+        attempts = self.data.get("attempts", 0)
+        cost = self.get_attempt_cost()
+        msg = f"🐶 یک هاپوی خیابونی پیدا شده!\n\n"
+        msg += f"⏳ زمان باقی‌مونده: {remaining} ثانیه\n"
+        msg += f"🔄 تلاش‌های انجام شده: {attempts}/{STREET_HAPO_MAX_ATTEMPTS}\n"
+        if cost is not None:
+            msg += f"💰 هزینه تلاش بعدی: {cost} 🪙\n"
+        else:
+            msg += f"❌ همه شانس‌ها از دست رفته!\n"
+        msg += f"\n🍀 شانس موفقیت: {int(STREET_HAPO_SUCCESS_CHANCE * 100)}%\n"
+        msg += f"🎁 جایزه: {STREET_HAPO_REWARD_MIN} تا {STREET_HAPO_REWARD_MAX} 🪙"
+        return msg
+
+
+# ============================================================
 # اضافه کردن متدها به کلاس HopDogGame
 # ============================================================
 
@@ -836,3 +1028,32 @@ HopDogGame.feed_hapo_from_fridge = feed_hapo_from_fridge
 HopDogGame.start_smuggle = start_smuggle
 HopDogGame.check_smuggle_status = check_smuggle_status
 HopDogGame.get_smuggle_info = get_smuggle_info
+
+
+# ============================================================
+# تست
+# ============================================================
+
+if __name__ == "__main__":
+    print("=" * 60)
+    print("🧪 تست game_hapo_extras.py")
+    print("=" * 60)
+    
+    # تست ایجاد بازی
+    game = HopDogGame(123456789, "testuser")
+    print(f"✅ بازی برای کاربر {game.user_id} ایجاد شد")
+    
+    # تست متدهای هاپو
+    print("✅ get_hapo_total_level:", game.get_hapo_total_level())
+    print("✅ get_hapo_max_food:", game.get_hapo_max_food())
+    print("✅ get_hapo_capacity:", game.get_hapo_capacity())
+    print("✅ get_hapo_production:", game.get_hapo_production())
+    
+    # تست StreetHapo
+    street = StreetHapo()
+    print("✅ StreetHapo ایجاد شد")
+    print("✅ active:", street.active)
+    
+    print("=" * 60)
+    print("🎉 همه تست‌ها با موفقیت انجام شد!")
+    print("=" * 60)
