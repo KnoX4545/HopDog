@@ -31,12 +31,13 @@ from logger_config import init_logging, log_transaction, log_security, log_game,
 root_logger, transaction_logger, security_logger, game_logger, db_logger = init_logging()
 logger = root_logger
 
+
 # ================================================================
-# توابع پاک‌سازی خودکار
+# توابع پاک‌سازی خودکار (با زمان‌بندی دقیق‌تر)
 # ================================================================
 
 async def cleanup_games(context: ContextTypes.DEFAULT_TYPE):
-    """پاک‌سازی خودکار بازی‌های منقضی شده"""
+    """پاک‌سازی خودکار بازی‌های منقضی شده (هر ۱۰ ثانیه)"""
     try:
         game_manager.check_timeout()
         logger.info("🧹 پاک‌سازی خودکار بازی‌ها انجام شد")
@@ -46,7 +47,7 @@ async def cleanup_games(context: ContextTypes.DEFAULT_TYPE):
 
 
 async def cleanup_votes(context: ContextTypes.DEFAULT_TYPE):
-    """پاک‌سازی خودکار رای‌های منقضی شده"""
+    """پاک‌سازی خودکار رای‌های منقضی شده (هر ۳۰ ثانیه)"""
     try:
         count = VoteStorage.cleanup_expired()
         if count > 0:
@@ -56,16 +57,49 @@ async def cleanup_votes(context: ContextTypes.DEFAULT_TYPE):
         log_error(e, "پاک‌سازی رای‌ها")
 
 
+async def cleanup_user_cache(context: ContextTypes.DEFAULT_TYPE):
+    """پاک‌سازی خودکار کش کاربران منقضی شده (هر ۵ دقیقه)"""
+    try:
+        from globals import user_games, USER_CACHE_TIMESTAMPS, USER_CACHE_TTL
+        import time
+        
+        now = time.time()
+        expired_users = []
+        
+        for user_id, timestamp in USER_CACHE_TIMESTAMPS.items():
+            if now - timestamp > USER_CACHE_TTL:
+                expired_users.append(user_id)
+        
+        for user_id in expired_users:
+            if user_id in user_games:
+                del user_games[user_id]
+            if user_id in USER_CACHE_TIMESTAMPS:
+                del USER_CACHE_TIMESTAMPS[user_id]
+        
+        if expired_users:
+            logger.info(f"🧹 {len(expired_users)} کش کاربر منقضی شده پاک شد")
+            
+    except Exception as e:
+        logger.error(f"❌ خطا در پاک‌سازی کش کاربران: {e}")
+        log_error(e, "پاک‌سازی کش کاربران")
+
+
 async def log_system_stats(context: ContextTypes.DEFAULT_TYPE):
     """لاگ آمار سیستم هر ساعت"""
     try:
         from database import get_all_groups
+        from globals import get_memory_stats
+        
         groups = get_all_groups()
         active_games = len(game_manager.games)
         active_users = len(game_manager.user_games)
+        memory_stats = get_memory_stats()
         
         log_stats(active_users, active_games, len(groups))
-        logger.info(f"📊 آمار: {active_users} کاربر فعال، {active_games} بازی، {len(groups)} گروه")
+        logger.info(
+            f"📊 آمار: {active_users} کاربر فعال، {active_games} بازی، "
+            f"{len(groups)} گروه، حافظه: {memory_stats['total']} آیتم"
+        )
     except Exception as e:
         logger.error(f"❌ خطا در لاگ آمار: {e}")
         log_error(e, "آمار سیستم")
@@ -95,6 +129,11 @@ async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         error = context.error
         logger.error(f"❌ خطا در درخواست از {user_id}: {error}")
         log_error(error, f"درخواست از {user_id}", user_id if user_id != "نامشخص" else None)
+        
+        # اگر خطا از نوع Timeout یا Network Error بود، سعی نکن پیام بفرستی
+        if "Timeout" in str(error) or "Network" in str(error):
+            logger.warning(f"⚠️ خطای شبکه/تایم‌اوت برای کاربر {user_id} - پیام ارسال نشد")
+            return
         
         if message:
             try:
@@ -195,7 +234,7 @@ def main():
     logger.info("✅ هندلر خطاها ثبت شد")
     
     # ================================================================
-    # Job Queue (کارهای زمان‌بندی شده)
+    # Job Queue (کارهای زمان‌بندی شده) - با زمان‌بندی دقیق‌تر
     # ================================================================
     job_queue = app.job_queue
     if job_queue:
@@ -209,13 +248,17 @@ def main():
         )
         logger.info(f"✅ هاپوی خیابونی فعال شد (هر {STREET_HAPO_INTERVAL//3600} ساعت)")
         
-        # ======== پاک‌سازی بازی‌ها (هر ۳۰ ثانیه) ========
-        job_queue.run_repeating(cleanup_games, interval=30, first=5)
-        logger.info("✅ پاک‌سازی خودکار بازی‌ها فعال شد (هر ۳۰ ثانیه)")
+        # ======== پاک‌سازی بازی‌ها (هر ۱۰ ثانیه) - برای تشخیص سریع‌تر ========
+        job_queue.run_repeating(cleanup_games, interval=10, first=5)
+        logger.info("✅ پاک‌سازی خودکار بازی‌ها فعال شد (هر ۱۰ ثانیه)")
         
-        # ======== پاک‌سازی رای‌ها (هر ۱ ساعت) ========
-        job_queue.run_repeating(cleanup_votes, interval=3600, first=10)
-        logger.info("✅ پاک‌سازی خودکار رای‌ها فعال شد (هر ۱ ساعت)")
+        # ======== پاک‌سازی رای‌ها (هر ۳۰ ثانیه) ========
+        job_queue.run_repeating(cleanup_votes, interval=30, first=10)
+        logger.info("✅ پاک‌سازی خودکار رای‌ها فعال شد (هر ۳۰ ثانیه)")
+        
+        # ======== پاک‌سازی کش کاربران (هر ۵ دقیقه) ========
+        job_queue.run_repeating(cleanup_user_cache, interval=300, first=60)
+        logger.info("✅ پاک‌سازی خودکار کش کاربران فعال شد (هر ۵ دقیقه)")
         
         # ======== لاگ آمار سیستم (هر ۱ ساعت) ========
         job_queue.run_repeating(log_system_stats, interval=3600, first=60)
