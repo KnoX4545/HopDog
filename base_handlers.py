@@ -1,4 +1,4 @@
-# base_handlers.py - توابع پایه (شروع، راهنما، قوانین، خوش‌آمدگویی)
+# base_handlers.py - توابع پایه (شروع، راهنما، قوانین، خوش‌آمدگویی، پیام‌ها)
 
 import asyncio
 import logging
@@ -11,12 +11,17 @@ from telegram.ext import ContextTypes
 from config import (
     ADMIN_PASSWORD, MIN_MEMBERS_TO_STAY, JAIL_MAX_SPAM_COMMANDS,
     JAIL_SPAM_WINDOW, JAIL_DURATION_SPAM, JAIL_FINE_SPAM,
-    JAIL_REASON_SPAM, JAIL_VOTE_NEEDED
+    JAIL_REASON_SPAM, JAIL_VOTE_NEEDED, JAIL_VOTE_DURATION,
+    JAIL_DURATION_MEOW, JAIL_FINE_MEOW, JAIL_REASON_MEOW,
+    STREET_HAPO_INTERVAL, STREET_HAPO_DECISION_TIME,
+    STREET_HAPO_COSTS, STREET_HAPO_SUCCESS_CHANCE,
+    STREET_HAPO_IMAGE_URL
 )
-from globals import get_game, SPAM_TRACKER
-from database import add_group, supabase
-from logger_config import log_security, log_error
-from utils import format_number
+from globals import get_game, SPAM_TRACKER, STREET_HAPO_LAST_SENT, get_street_hapo
+from database import add_group, supabase, get_all_groups, get_user_by_identifier
+from utils import format_number, get_confirm_keyboard
+from logger_config import log_security, log_error, log_transaction
+from vote_storage import VoteStorage, create_meow_vote_key, create_meow_vote_data
 
 logger = logging.getLogger(__name__)
 
@@ -70,6 +75,7 @@ RULES_PAGE2 = """🐶 *قوانین هاپویی* 📚 *(2 / 2)*
 # ================================================================
 
 def get_user_display_name(user_id, username="", full_name=""):
+    """دریافت نام نمایشی کاربر"""
     if full_name and full_name.strip() and not full_name.startswith("کاربر"):
         return full_name
     if username and username.strip():
@@ -78,6 +84,7 @@ def get_user_display_name(user_id, username="", full_name=""):
 
 
 def get_user_link(user_id, username, full_name):
+    """دریافت لینک کاربر"""
     display_name = get_user_display_name(user_id, username, full_name)
     if username:
         return f"@{username}"
@@ -86,6 +93,7 @@ def get_user_link(user_id, username, full_name):
 
 
 def check_spam(user_id):
+    """بررسی اسپم کاربر"""
     now = datetime.now().timestamp()
     if user_id not in SPAM_TRACKER:
         SPAM_TRACKER[user_id] = {"commands": [now]}
@@ -104,8 +112,7 @@ def check_spam(user_id):
 
 async def my_profile_from_callback(query, game):
     """نمایش پروفایل از کالبک"""
-    from hapo_handlers import get_hapo_menu_text, get_hapo_menu_keyboard
-    from admin_handlers import get_user_display_name
+    from config import RANK_NAMES
     
     user_id = int(game.user_id)
     full_name = game.data["player_name"]
@@ -132,7 +139,6 @@ async def my_profile_from_callback(query, game):
     msg += f"┐─ 🏹 *تعداد شکار:* {total_hunts}\n"
     
     if game.data.get("hapo_owned", False):
-        from config import RANK_NAMES
         msg += f"┐─ 🐕 *هاپو:* {game.data['hapo_name']}\n"
         msg += f"┘─ 🌟 *مقام:* {RANK_NAMES[hapo_rank]} | ⭐ *سطح:* {hapo_level}/5\n\n"
     else:
@@ -161,6 +167,7 @@ async def my_profile_from_callback(query, game):
 # ================================================================
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """هندلر شروع /start"""
     chat_type = update.message.chat.type
     if chat_type in ["group", "supergroup"]:
         return
@@ -213,6 +220,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """هندلر راهنما /help"""
     from academy import show_academy_main
     chat_type = update.message.chat.type
     if chat_type in ["group", "supergroup"]:
@@ -222,6 +230,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def show_rules(update: Update, context: ContextTypes.DEFAULT_TYPE, page=1):
+    """نمایش قوانین"""
     is_private = False
     is_callback = False
     
@@ -254,6 +263,7 @@ async def show_rules(update: Update, context: ContextTypes.DEFAULT_TYPE, page=1)
 
 
 async def group_welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """خوش‌آمدگویی به گروه"""
     if update.message and update.message.new_chat_members:
         for member in update.message.new_chat_members:
             if member.id == context.bot.id:
@@ -295,6 +305,7 @@ async def group_welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def handle_admin_login(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """ورود ادمین با پسورد"""
     user_id = update.effective_user.id
     game = get_game(user_id)
     
@@ -322,6 +333,7 @@ async def handle_admin_login(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
 
 async def admin_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """راهنمای ادمین"""
     if update.message.chat.type in ["group", "supergroup"]:
         return
     
@@ -356,9 +368,12 @@ async def admin_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(help_text, parse_mode="Markdown")
 
 
+# ================================================================
+# هاپ هاپ
+# ================================================================
+
 async def do_hop(update: Update, game):
-    from hapo_handlers import show_hapo_menu
-    
+    """انجام هاپ هاپ"""
     if game.is_jailed():
         await update.message.reply_text(
             "⛓️ *شما در زندان هستید.*\n\n"
@@ -383,7 +398,6 @@ async def do_hop(update: Update, game):
     try:
         if update.message.chat.type in ["group", "supergroup"]:
             chat_id = str(update.message.chat.id)
-            from database import add_group
             add_group(chat_id, update.message.chat.title or "گروه بدون نام")
             response = supabase.table("groups").select("total_hops, total_hapo_points").eq("chat_id", chat_id).execute()
             if response.data:
@@ -427,7 +441,12 @@ async def do_hop(update: Update, game):
         await update.message.reply_text(msg, parse_mode="Markdown")
 
 
+# ================================================================
+# زندان هاپویی
+# ================================================================
+
 async def show_jail(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """نمایش وضعیت زندان"""
     user_id = update.effective_user.id
     game = get_game(user_id)
     jail_info = game.get_jail_info()
@@ -478,7 +497,12 @@ async def show_jail(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(msg, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
 
 
+# ================================================================
+# پروفایل
+# ================================================================
+
 async def my_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """نمایش پروفایل خودم"""
     user_id = update.effective_user.id
     username = update.effective_user.username
     full_name = update.effective_user.full_name or f"کاربر{user_id}"
@@ -542,6 +566,7 @@ async def my_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def show_user_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """نمایش پروفایل کاربر دیگر"""
     user_id = update.effective_user.id
     game = get_game(user_id)
     
@@ -654,10 +679,12 @@ async def show_user_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(msg, parse_mode="Markdown")
 
 
+# ================================================================
+# سیستم میو
+# ================================================================
+
 async def handle_meow(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    from vote_storage import VoteStorage, create_meow_vote_key, create_meow_vote_data
-    from config import JAIL_VOTE_NEEDED, JAIL_VOTE_DURATION, JAIL_DURATION_MEOW, JAIL_FINE_MEOW, JAIL_REASON_MEOW
-    
+    """هندلر میو گفتن (گربه بی ادب)"""
     user_id = update.effective_user.id
     chat_id = update.message.chat.id
     game = get_game(user_id)
@@ -701,10 +728,7 @@ async def handle_meow(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def meow_vote_timer(vote_key: str, context: ContextTypes.DEFAULT_TYPE):
-    from vote_storage import VoteStorage
-    from config import JAIL_VOTE_NEEDED, JAIL_VOTE_DURATION, JAIL_DURATION_MEOW, JAIL_FINE_MEOW, JAIL_REASON_MEOW
-    from logger_config import log_security
-    
+    """تایمر رای‌گیری میو"""
     await asyncio.sleep(JAIL_VOTE_DURATION)
     
     vote_data = VoteStorage.get_vote(vote_key)
@@ -745,10 +769,67 @@ async def meow_vote_timer(vote_key: str, context: ContextTypes.DEFAULT_TYPE):
 
 
 # ================================================================
+# هاپوی خیابونی - ارسال نوتیفیکیشن
+# ================================================================
+
+async def send_street_hapo_notification(context: ContextTypes.DEFAULT_TYPE):
+    """ارسال نوتیفیکیشن هاپوی خیابونی به گروه‌ها"""
+    try:
+        chat_ids = get_all_groups()
+        if not chat_ids:
+            return
+        
+        street_hapo = get_street_hapo()
+        if street_hapo.active:
+            if street_hapo.is_expired():
+                street_hapo.active = False
+                street_hapo.save_status()
+            else:
+                logger.info("🐶 هاپوی خیابونی در حال حاضر فعال است")
+                return
+        
+        now = datetime.now().timestamp()
+        available_groups = []
+        for chat_id in chat_ids:
+            last_sent = STREET_HAPO_LAST_SENT.get(chat_id, 0)
+            if now - last_sent >= STREET_HAPO_INTERVAL:
+                available_groups.append(chat_id)
+        
+        if not available_groups:
+            available_groups = chat_ids
+        
+        chat_id = random.choice(available_groups)
+        success, msg = street_hapo.start_event(int(chat_id))
+        if not success:
+            logger.info(f"🐶 خطا در شروع هاپوی خیابونی: {msg}")
+            return
+        
+        STREET_HAPO_LAST_SENT[chat_id] = now
+        
+        keyboard = [[InlineKeyboardButton("🐶 نجات هاپوی خیابونی", callback_data="street_hapo_rescue")]]
+        message = await context.bot.send_photo(
+            chat_id=chat_id,
+            photo=STREET_HAPO_IMAGE_URL,
+            caption=f"🐶 *یک هاپوی خیابونی پیدا شده!*\n\n⏳ *زمان برای نجات:* {STREET_HAPO_DECISION_TIME} ثانیه\n💰 *هزینه تلاش اول:* {STREET_HAPO_COSTS[0]} 🪙\n🍀 *شانس موفقیت:* {int(STREET_HAPO_SUCCESS_CHANCE * 100)}%\n\nبرای نجاتش کلیک کن 👇",
+            reply_markup=InlineKeyboardMarkup(keyboard),
+            parse_mode="Markdown"
+        )
+        
+        street_hapo.data["message_id"] = message.message_id
+        street_hapo.save_status()
+        logger.info(f"🐶 هاپوی خیابونی به گروه {chat_id} ارسال شد")
+        
+    except Exception as e:
+        logger.error(f"Error sending street hapo notification: {e}")
+        log_error(e, "ارسال هاپوی خیابونی")
+
+
+# ================================================================
 # هندلر اصلی پیام‌ها
 # ================================================================
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """هندلر اصلی پیام‌ها"""
     try:
         if not update.message or not update.message.text:
             return
@@ -771,7 +852,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if is_group:
             try:
                 chat_id = str(update.message.chat.id)
-                from database import add_group
                 add_group(chat_id, update.message.chat.title or "گروه بدون نام")
             except:
                 pass
@@ -790,6 +870,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if context.user_data.get("waiting_for_deposit") or context.user_data.get("waiting_for_withdraw"):
             from bank_handlers import process_bank_transaction
             await process_bank_transaction(update, context)
+            return
+        
+        if context.user_data.get("waiting_for_card_to_card"):
+            from bank_handlers import process_card_to_card
+            await process_card_to_card(update, context)
             return
         
         # ======== بازی XO ========
@@ -1042,3 +1127,15 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("❌ *خطایی رخ داد! لطفاً دوباره تلاش کنید.*", parse_mode="Markdown")
         except:
             pass
+
+
+# ================================================================
+# تست
+# ================================================================
+
+if __name__ == "__main__":
+    print("=" * 60)
+    print("🧪 base_handlers.py - تست اولیه")
+    print("=" * 60)
+    print("✅ فایل آماده استفاده است!")
+    print("=" * 60)
