@@ -1,9 +1,15 @@
-# globals.py - اشیاء و متغیرهای سراسری (نسخه کامل با کش TTL و به‌روزرسانی)
+# globals.py - اشیاء و متغیرهای سراسری (نسخه کامل با اصلاح import)
 
 import time
 from typing import Dict, Optional, Any, List
+
+# ================================================================
+# ✅ اصلاح: import از فایل‌های صحیح
+# ================================================================
+
+from game import HopDogGame
+from game_hapo_extras import StreetHapo
 from game_functions import game_manager
-from game import StreetHapo, HopDogGame
 
 # ================================================================
 # دیکشنری‌های عمومی (که در حافظه هستن)
@@ -49,7 +55,12 @@ USER_CACHE_TTL = 300
 street_hapo_instance = None
 
 def get_street_hapo():
-    """دریافت یا ایجاد نمونه StreetHapo"""
+    """
+    دریافت یا ایجاد نمونه StreetHapo
+    
+    Returns:
+        StreetHapo: نمونه هاپوی خیابونی
+    """
     global street_hapo_instance
     if street_hapo_instance is None:
         street_hapo_instance = StreetHapo()
@@ -57,7 +68,7 @@ def get_street_hapo():
 
 
 # ================================================================
-# توابع مدیریت کش کاربران (نسخه نهایی با TTL)
+# توابع مدیریت کش کاربران
 # ================================================================
 
 def get_game(user_id: int, username: str = "") -> HopDogGame:
@@ -585,12 +596,18 @@ def get_memory_stats() -> Dict[str, int]:
 # ================================================================
 
 if __name__ == "__main__":
-    # تست کش
-    print("🧪 تست globals.py...")
+    print("=" * 60)
+    print("🧪 تست globals.py")
+    print("=" * 60)
+    
+    # تست importها
+    print("✅ import از game:", HopDogGame)
+    print("✅ import از game_hapo_extras:", StreetHapo)
+    print("✅ import از game_functions:", game_manager)
     
     # تست get_game
-    game1 = get_game(123456789, "testuser")
-    print(f"✅ کاربر 123456789: {game1.data.get('player_name')}")
+    game = get_game(123456789, "testuser")
+    print(f"✅ کاربر 123456789: {game.data.get('player_name')}")
     
     # تست کش
     print(f"✅ کش کاربران: {len(user_games)}")
@@ -607,4 +624,6 @@ if __name__ == "__main__":
     stats = get_memory_stats()
     print(f"📊 آمار حافظه: {stats}")
     
+    print("=" * 60)
     print("🎉 همه تست‌ها با موفقیت انجام شد!")
+    print("=" * 60)
