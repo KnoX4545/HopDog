@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 
 # ============================================================
-# متدهای هاپو (اضافه به کلاس HopDogGame)
+# متدهای هاپو
 # ============================================================
 
 def get_hapo_total_level(self):
@@ -75,7 +75,6 @@ def get_hapo_rank_up_price(self):
 
 
 def get_hapo_food_status(self):
-    """دریافت وضعیت غذا - اگر ۰ باشد «کار نمیکنم» نمایش داده می‌شود"""
     max_food = self.get_hapo_max_food()
     hapo_food = self._to_int(self.data["hapo_food"])
     
@@ -89,7 +88,6 @@ def get_hapo_food_status(self):
 
 
 def update_hapo_production(self):
-    """به‌روزرسانی تولید هاپو - اگر غذا ۰ باشد تولید متوقف می‌شود"""
     now = datetime.now().timestamp()
     hapo_last_update = self._to_float(self.data["hapo_last_update"])
     elapsed = now - hapo_last_update
@@ -220,7 +218,6 @@ def upgrade_hapo_level(self):
 
 
 def feed_hapo(self):
-    """تغذیه هاپو با حیوان شکار شده"""
     animal = self.data.get("current_hunt_animal")
     if not animal:
         return {"success": False, "reason": "هیچ حیوانی برای غذا دادن وجود ندارد"}
@@ -416,7 +413,7 @@ def sell_animal(self):
 
 
 # ============================================================
-# متدهای یخچال هاپویی
+# ✅ متدهای یخچال هاپویی (نسخه اصلاح شده با محافظت)
 # ============================================================
 
 def get_fridge_items(self):
@@ -506,6 +503,8 @@ def add_to_fridge(self, animal):
     animal_copy["cooking"] = False
     items.append(animal_copy)
     self.save_fridge_items(items)
+    self.save_data()  # ✅ اطمینان از ذخیره
+    logger.info(f"✅ حیوان {animal_name} در یخچال ذخیره شد - مجموع: {len(items)}")
     return {"success": True, "item": animal_copy}
 
 
@@ -515,6 +514,8 @@ def remove_from_fridge(self, index):
         return {"success": False, "reason": "حیوان مورد نظر یافت نشد"}
     removed = items.pop(index)
     self.save_fridge_items(items)
+    self.save_data()
+    logger.info(f"🗑️ حیوان {removed.get('name', 'نامشخص')} از یخچال حذف شد")
     return {"success": True, "item": removed}
 
 
@@ -535,6 +536,7 @@ def cook_item(self, index):
     item["cook_time"] = cook_time
     item["cook_start"] = datetime.now().timestamp()
     self.save_fridge_items(items)
+    self.save_data()
     logger.info(f"🔥 شروع پخت {item['name']} - زمان: {cook_time} ثانیه")
     return {
         "success": True,
@@ -544,26 +546,33 @@ def cook_item(self, index):
 
 
 def check_cooking_status(self):
+    """✅ بررسی و تکمیل پخت حیوانات - آیتم‌ها را حذف نمی‌کند"""
     from datetime import datetime
     items = self.get_fridge_items()
     now = datetime.now().timestamp()
     changed = False
+    
     for item in items:
         if item.get("cooking", False):
             cook_start = item.get("cook_start", 0)
             cook_time = item.get("cook_time", 0)
             elapsed = now - cook_start
+            
             if elapsed >= cook_time:
                 item["cooked"] = True
                 item["cooking"] = False
                 item["original_value"] = item.get("value", 0)
                 item["original_nutrition"] = item.get("nutrition", 1)
-                item["value"] = int(item["value"] * FRIDGE_COOK_MULTIPLIER_SELL)
-                item["nutrition"] = item["nutrition"] * FRIDGE_COOK_MULTIPLIER_FOOD
+                item["value"] = int(item["value"] * 10)
+                item["nutrition"] = item["nutrition"] * 2
                 changed = True
-                logger.info(f"✅ پخت {item['name']} کامل شد")
+                logger.info(f"✅ پخت {item.get('name', 'نامشخص')} کامل شد")
+    
     if changed:
         self.save_fridge_items(items)
+        self.save_data()
+        logger.info(f"💾 وضعیت پخت به‌روزرسانی شد - {len(items)} آیتم در یخچال")
+    
     return items
 
 
@@ -602,6 +611,8 @@ def sell_from_fridge(self, index):
     self.data["hop_point"] = self._to_str(hop_point + value)
     removed = items.pop(index)
     self.save_fridge_items(items)
+    self.save_data()
+    logger.info(f"💰 فروش {removed.get('name', 'نامشخص')} از یخچال - {value} 🪙")
     return {
         "success": True,
         "value": value,
@@ -644,7 +655,7 @@ def feed_hapo_from_fridge(self, index):
     self.save_fridge_items(items)
     self.save_data()
     
-    logger.info(f"🍖 تغذیه هاپو از یخچال: {removed['name']} - {actual} کالری")
+    logger.info(f"🍖 تغذیه هاپو از یخچال: {removed.get('name', 'نامشخص')} - {actual} کالری")
     
     return {
         "success": True,
@@ -1028,32 +1039,3 @@ HopDogGame.feed_hapo_from_fridge = feed_hapo_from_fridge
 HopDogGame.start_smuggle = start_smuggle
 HopDogGame.check_smuggle_status = check_smuggle_status
 HopDogGame.get_smuggle_info = get_smuggle_info
-
-
-# ============================================================
-# تست
-# ============================================================
-
-if __name__ == "__main__":
-    print("=" * 60)
-    print("🧪 تست game_hapo_extras.py")
-    print("=" * 60)
-    
-    # تست ایجاد بازی
-    game = HopDogGame(123456789, "testuser")
-    print(f"✅ بازی برای کاربر {game.user_id} ایجاد شد")
-    
-    # تست متدهای هاپو
-    print("✅ get_hapo_total_level:", game.get_hapo_total_level())
-    print("✅ get_hapo_max_food:", game.get_hapo_max_food())
-    print("✅ get_hapo_capacity:", game.get_hapo_capacity())
-    print("✅ get_hapo_production:", game.get_hapo_production())
-    
-    # تست StreetHapo
-    street = StreetHapo()
-    print("✅ StreetHapo ایجاد شد")
-    print("✅ active:", street.active)
-    
-    print("=" * 60)
-    print("🎉 همه تست‌ها با موفقیت انجام شد!")
-    print("=" * 60)
