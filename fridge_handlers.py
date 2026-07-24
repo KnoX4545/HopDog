@@ -1,7 +1,8 @@
-# fridge_handlers.py - هندلرهای یخچال هاپویی و قاچاق (نسخه کامل)
+# fridge_handlers.py - نسخه کامل اصلاح شده برای ذخیره‌سازی صحیح یخچال
 
 import asyncio
 import logging
+import json
 from datetime import datetime
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
@@ -77,8 +78,10 @@ async def show_fridge_menu(update: Update, game):
             await update.message.reply_text(msg, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
         return
     
-    # ======== یخچال وجود دارد ========
+    # ======== یخچال وجود دارد - بررسی وضعیت پخت ========
     game.check_cooking_status()
+    
+    # ======== دریافت مجدد آیتم‌ها از دیتابیس ========
     items = game.get_fridge_items()
     fridge_level = game._to_int(game.data.get("fridge_level", 1))
     capacity = game.get_fridge_capacity()
@@ -154,32 +157,27 @@ async def show_fridge_menu(update: Update, game):
 
 
 # ================================================================
-# ذخیره حیوان در یخچال (از شکار)
+# ✅ ذخیره حیوان در یخچال (اصلاح شده با لاگ و ذخیره‌سازی مطمئن)
 # ================================================================
 
 async def handle_hunt_to_fridge(update: Update, context: ContextTypes.DEFAULT_TYPE, query, animal_name):
-    """ذخیره حیوان شکار شده در یخچال"""
+    """ذخیره حیوان شکار شده در یخچال - نسخه اصلاح شده"""
     user_id = update.effective_user.id
     username = update.effective_user.username
     full_name = update.effective_user.full_name or f"کاربر{user_id}"
     game = get_game(user_id, username or full_name)
     
+    # ======== دریافت حیوان از دیتابیس ========
     animal = game.data.get("current_hunt_animal")
+    
+    logger.info(f"🔍 handle_hunt_to_fridge - animal_name: '{animal_name}'")
+    logger.info(f"🔍 handle_hunt_to_fridge - animal from data: {animal}")
     
     if not animal:
         await query.edit_message_text("❌ *هیچ حیوانی برای ذخیره وجود ندارد*", parse_mode="Markdown")
         return
     
-    animal_data_name = animal.get("name", "")
-    
-    if not animal_name:
-        animal_name = animal_data_name
-    
-    if animal_data_name.replace(" ", "") != animal_name.replace(" ", ""):
-        if animal_data_name not in animal_name and animal_name not in animal_data_name:
-            await query.edit_message_text("❌ *خطا در شناسایی حیوان*", parse_mode="Markdown")
-            return
-    
+    # ======== بررسی زمان ========
     hunt_time = game._to_float(game.data.get("hunt_time", 0))
     if hunt_time > 0:
         now = datetime.now().timestamp()
@@ -190,12 +188,16 @@ async def handle_hunt_to_fridge(update: Update, context: ContextTypes.DEFAULT_TY
             await query.edit_message_text("🦌 *حیوان فرار کرد! وقتت تموم شد.*", parse_mode="Markdown")
             return
     
+    # ======== بررسی وجود یخچال ========
     if not game.data.get("fridge_owned", False):
         await query.edit_message_text("❌ *شما یخچال هاپویی ندارید! با دستور «یخچال هاپویی» بخر.*", parse_mode="Markdown")
         return
     
+    # ======== بررسی ظرفیت یخچال ========
     items = game.get_fridge_items()
     capacity = game.get_fridge_capacity()
+    
+    logger.info(f"📦 ظرفیت یخچال: {len(items)}/{capacity}")
     
     if len(items) >= capacity:
         msg = f"❌ *یخچال شما پر است!* 📦\n\n"
@@ -215,22 +217,33 @@ async def handle_hunt_to_fridge(update: Update, context: ContextTypes.DEFAULT_TY
         await query.edit_message_text(msg, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
         return
     
-    result = game.add_to_fridge(animal)
-    if result["success"]:
-        game.data["current_hunt_animal"] = None
-        game.data["hunt_time"] = "0"
-        game.save_data()
-        await query.edit_message_text(
-            f"❄️ *{animal['emoji']} {animal['name']} با موفقیت در یخچال ذخیره شد!*\n\n"
-            f"📦 *ظرفیت یخچال:* {len(game.get_fridge_items())}/{game.get_fridge_capacity()}",
-            parse_mode="Markdown"
-        )
-    else:
-        await query.edit_message_text(f"❌ *{result['reason']}*", parse_mode="Markdown")
+    # ======== ✅ ذخیره در یخچال ========
+    animal_copy = animal.copy()
+    animal_copy["cooked"] = False
+    animal_copy["cooking"] = False
+    items.append(animal_copy)
+    
+    # ذخیره در دیتابیس
+    game.save_fridge_items(items)
+    
+    # حذف حیوان از حالت شکار
+    game.data["current_hunt_animal"] = None
+    game.data["hunt_time"] = "0"
+    game.save_data()
+    
+    # ✅ لاگ برای اطمینان
+    logger.info(f"✅ حیوان {animal['name']} در یخچال ذخیره شد - کاربر {user_id}")
+    logger.info(f"📦 تعداد آیتم‌های یخچال: {len(items)}")
+    
+    await query.edit_message_text(
+        f"❄️ *{animal['emoji']} {animal['name']} با موفقیت در یخچال ذخیره شد!*\n\n"
+        f"📦 *ظرفیت یخچال:* {len(items)}/{game.get_fridge_capacity()}",
+        parse_mode="Markdown"
+    )
 
 
 # ================================================================
-# کالبک‌های یخچال
+# کالبک‌های یخچال (بقیه توابع)
 # ================================================================
 
 async def handle_fridge_buy(update: Update, context: ContextTypes.DEFAULT_TYPE, query):
@@ -353,7 +366,7 @@ async def handle_fridge_item(update: Update, context: ContextTypes.DEFAULT_TYPE,
 
 
 async def handle_fridge_cook(update: Update, context: ContextTypes.DEFAULT_TYPE, query, index):
-    """شروع پخت حیوان در یخچال"""
+    """شروع پخت حیوان در یخچال - ✅ با ذخیره‌سازی در دیتابیس"""
     user_id = update.effective_user.id
     username = update.effective_user.username
     full_name = update.effective_user.full_name or f"کاربر{user_id}"
@@ -365,6 +378,11 @@ async def handle_fridge_cook(update: Update, context: ContextTypes.DEFAULT_TYPE,
         minutes = cook_time // 60
         seconds = cook_time % 60
         item = result["item"]
+        
+        # ✅ اطمینان از ذخیره در دیتابیس
+        game.save_data()
+        
+        logger.info(f"🔥 شروع پخت {item['name']} - کاربر {user_id} - زمان: {cook_time}s")
         
         await query.edit_message_text(
             f"🔥 *شروع پخت {item['emoji']} {item['name']}!*\n\n"
@@ -380,13 +398,14 @@ async def handle_fridge_cook(update: Update, context: ContextTypes.DEFAULT_TYPE,
 
 
 async def cook_timer(update: Update, context: ContextTypes.DEFAULT_TYPE, user_id, index, cook_time):
-    """تایمر پخت حیوان"""
+    """تایمر پخت حیوان - ✅ با ذخیره‌سازی در دیتابیس"""
     await asyncio.sleep(cook_time)
     try:
         game = get_game(user_id)
         if not game.data.get("fridge_owned", False):
             return
         
+        # بازیابی آیتم‌ها از دیتابیس
         items = game.get_fridge_items()
         if index < 0 or index >= len(items):
             return
@@ -395,7 +414,19 @@ async def cook_timer(update: Update, context: ContextTypes.DEFAULT_TYPE, user_id
         if not item.get("cooking", False):
             return
         
-        game.check_cooking_status()
+        # ✅ تکمیل پخت
+        item["cooked"] = True
+        item["cooking"] = False
+        item["original_value"] = item.get("value", 0)
+        item["original_nutrition"] = item.get("nutrition", 1)
+        item["value"] = int(item["value"] * 10)
+        item["nutrition"] = item["nutrition"] * 2
+        
+        # ✅ ذخیره در دیتابیس
+        game.save_fridge_items(items)
+        game.save_data()
+        
+        logger.info(f"✅ پخت {item['name']} کامل شد - کاربر {user_id}")
         
         try:
             await context.bot.send_message(
@@ -413,7 +444,7 @@ async def cook_timer(update: Update, context: ContextTypes.DEFAULT_TYPE, user_id
 
 
 async def handle_fridge_sell(update: Update, context: ContextTypes.DEFAULT_TYPE, query, index):
-    """فروش حیوان از یخچال"""
+    """فروش حیوان از یخچال - ✅ با حذف از دیتابیس"""
     user_id = update.effective_user.id
     username = update.effective_user.username
     full_name = update.effective_user.full_name or f"کاربر{user_id}"
@@ -424,6 +455,9 @@ async def handle_fridge_sell(update: Update, context: ContextTypes.DEFAULT_TYPE,
         item = result["item"]
         value = result["value"]
         hop_point = game._to_int(game.data["hop_point"])
+        
+        logger.info(f"💰 فروش {item['name']} از یخچال - کاربر {user_id} - {value} 🪙")
+        
         await query.edit_message_text(
             f"💰 *{item['emoji']} {item['name']} فروخته شد!*\n"
             f"✅ *{format_number(value)} 🪙 به حساب شما واریز شد.*\n"
@@ -437,7 +471,7 @@ async def handle_fridge_sell(update: Update, context: ContextTypes.DEFAULT_TYPE,
 
 
 async def handle_fridge_feed(update: Update, context: ContextTypes.DEFAULT_TYPE, query, index):
-    """تغذیه هاپو از یخچال"""
+    """تغذیه هاپو از یخچال - ✅ با حذف از دیتابیس"""
     user_id = update.effective_user.id
     username = update.effective_user.username
     full_name = update.effective_user.full_name or f"کاربر{user_id}"
@@ -450,6 +484,8 @@ async def handle_fridge_feed(update: Update, context: ContextTypes.DEFAULT_TYPE,
         new_food = result.get("new_food", 0)
         max_food = result.get("max_food", 0)
         hop_point = game._to_int(game.data["hop_point"])
+        
+        logger.info(f"🍖 تغذیه هاپو از یخچال - {item['name']} - کاربر {user_id}")
         
         await query.edit_message_text(
             f"🍖 *{item['emoji']} {item['name']} به هاپو داده شد!*\n\n"
@@ -682,10 +718,6 @@ async def smuggle_timer(update: Update, context: ContextTypes.DEFAULT_TYPE, user
     except Exception as e:
         logger.error(f"Error in smuggle_timer: {e}")
 
-
-# ================================================================
-# برگشت به منوی قاچاق
-# ================================================================
 
 async def handle_smuggle_back(update: Update, context: ContextTypes.DEFAULT_TYPE, query):
     """برگشت به منوی قاچاق"""
