@@ -1,4 +1,4 @@
-# bot.py - فایل اصلی (نسخه نهایی)
+# bot.py - فایل اصلی (نسخه کامل با اصلاحات نهایی)
 
 import logging
 import os
@@ -122,6 +122,7 @@ def main():
     logger.info(f"🤖 نام بات: @HopDogQ")
     logger.info("=" * 60)
     
+    # ======== ایجاد اپلیکیشن ========
     app = Application.builder().token(TOKEN).build()
     
     # ================================================================
@@ -161,7 +162,7 @@ def main():
     logger.info("🔑 ورود ادمین فعال شد")
     
     # ================================================================
-    # هندلر پیام‌های گروه
+    # هندلر پیام‌های گروه (با اولویت بالا)
     # ================================================================
     logger.info("📝 ثبت هندلر پیام‌های گروه...")
     app.add_handler(MessageHandler(
@@ -171,7 +172,7 @@ def main():
     logger.info("✅ هندلر گروه ثبت شد")
     
     # ================================================================
-    # هندلر پیام‌های پیوی (باید آخر باشه)
+    # هندلر پیام‌های پیوی
     # ================================================================
     logger.info("📝 ثبت هندلر پیام‌های پیوی...")
     app.add_handler(MessageHandler(
@@ -200,6 +201,7 @@ def main():
     if job_queue:
         logger.info("⏰ تنظیم Job Queue...")
         
+        # ======== هاپوی خیابونی (هر ۶ ساعت) ========
         job_queue.run_repeating(
             send_street_hapo_notification, 
             interval=STREET_HAPO_INTERVAL, 
@@ -207,12 +209,15 @@ def main():
         )
         logger.info(f"✅ هاپوی خیابونی فعال شد (هر {STREET_HAPO_INTERVAL//3600} ساعت)")
         
+        # ======== پاک‌سازی بازی‌ها (هر ۳۰ ثانیه) ========
         job_queue.run_repeating(cleanup_games, interval=30, first=5)
         logger.info("✅ پاک‌سازی خودکار بازی‌ها فعال شد (هر ۳۰ ثانیه)")
         
+        # ======== پاک‌سازی رای‌ها (هر ۱ ساعت) ========
         job_queue.run_repeating(cleanup_votes, interval=3600, first=10)
         logger.info("✅ پاک‌سازی خودکار رای‌ها فعال شد (هر ۱ ساعت)")
         
+        # ======== لاگ آمار سیستم (هر ۱ ساعت) ========
         job_queue.run_repeating(log_system_stats, interval=3600, first=60)
         logger.info("✅ لاگ آمار سیستم فعال شد (هر ۱ ساعت)")
         
