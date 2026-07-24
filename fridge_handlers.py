@@ -1,4 +1,4 @@
-# fridge_handlers.py - نسخه کامل اصلاح شده برای ذخیره‌سازی صحیح یخچال
+# fridge_handlers.py - هندلرهای یخچال هاپویی و قاچاق (نسخه کامل نهایی)
 
 import asyncio
 import logging
@@ -157,11 +157,11 @@ async def show_fridge_menu(update: Update, game):
 
 
 # ================================================================
-# ✅ ذخیره حیوان در یخچال (اصلاح شده با لاگ و ذخیره‌سازی مطمئن)
+# ذخیره حیوان در یخچال (از شکار) - نسخه اصلاح شده
 # ================================================================
 
 async def handle_hunt_to_fridge(update: Update, context: ContextTypes.DEFAULT_TYPE, query, animal_name):
-    """ذخیره حیوان شکار شده در یخچال - نسخه اصلاح شده"""
+    """ذخیره حیوان شکار شده در یخچال - نسخه اصلاح شده با ذخیره‌سازی مطمئن"""
     user_id = update.effective_user.id
     username = update.effective_user.username
     full_name = update.effective_user.full_name or f"کاربر{user_id}"
@@ -217,7 +217,7 @@ async def handle_hunt_to_fridge(update: Update, context: ContextTypes.DEFAULT_TY
         await query.edit_message_text(msg, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
         return
     
-    # ======== ✅ ذخیره در یخچال ========
+    # ======== ذخیره در یخچال ========
     animal_copy = animal.copy()
     animal_copy["cooked"] = False
     animal_copy["cooking"] = False
@@ -225,13 +225,14 @@ async def handle_hunt_to_fridge(update: Update, context: ContextTypes.DEFAULT_TY
     
     # ذخیره در دیتابیس
     game.save_fridge_items(items)
+    game.save_data()  # اطمینان از ذخیره
     
     # حذف حیوان از حالت شکار
     game.data["current_hunt_animal"] = None
     game.data["hunt_time"] = "0"
     game.save_data()
     
-    # ✅ لاگ برای اطمینان
+    # لاگ برای اطمینان
     logger.info(f"✅ حیوان {animal['name']} در یخچال ذخیره شد - کاربر {user_id}")
     logger.info(f"📦 تعداد آیتم‌های یخچال: {len(items)}")
     
@@ -243,7 +244,7 @@ async def handle_hunt_to_fridge(update: Update, context: ContextTypes.DEFAULT_TY
 
 
 # ================================================================
-# کالبک‌های یخچال (بقیه توابع)
+# کالبک‌های یخچال
 # ================================================================
 
 async def handle_fridge_buy(update: Update, context: ContextTypes.DEFAULT_TYPE, query):
@@ -366,7 +367,7 @@ async def handle_fridge_item(update: Update, context: ContextTypes.DEFAULT_TYPE,
 
 
 async def handle_fridge_cook(update: Update, context: ContextTypes.DEFAULT_TYPE, query, index):
-    """شروع پخت حیوان در یخچال - ✅ با ذخیره‌سازی در دیتابیس"""
+    """شروع پخت حیوان در یخچال - با ذخیره‌سازی در دیتابیس"""
     user_id = update.effective_user.id
     username = update.effective_user.username
     full_name = update.effective_user.full_name or f"کاربر{user_id}"
@@ -379,7 +380,7 @@ async def handle_fridge_cook(update: Update, context: ContextTypes.DEFAULT_TYPE,
         seconds = cook_time % 60
         item = result["item"]
         
-        # ✅ اطمینان از ذخیره در دیتابیس
+        # اطمینان از ذخیره در دیتابیس
         game.save_data()
         
         logger.info(f"🔥 شروع پخت {item['name']} - کاربر {user_id} - زمان: {cook_time}s")
@@ -398,7 +399,7 @@ async def handle_fridge_cook(update: Update, context: ContextTypes.DEFAULT_TYPE,
 
 
 async def cook_timer(update: Update, context: ContextTypes.DEFAULT_TYPE, user_id, index, cook_time):
-    """تایمر پخت حیوان - ✅ با ذخیره‌سازی در دیتابیس"""
+    """تایمر پخت حیوان - با ذخیره‌سازی در دیتابیس"""
     await asyncio.sleep(cook_time)
     try:
         game = get_game(user_id)
@@ -414,7 +415,7 @@ async def cook_timer(update: Update, context: ContextTypes.DEFAULT_TYPE, user_id
         if not item.get("cooking", False):
             return
         
-        # ✅ تکمیل پخت
+        # تکمیل پخت
         item["cooked"] = True
         item["cooking"] = False
         item["original_value"] = item.get("value", 0)
@@ -422,7 +423,7 @@ async def cook_timer(update: Update, context: ContextTypes.DEFAULT_TYPE, user_id
         item["value"] = int(item["value"] * 10)
         item["nutrition"] = item["nutrition"] * 2
         
-        # ✅ ذخیره در دیتابیس
+        # ذخیره در دیتابیس
         game.save_fridge_items(items)
         game.save_data()
         
@@ -444,7 +445,7 @@ async def cook_timer(update: Update, context: ContextTypes.DEFAULT_TYPE, user_id
 
 
 async def handle_fridge_sell(update: Update, context: ContextTypes.DEFAULT_TYPE, query, index):
-    """فروش حیوان از یخچال - ✅ با حذف از دیتابیس"""
+    """فروش حیوان از یخچال - با حذف از دیتابیس"""
     user_id = update.effective_user.id
     username = update.effective_user.username
     full_name = update.effective_user.full_name or f"کاربر{user_id}"
@@ -471,7 +472,7 @@ async def handle_fridge_sell(update: Update, context: ContextTypes.DEFAULT_TYPE,
 
 
 async def handle_fridge_feed(update: Update, context: ContextTypes.DEFAULT_TYPE, query, index):
-    """تغذیه هاپو از یخچال - ✅ با حذف از دیتابیس"""
+    """تغذیه هاپو از یخچال - با حذف از دیتابیس"""
     user_id = update.effective_user.id
     username = update.effective_user.username
     full_name = update.effective_user.full_name or f"کاربر{user_id}"
