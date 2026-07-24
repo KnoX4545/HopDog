@@ -1,4 +1,4 @@
-# fridge_handlers.py - هندلرهای یخچال هاپویی و قاچاق
+# fridge_handlers.py - هندلرهای یخچال هاپویی و قاچاق (نسخه کامل)
 
 import asyncio
 import logging
@@ -164,30 +164,22 @@ async def handle_hunt_to_fridge(update: Update, context: ContextTypes.DEFAULT_TY
     full_name = update.effective_user.full_name or f"کاربر{user_id}"
     game = get_game(user_id, username or full_name)
     
-    # ======== دریافت حیوان از دیتابیس ========
     animal = game.data.get("current_hunt_animal")
-    
-    logger.info(f"🔍 handle_hunt_to_fridge - animal_name: '{animal_name}'")
-    logger.info(f"🔍 handle_hunt_to_fridge - animal from data: {animal}")
     
     if not animal:
         await query.edit_message_text("❌ *هیچ حیوانی برای ذخیره وجود ندارد*", parse_mode="Markdown")
         return
     
-    # ======== بررسی نام حیوان ========
     animal_data_name = animal.get("name", "")
     
     if not animal_name:
         animal_name = animal_data_name
-        logger.info(f"🔍 animal_name was empty, using: '{animal_name}'")
     
     if animal_data_name.replace(" ", "") != animal_name.replace(" ", ""):
-        logger.warning(f"⚠️ Animal name mismatch: '{animal_data_name}' vs '{animal_name}'")
         if animal_data_name not in animal_name and animal_name not in animal_data_name:
             await query.edit_message_text("❌ *خطا در شناسایی حیوان*", parse_mode="Markdown")
             return
     
-    # ======== بررسی زمان ========
     hunt_time = game._to_float(game.data.get("hunt_time", 0))
     if hunt_time > 0:
         now = datetime.now().timestamp()
@@ -198,12 +190,10 @@ async def handle_hunt_to_fridge(update: Update, context: ContextTypes.DEFAULT_TY
             await query.edit_message_text("🦌 *حیوان فرار کرد! وقتت تموم شد.*", parse_mode="Markdown")
             return
     
-    # ======== بررسی وجود یخچال ========
     if not game.data.get("fridge_owned", False):
         await query.edit_message_text("❌ *شما یخچال هاپویی ندارید! با دستور «یخچال هاپویی» بخر.*", parse_mode="Markdown")
         return
     
-    # ======== بررسی ظرفیت یخچال ========
     items = game.get_fridge_items()
     capacity = game.get_fridge_capacity()
     
@@ -225,7 +215,6 @@ async def handle_hunt_to_fridge(update: Update, context: ContextTypes.DEFAULT_TY
         await query.edit_message_text(msg, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
         return
     
-    # ======== ذخیره در یخچال ========
     result = game.add_to_fridge(animal)
     if result["success"]:
         game.data["current_hunt_animal"] = None
@@ -476,6 +465,35 @@ async def handle_fridge_feed(update: Update, context: ContextTypes.DEFAULT_TYPE,
 
 
 # ================================================================
+# رها کردن حیوان (از شکار)
+# ================================================================
+
+async def handle_hunt_release(update: Update, context: ContextTypes.DEFAULT_TYPE, query):
+    """رها کردن حیوان شکار شده"""
+    user_id = update.effective_user.id
+    username = update.effective_user.username
+    full_name = update.effective_user.full_name or f"کاربر{user_id}"
+    game = get_game(user_id, username or full_name)
+    
+    animal = game.data.get("current_hunt_animal")
+    if not animal:
+        await query.edit_message_text("❌ *هیچ حیوانی برای رها کردن وجود ندارد*", parse_mode="Markdown")
+        return
+    
+    animal_name = animal.get("name", "حیوان")
+    animal_emoji = animal.get("emoji", "🐾")
+    
+    game.data["current_hunt_animal"] = None
+    game.data["hunt_time"] = "0"
+    game.save_data()
+    
+    await query.edit_message_text(
+        f"{animal_emoji} *{animal_name} رو رها کردی!*\n\n🐾 حیوان به طبیعت برگشت...",
+        parse_mode="Markdown"
+    )
+
+
+# ================================================================
 # قاچاق هاپویی
 # ================================================================
 
@@ -664,6 +682,10 @@ async def smuggle_timer(update: Update, context: ContextTypes.DEFAULT_TYPE, user
     except Exception as e:
         logger.error(f"Error in smuggle_timer: {e}")
 
+
+# ================================================================
+# برگشت به منوی قاچاق
+# ================================================================
 
 async def handle_smuggle_back(update: Update, context: ContextTypes.DEFAULT_TYPE, query):
     """برگشت به منوی قاچاق"""
