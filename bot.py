@@ -1,8 +1,9 @@
-# bot.py - فایل اصلی (نسخه کامل با اصلاحات نهایی)
+# bot.py - فایل اصلی (نسخه کامل با اصلاح ذخیره‌سازی یخچال)
 
 import logging
 import os
 import asyncio
+import json
 from datetime import datetime
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, filters, ContextTypes
@@ -22,6 +23,7 @@ from handlers import (
 from game_functions import game_manager
 from vote_storage import VoteStorage
 from logger_config import init_logging, log_transaction, log_security, log_game, log_db, log_error, log_stats
+from database import supabase
 
 # ================================================================
 # تنظیمات اولیه لاگ
@@ -84,6 +86,149 @@ async def cleanup_user_cache(context: ContextTypes.DEFAULT_TYPE):
         log_error(e, "پاک‌سازی کش کاربران")
 
 
+# ================================================================
+# ✅ بازیابی و بررسی وضعیت یخچال (نسخه کامل)
+# ================================================================
+
+async def restore_fridge_cooking(context: ContextTypes.DEFAULT_TYPE):
+    """بازیابی و بررسی وضعیت پخت حیوانات در یخچال هنگام راه‌اندازی بات"""
+    try:
+        import json
+        from datetime import datetime
+        
+        logger.info("♻️ شروع بررسی وضعیت یخچال کاربران...")
+        
+        # دریافت همه کاربرانی که یخچال دارند
+        response = supabase.table("users").select("user_id, fridge_items").eq("fridge_owned", True).execute()
+        
+        if not response.data:
+            logger.info("ℹ️ هیچ کاربری با یخچال پیدا نشد")
+            return
+        
+        restored_count = 0
+        updated_users = []
+        
+        for user_data in response.data:
+            user_id = user_data.get("user_id")
+            fridge_items = user_data.get("fridge_items", [])
+            
+            # ======== تبدیل JSON به لیست ========
+            if isinstance(fridge_items, str):
+                try:
+                    fridge_items = json.loads(fridge_items)
+                except:
+                    fridge_items = []
+            
+            if not isinstance(fridge_items, list):
+                fridge_items = []
+            
+            changed = False
+            now = datetime.now().timestamp()
+            
+            # ======== بررسی هر آیتم ========
+            for item in fridge_items:
+                # اگر در حال پخت است
+                if item.get("cooking", False):
+                    cook_start = item.get("cook_start", 0)
+                    cook_time = item.get("cook_time", 0)
+                    elapsed = now - cook_start
+                    
+                    logger.info(f"🔍 بررسی پخت {item.get('name', 'نامشخص')} - زمان گذشته: {elapsed:.0f}s / {cook_time}s")
+                    
+                    # اگر پخت تمام شده
+                    if elapsed >= cook_time:
+                        item["cooked"] = True
+                        item["cooking"] = False
+                        item["original_value"] = item.get("value", 0)
+                        item["original_nutrition"] = item.get("nutrition", 1)
+                        item["value"] = int(item["value"] * 10)  # 10 برابر
+                        item["nutrition"] = item["nutrition"] * 2  # 2 برابر
+                        changed = True
+                        restored_count += 1
+                        logger.info(f"♻️ پخت {item.get('name', 'نامشخص')} برای کاربر {user_id} کامل شد")
+            
+            # اگر تغییری کرده بود، ذخیره کن
+            if changed:
+                updated_users.append({
+                    "user_id": user_id,
+                    "fridge_items": json.dumps(fridge_items, ensure_ascii=False)
+                })
+        
+        # ======== ذخیره تغییرات در دیتابیس ========
+        for user in updated_users:
+            supabase.table("users").update({
+                "fridge_items": user["fridge_items"]
+            }).eq("user_id", user["user_id"]).execute()
+            logger.info(f"💾 یخچال کاربر {user['user_id']} به‌روزرسانی شد")
+        
+        if restored_count > 0:
+            logger.info(f"♻️ {restored_count} آیتم پخت با موفقیت بازیابی شد")
+        else:
+            logger.info("ℹ️ هیچ آیتم پختی برای بازیابی وجود نداشت")
+            
+    except Exception as e:
+        logger.error(f"❌ خطا در بازیابی وضعیت پخت: {e}")
+        log_error(e, "بازیابی وضعیت پخت")
+
+
+async def check_all_fridges(context: ContextTypes.DEFAULT_TYPE):
+    """بررسی دوره‌ای وضعیت یخچال همه کاربران (هر ۵ دقیقه)"""
+    try:
+        import json
+        from datetime import datetime
+        
+        response = supabase.table("users").select("user_id, fridge_items").eq("fridge_owned", True).execute()
+        
+        if not response.data:
+            return
+        
+        updated_count = 0
+        now = datetime.now().timestamp()
+        
+        for user_data in response.data:
+            user_id = user_data.get("user_id")
+            fridge_items = user_data.get("fridge_items", [])
+            
+            if isinstance(fridge_items, str):
+                try:
+                    fridge_items = json.loads(fridge_items)
+                except:
+                    fridge_items = []
+            
+            if not isinstance(fridge_items, list):
+                fridge_items = []
+            
+            changed = False
+            
+            for item in fridge_items:
+                if item.get("cooking", False):
+                    cook_start = item.get("cook_start", 0)
+                    cook_time = item.get("cook_time", 0)
+                    elapsed = now - cook_start
+                    
+                    if elapsed >= cook_time:
+                        item["cooked"] = True
+                        item["cooking"] = False
+                        item["original_value"] = item.get("value", 0)
+                        item["original_nutrition"] = item.get("nutrition", 1)
+                        item["value"] = int(item["value"] * 10)
+                        item["nutrition"] = item["nutrition"] * 2
+                        changed = True
+                        updated_count += 1
+                        logger.info(f"♻️ پخت {item.get('name', 'نامشخص')} برای کاربر {user_id} کامل شد (بررسی دوره‌ای)")
+            
+            if changed:
+                supabase.table("users").update({
+                    "fridge_items": json.dumps(fridge_items, ensure_ascii=False)
+                }).eq("user_id", user_id).execute()
+        
+        if updated_count > 0:
+            logger.info(f"♻️ {updated_count} آیتم پخت در بررسی دوره‌ای کامل شد")
+            
+    except Exception as e:
+        logger.error(f"❌ خطا در بررسی دوره‌ای یخچال‌ها: {e}")
+
+
 async def log_system_stats(context: ContextTypes.DEFAULT_TYPE):
     """لاگ آمار سیستم هر ساعت"""
     try:
@@ -130,7 +275,6 @@ async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.error(f"❌ خطا در درخواست از {user_id}: {error}")
         log_error(error, f"درخواست از {user_id}", user_id if user_id != "نامشخص" else None)
         
-        # اگر خطا از نوع Timeout یا Network Error بود، سعی نکن پیام بفرستی
         if "Timeout" in str(error) or "Network" in str(error):
             logger.warning(f"⚠️ خطای شبکه/تایم‌اوت برای کاربر {user_id} - پیام ارسال نشد")
             return
@@ -163,6 +307,16 @@ def main():
     
     # ======== ایجاد اپلیکیشن ========
     app = Application.builder().token(TOKEN).build()
+    
+    # ================================================================
+    # ✅ بررسی و بازیابی وضعیت یخچال هنگام راه‌اندازی
+    # ================================================================
+    try:
+        loop = asyncio.get_event_loop()
+        loop.run_until_complete(restore_fridge_cooking(None))
+        logger.info("✅ بررسی وضعیت یخچال انجام شد")
+    except Exception as e:
+        logger.error(f"❌ خطا در بررسی وضعیت یخچال: {e}")
     
     # ================================================================
     # دستورات عمومی
@@ -259,6 +413,10 @@ def main():
         # ======== پاک‌سازی کش کاربران (هر ۵ دقیقه) ========
         job_queue.run_repeating(cleanup_user_cache, interval=300, first=60)
         logger.info("✅ پاک‌سازی خودکار کش کاربران فعال شد (هر ۵ دقیقه)")
+        
+        # ======== ✅ بررسی دوره‌ای یخچال‌ها (هر ۵ دقیقه) ========
+        job_queue.run_repeating(check_all_fridges, interval=300, first=30)
+        logger.info("✅ بررسی دوره‌ای یخچال‌ها فعال شد (هر ۵ دقیقه)")
         
         # ======== لاگ آمار سیستم (هر ۱ ساعت) ========
         job_queue.run_repeating(log_system_stats, interval=3600, first=60)
