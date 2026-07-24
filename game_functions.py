@@ -1,4 +1,4 @@
-# game_functions.py - توابع خالص بازی هاپویی (نسخه کامل با اصلاحات)
+# game_functions.py - توابع خالص بازی هاپویی (نسخه کامل با اصلاحات تایم‌اوت ۱ دقیقه)
 
 import random
 import logging
@@ -231,9 +231,11 @@ class GameManager:
         self.TURN_TIMEOUT = 60  # 60 ثانیه
         self.GAME_COOLDOWN = 120  # 2 دقیقه بین بازی‌ها
         self.CLEANUP_DELAY = 300  # 5 دقیقه بعد از پایان بازی
+        self.WAITING_TIMEOUT = 60  # ✅ 1 دقیقه برای بازی بدون بازیکن
         
         logger.info("🎮 GameManager راه‌اندازی شد")
         logger.info(f"📊 تنظیمات: حداکثر {self.MAX_GAMES} بازی, تایم‌اوت {self.TURN_TIMEOUT} ثانیه")
+        logger.info(f"⏰ تایم‌اوت انتظار: {self.WAITING_TIMEOUT} ثانیه")
     
     # ================================================================
     # توابع کمکی
@@ -429,7 +431,10 @@ class GameManager:
             logger.info(f"🗑️ بازی {game_id} حذف شد")
     
     def check_timeout(self):
-        """بررسی تایم‌اوت بازی‌ها"""
+        """
+        بررسی تایم‌اوت بازی‌ها
+        ✅ اصلاح شده: تایم‌اوت ۱ دقیقه برای بازی بدون بازیکن
+        """
         now = datetime.now().timestamp()
         to_remove = []
         
@@ -438,7 +443,21 @@ class GameManager:
             if game.status == "finished":
                 if now - game.last_move_at > self.CLEANUP_DELAY:
                     to_remove.append(game_id)
-                    logger.info(f"⏰ بازی {game_id} بعد از {self.CLEANUP_DELAY} ثانیه حذف شد")
+                    logger.info(f"⏰ بازی {game_id} بعد از {self.CLEANUP_DELAY} ثانیه حذف شد (تمام شده)")
+                continue
+            
+            # ======== ✅ بازی در حال انتظار - ۱ دقیقه ========
+            if game.status == "waiting":
+                elapsed = now - game.created_at
+                if elapsed > self.WAITING_TIMEOUT:
+                    # برگشت پول به میزبان
+                    logger.info(f"⏰ بازی {game_id} بعد از {self.WAITING_TIMEOUT} ثانیه (بدون بازیکن) حذف شد - پول میزبان برگشت می‌خورد")
+                    
+                    # حذف از لیست کاربران
+                    if game.host_id in self.user_games:
+                        del self.user_games[game.host_id]
+                    
+                    to_remove.append(game_id)
                 continue
             
             # ======== بازی در حال انجام و ۶۰ ثانیه از آخرین حرکت گذشته ========
@@ -466,12 +485,6 @@ class GameManager:
                             self.user_game_timeout[uid] = now
                     
                     to_remove.append(game_id)
-            
-            # ======== بازی در حال انتظار و بیش از ۵ دقیقه گذشته ========
-            if game.status == "waiting":
-                if now - game.created_at > self.CLEANUP_DELAY:
-                    to_remove.append(game_id)
-                    logger.info(f"⏰ بازی {game_id} بعد از {self.CLEANUP_DELAY} ثانیه (بدون بازیکن) حذف شد")
         
         # حذف بازی‌های منقضی شده
         for game_id in to_remove:
@@ -679,21 +692,26 @@ game_manager = GameManager()
 
 if __name__ == "__main__":
     # تست GameManager
-    print("🧪 تست GameManager...")
+    print("=" * 60)
+    print("🧪 تست GameManager")
+    print("=" * 60)
     
     manager = GameManager()
     
-    # تست ساخت بازی
+    # تست 1: ساخت بازی
+    print("\n📝 تست 1: ساخت بازی...")
     success, game_id, game = manager.create_game(123, "آرش", 1000)
     if success:
         print(f"✅ بازی ساخته شد: {game_id}")
         
-        # تست پیوستن
+        # تست 2: پیوستن به بازی
+        print("\n📝 تست 2: پیوستن به بازی...")
         success2, _, game2 = manager.join_game(game_id, 456, "سارا")
         if success2:
             print(f"✅ بازیکن دوم پیوست: {game2.player_name}")
             
-            # تست حرکت
+            # تست 3: حرکت
+            print("\n📝 تست 3: انجام حرکت...")
             result = manager.make_move(game_id, 123, 0, 0)
             print(f"✅ حرکت میزبان: {result}")
             
@@ -704,4 +722,29 @@ if __name__ == "__main__":
     else:
         print(f"❌ خطا در ساخت بازی: {success}")
     
-    print("🎉 تست‌ها با موفقیت انجام شد!")
+    # تست 4: تایم‌اوت
+    print("\n📝 تست 4: تست تایم‌اوت...")
+    # ساخت بازی بدون بازیکن دوم
+    success3, game_id3, game3 = manager.create_game(789, "رضا", 500)
+    if success3:
+        print(f"✅ بازی بدون بازیکن ساخته شد: {game_id3}")
+        print(f"⏰ منتظر ۲ ثانیه برای تست تایم‌اوت...")
+        import time
+        time.sleep(2)
+        manager.check_timeout()
+        game3 = manager.get_game(game_id3)
+        if game3 is None:
+            print("✅ بازی بعد از تایم‌اوت حذف شد")
+        else:
+            print(f"❌ بازی هنوز وجود دارد: وضعیت {game3.status}")
+    else:
+        print(f"❌ خطا در ساخت بازی: {success3}")
+    
+    # تست 5: آمار
+    print("\n📝 تست 5: آمار بازی‌ها...")
+    stats = manager.get_game_stats()
+    print(f"✅ آمار: {stats}")
+    
+    print("\n" + "=" * 60)
+    print("🎉 همه تست‌ها با موفقیت انجام شد!")
+    print("=" * 60)
