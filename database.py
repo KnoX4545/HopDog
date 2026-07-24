@@ -87,6 +87,20 @@ def _to_bool(value, default=False):
     return bool(value)
 
 
+def _to_float(value, default=0.0):
+    """تبدیل هر نوع داده به عدد اعشاری"""
+    if value is None:
+        return default
+    if isinstance(value, (int, float)):
+        return float(value)
+    if isinstance(value, str):
+        try:
+            return float(value)
+        except:
+            return default
+    return default
+
+
 # ================================================================
 # توابع اصلی کاربر
 # ================================================================
@@ -147,7 +161,8 @@ def get_user_data(user_id: Union[int, str]) -> Optional[Dict[str, Any]]:
                 "total_hunts": "0",
                 "last_transfer_time": "0",
                 "created_at": datetime.now().isoformat(),
-                "last_updated": datetime.now().isoformat()
+                "last_updated": datetime.now().isoformat(),
+                "_hapo_stopped_message": False  # ✅ جدید - برای پیام کار نمیکنم
             }
             
             for key, default in defaults.items():
@@ -237,7 +252,6 @@ def save_user_data(user_id: Union[int, str], data: Dict[str, Any]) -> bool:
                         else:
                             data_to_save[field] = "[]"
                 elif isinstance(data_to_save[field], str):
-                    # اگه قبلاً string هست، بررسی کن که JSON معتبر هست یا نه
                     if field == "fridge_items" and data_to_save[field] == "":
                         data_to_save[field] = "[]"
                     elif field == "current_hunt_animal" and data_to_save[field] == "":
@@ -256,7 +270,8 @@ def save_user_data(user_id: Union[int, str], data: Dict[str, Any]) -> bool:
         bool_fields = [
             "is_admin", "hunt_active", "hapo_owned", "bank_opened", 
             "has_seen_welcome", "profile_hidden", "profile_locked", 
-            "is_transferring", "jailed", "fridge_owned", "smuggling"
+            "is_transferring", "jailed", "fridge_owned", "smuggling",
+            "_hapo_stopped_message"  # ✅ جدید
         ]
         
         for field in bool_fields:
@@ -375,18 +390,19 @@ def is_card_unique(card_number: str) -> bool:
         return False
 
 
-def _to_float(value, default=0.0):
-    """تبدیل هر نوع داده به عدد اعشاری"""
-    if value is None:
-        return default
-    if isinstance(value, (int, float)):
-        return float(value)
-    if isinstance(value, str):
-        try:
-            return float(value)
-        except:
-            return default
-    return default
+def get_user_count() -> int:
+    """
+    دریافت تعداد کل کاربران
+    
+    Returns:
+        int: تعداد کاربران
+    """
+    try:
+        response = supabase.table("users").select("user_id", count="exact").execute()
+        return response.count if hasattr(response, 'count') else 0
+    except Exception as e:
+        logger.error(f"❌ خطا در دریافت تعداد کاربران: {e}")
+        return 0
 
 
 # ================================================================
@@ -600,6 +616,21 @@ def remove_group(chat_id: Union[int, str]) -> bool:
         return False
 
 
+def get_group_count() -> int:
+    """
+    دریافت تعداد کل گروه‌های فعال
+    
+    Returns:
+        int: تعداد گروه‌ها
+    """
+    try:
+        response = supabase.table("groups").select("chat_id", count="exact").eq("is_active", True).execute()
+        return response.count if hasattr(response, 'count') else 0
+    except Exception as e:
+        logger.error(f"❌ خطا در دریافت تعداد گروه‌ها: {e}")
+        return 0
+
+
 # ================================================================
 # توابع هاپوی خیابونی
 # ================================================================
@@ -686,22 +717,36 @@ def set_street_hapo_status(active: bool, data: Optional[Dict] = None) -> bool:
 
 
 # ================================================================
-# توابع رای‌گیری (Votes) - جدید
+# توابع رای‌گیری (Votes) - با پشتیبانی کامل
 # ================================================================
 
-def save_vote(vote_key: str, data: Dict[str, Any], expires_at: datetime) -> bool:
+def save_vote(vote_key: str, data: Dict[str, Any], expires_at: Optional[datetime] = None) -> bool:
     """
     ذخیره رای در دیتابیس
     
     Args:
         vote_key: کلید یکتای رای
         data: داده‌های رای
-        expires_at: زمان انقضا
+        expires_at: زمان انقضا (اختیاری)
     
     Returns:
         bool: موفقیت‌آمیز بودن ذخیره
     """
     try:
+        if expires_at is None:
+            # اگر زمان انقضا داده نشده، از داده استخراج کن
+            until = data.get("until")
+            if until:
+                if isinstance(until, (int, float)):
+                    expires_at = datetime.fromtimestamp(until)
+                elif isinstance(until, str):
+                    try:
+                        expires_at = datetime.fromisoformat(until)
+                    except:
+                        expires_at = datetime.now() + timedelta(minutes=5)
+            else:
+                expires_at = datetime.now() + timedelta(minutes=5)
+        
         data_json = json.dumps(data, ensure_ascii=False, default=str)
         
         supabase.table("votes").upsert({
@@ -730,12 +775,20 @@ def get_vote(vote_key: str) -> Optional[Dict[str, Any]]:
         Optional[Dict]: اطلاعات رای یا None
     """
     try:
-        response = supabase.table("votes").select("data").eq("vote_key", vote_key).execute()
+        response = supabase.table("votes").select("data, expires_at").eq("vote_key", vote_key).execute()
         
         if response.data and len(response.data) > 0:
             data_str = response.data[0].get("data")
             if data_str:
-                return json.loads(data_str)
+                data = json.loads(data_str)
+                # اضافه کردن زمان انقضا به داده
+                expires_at = response.data[0].get("expires_at")
+                if expires_at:
+                    try:
+                        data["_expires_at"] = expires_at
+                    except:
+                        pass
+                return data
         return None
         
     except Exception as e:
@@ -765,7 +818,7 @@ def delete_vote(vote_key: str) -> bool:
 
 def cleanup_expired_votes() -> int:
     """
-    پاک‌سازی رای‌های منقضی شده
+    پاک‌سازی رای‌های منقضی شده با لاگ دقیق
     
     Returns:
         int: تعداد رای‌های حذف شده
@@ -773,13 +826,22 @@ def cleanup_expired_votes() -> int:
     try:
         now = datetime.now().isoformat()
         
-        # شمارش رای‌های منقضی شده
-        count_response = supabase.table("votes").select("vote_key", count="exact").lt("expires_at", now).execute()
-        count = count_response.count if hasattr(count_response, 'count') else 0
+        # دریافت لیست رای‌های منقضی شده
+        response = supabase.table("votes").select("vote_key").lt("expires_at", now).execute()
+        
+        expired_votes = response.data if response.data else []
+        count = len(expired_votes)
         
         if count > 0:
+            # حذف رای‌های منقضی شده
             supabase.table("votes").delete().lt("expires_at", now).execute()
             logger.info(f"🧹 {count} رای منقضی شده پاک شد")
+            for vote in expired_votes[:5]:  # فقط ۵ تا برای لاگ
+                logger.debug(f"  └─ حذف: {vote.get('vote_key')}")
+            if count > 5:
+                logger.debug(f"  └─ و {count - 5} رای دیگر...")
+        else:
+            logger.debug("🧹 هیچ رای منقضی شده‌ای وجود ندارد")
         
         return count
         
@@ -790,7 +852,7 @@ def cleanup_expired_votes() -> int:
 
 def get_active_votes(limit: int = 100) -> List[Dict[str, Any]]:
     """
-    دریافت لیست رای‌های فعال
+    دریافت لیست رای‌های فعال (غیرمنقضی)
     
     Args:
         limit: حداکثر تعداد
@@ -826,6 +888,48 @@ def get_active_votes(limit: int = 100) -> List[Dict[str, Any]]:
     except Exception as e:
         logger.error(f"❌ خطا در دریافت رای‌های فعال: {e}")
         return []
+
+
+def get_vote_count(vote_key: str) -> int:
+    """
+    دریافت تعداد رای‌های یک رای‌گیری
+    
+    Args:
+        vote_key: کلید یکتای رای
+    
+    Returns:
+        int: تعداد رای‌ها
+    """
+    data = get_vote(vote_key)
+    if data:
+        return len(data.get("votes", []))
+    return 0
+
+
+def is_vote_expired(vote_key: str) -> bool:
+    """
+    بررسی منقضی شدن یک رای
+    
+    Args:
+        vote_key: کلید یکتای رای
+    
+    Returns:
+        bool: منقضی شده یا نه
+    """
+    try:
+        response = supabase.table("votes").select("expires_at").eq("vote_key", vote_key).execute()
+        
+        if response.data and len(response.data) > 0:
+            expires_at_str = response.data[0].get("expires_at")
+            if expires_at_str:
+                expires_at = datetime.fromisoformat(expires_at_str)
+                return expires_at < datetime.now()
+        
+        return True
+        
+    except Exception as e:
+        logger.error(f"❌ خطا در بررسی انقضای رای {vote_key}: {e}")
+        return True
 
 
 # ================================================================
@@ -887,6 +991,39 @@ def get_top_groups(limit: int = 10, order_by: str = "total_hops") -> List[Dict[s
         return []
 
 
+def search_users(query: str, limit: int = 20) -> List[Dict[str, Any]]:
+    """
+    جستجوی کاربران بر اساس نام یا آیدی
+    
+    Args:
+        query: عبارت جستجو
+        limit: تعداد
+    
+    Returns:
+        List[Dict]: لیست کاربران
+    """
+    try:
+        query = query.strip()
+        if query.isdigit():
+            response = supabase.table("users") \
+                .select("user_id, player_name") \
+                .eq("user_id", query) \
+                .limit(limit) \
+                .execute()
+        else:
+            response = supabase.table("users") \
+                .select("user_id, player_name") \
+                .ilike("player_name", f"%{query}%") \
+                .limit(limit) \
+                .execute()
+        
+        return response.data if response.data else []
+        
+    except Exception as e:
+        logger.error(f"❌ خطا در جستجوی کاربران: {e}")
+        return []
+
+
 # ================================================================
 # اسکریپت‌های راه‌اندازی دیتابیس
 # ================================================================
@@ -941,6 +1078,7 @@ CREATE TABLE IF NOT EXISTS users (
     smuggle_success_chance TEXT DEFAULT '0',
     smuggle_used_hapo TEXT DEFAULT '0',
     total_hunts TEXT DEFAULT '0',
+    _hapo_stopped_message BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP DEFAULT NOW(),
     last_updated TIMESTAMP DEFAULT NOW()
 );
@@ -966,7 +1104,7 @@ CREATE TABLE IF NOT EXISTS settings (
     updated_at TIMESTAMP DEFAULT NOW()
 );
 
--- جدول رای‌ها (جدید)
+-- جدول رای‌ها
 CREATE TABLE IF NOT EXISTS votes (
     vote_key TEXT PRIMARY KEY,
     data JSONB NOT NULL,
@@ -996,6 +1134,7 @@ CREATE TRIGGER trigger_users_updated
     EXECUTE FUNCTION update_updated_at();
 """
 
+
 # ================================================================
 # تست و راه‌اندازی
 # ================================================================
@@ -1003,7 +1142,6 @@ CREATE TRIGGER trigger_users_updated
 def init_database():
     """راه‌اندازی اولیه دیتابیس (اجرای اسکریپت‌های ایجاد جدول)"""
     try:
-        # اینجا می‌تونید اسکریپت SQL رو اجرا کنید
         logger.info("🗄️ دیتابیس آماده است")
         return True
     except Exception as e:
@@ -1011,10 +1149,32 @@ def init_database():
         return False
 
 
+def test_connection() -> bool:
+    """
+    تست اتصال به دیتابیس
+    
+    Returns:
+        bool: موفقیت‌آمیز بودن اتصال
+    """
+    try:
+        supabase.table("users").select("user_id").limit(1).execute()
+        logger.info("✅ اتصال به Supabase برقرار است!")
+        return True
+    except Exception as e:
+        logger.error(f"❌ خطا در اتصال به Supabase: {e}")
+        return False
+
+
+# ================================================================
+# اجرای اصلی
+# ================================================================
+
 if __name__ == "__main__":
     # تست اتصال
     try:
-        supabase.table("users").select("count").limit(1).execute()
+        supabase.table("users").select("user_id").limit(1).execute()
         print("✅ اتصال به Supabase برقرار است!")
+        print(f"📊 تعداد کاربران: {get_user_count()}")
+        print(f"📊 تعداد گروه‌ها: {get_group_count()}")
     except Exception as e:
         print(f"❌ خطا در اتصال به Supabase: {e}")
