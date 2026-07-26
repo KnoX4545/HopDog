@@ -1,4 +1,4 @@
-# globals.py - اشیاء و متغیرهای سراسری (نسخه کامل با اصلاح import)
+# globals.py - اشیاء و متغیرهای سراسری (نسخه کامل با اصلاحات)
 
 import time
 from typing import Dict, Optional, Any, List
@@ -25,7 +25,10 @@ MEOW_VOTES = {}
 TRANSFER_STATE = {}
 
 # زمان آخرین ارسال هاپوی خیابونی به هر گروه
-STREET_HAPO_LAST_SENT = {}
+# ✅ اضافه شدن _last_batch_time برای ثبت زمان بچ ارسال
+STREET_HAPO_LAST_SENT = {
+    "_last_batch_time": 0  # زمان آخرین بچ ارسال
+}
 
 # وضعیت بازی XO برای هر کاربر (تعیین مبلغ شرط)
 GAME_XO_STATE = {}
@@ -420,10 +423,10 @@ def clear_all_transfer_states() -> int:
 
 
 # ================================================================
-# توابع کمکی برای مدیریت STREET_HAPO_LAST_SENT
+# ✅ توابع کمکی برای مدیریت STREET_HAPO_LAST_SENT (با پشتیبانی از بچ)
 # ================================================================
 
-def get_street_hapo_last_sent(chat_id: int) -> float:
+def get_street_hapo_last_sent(chat_id: str) -> float:
     """
     دریافت زمان آخرین ارسال هاپوی خیابونی به گروه
     
@@ -436,7 +439,7 @@ def get_street_hapo_last_sent(chat_id: int) -> float:
     return STREET_HAPO_LAST_SENT.get(str(chat_id), 0)
 
 
-def set_street_hapo_last_sent(chat_id: int, timestamp: float) -> None:
+def set_street_hapo_last_sent(chat_id: str, timestamp: float) -> None:
     """
     تنظیم زمان آخرین ارسال هاپوی خیابونی به گروه
     
@@ -447,7 +450,27 @@ def set_street_hapo_last_sent(chat_id: int, timestamp: float) -> None:
     STREET_HAPO_LAST_SENT[str(chat_id)] = timestamp
 
 
-def clear_street_hapo_last_sent(chat_id: int) -> bool:
+def get_street_hapo_last_batch_time() -> float:
+    """
+    دریافت زمان آخرین بچ ارسال هاپوی خیابونی
+    
+    Returns:
+        float: تایم‌استمپ آخرین بچ
+    """
+    return STREET_HAPO_LAST_SENT.get("_last_batch_time", 0)
+
+
+def set_street_hapo_last_batch_time(timestamp: float) -> None:
+    """
+    تنظیم زمان آخرین بچ ارسال هاپوی خیابونی
+    
+    Args:
+        timestamp: تایم‌استمپ
+    """
+    STREET_HAPO_LAST_SENT["_last_batch_time"] = timestamp
+
+
+def clear_street_hapo_last_sent(chat_id: str) -> bool:
     """
     پاک کردن زمان آخرین ارسال هاپوی خیابونی به گروه
     
@@ -458,7 +481,7 @@ def clear_street_hapo_last_sent(chat_id: int) -> bool:
         bool: موفقیت‌آمیز بودن پاک کردن
     """
     key = str(chat_id)
-    if key in STREET_HAPO_LAST_SENT:
+    if key in STREET_HAPO_LAST_SENT and key != "_last_batch_time":
         del STREET_HAPO_LAST_SENT[key]
         return True
     return False
@@ -466,14 +489,30 @@ def clear_street_hapo_last_sent(chat_id: int) -> bool:
 
 def clear_all_street_hapo_last_sent() -> int:
     """
-    پاک کردن همه زمان‌های ارسال هاپوی خیابونی
+    پاک کردن همه زمان‌های ارسال هاپوی خیابونی (به جز _last_batch_time)
     
     Returns:
         int: تعداد آیتم‌های پاک شده
     """
-    count = len(STREET_HAPO_LAST_SENT)
-    STREET_HAPO_LAST_SENT.clear()
+    count = 0
+    keys_to_remove = []
+    for key in STREET_HAPO_LAST_SENT:
+        if key != "_last_batch_time":
+            keys_to_remove.append(key)
+            count += 1
+    
+    for key in keys_to_remove:
+        del STREET_HAPO_LAST_SENT[key]
+    
     return count
+
+
+def reset_street_hapo_batch() -> None:
+    """
+    ریست کردن زمان بچ هاپوی خیابونی (برای تست یا رفع مشکل)
+    """
+    STREET_HAPO_LAST_SENT["_last_batch_time"] = 0
+    logger.info("🔄 زمان بچ هاپوی خیابونی ریست شد")
 
 
 # ================================================================
@@ -577,7 +616,7 @@ def get_memory_stats() -> Dict[str, int]:
         "xo_states": len(GAME_XO_STATE),
         "spam_trackers": len(SPAM_TRACKER),
         "transfer_states": len(TRANSFER_STATE),
-        "street_hapo_last_sent": len(STREET_HAPO_LAST_SENT),
+        "street_hapo_last_sent": len(STREET_HAPO_LAST_SENT) - 1,  # منهای _last_batch_time
         "meow_votes": len(MEOW_VOTES),
         "total": (
             len(user_games) + 
@@ -585,7 +624,7 @@ def get_memory_stats() -> Dict[str, int]:
             len(GAME_XO_STATE) + 
             len(SPAM_TRACKER) + 
             len(TRANSFER_STATE) + 
-            len(STREET_HAPO_LAST_SENT) + 
+            (len(STREET_HAPO_LAST_SENT) - 1) + 
             len(MEOW_VOTES)
         )
     }
@@ -596,6 +635,10 @@ def get_memory_stats() -> Dict[str, int]:
 # ================================================================
 
 if __name__ == "__main__":
+    import logging
+    logging.basicConfig(level=logging.INFO)
+    logger = logging.getLogger(__name__)
+    
     print("=" * 60)
     print("🧪 تست globals.py")
     print("=" * 60)
@@ -623,6 +666,15 @@ if __name__ == "__main__":
     # تست آمار
     stats = get_memory_stats()
     print(f"📊 آمار حافظه: {stats}")
+    
+    # تست STREET_HAPO_LAST_SENT
+    print("📋 STREET_HAPO_LAST_SENT:", STREET_HAPO_LAST_SENT)
+    
+    # تست توابع هاپوی خیابونی
+    set_street_hapo_last_sent("group_1", time.time())
+    set_street_hapo_last_batch_time(time.time())
+    print(f"✅ زمان ارسال گروه 1: {get_street_hapo_last_sent('group_1')}")
+    print(f"✅ زمان بچ: {get_street_hapo_last_batch_time()}")
     
     print("=" * 60)
     print("🎉 همه تست‌ها با موفقیت انجام شد!")
