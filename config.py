@@ -1,8 +1,8 @@
-# config.py - تنظیمات و ثابت‌های اصلی (نسخه نهایی کامل با اصلاح import)
+# config.py - تنظیمات و ثابت‌های اصلی (نسخه نهایی کامل)
 
 import os
 from datetime import timedelta
-from typing import Dict, Any, List  # <-- اصلاح شده
+from typing import Dict, Any, List
 
 # ================================================================
 # تنظیمات اولیه (از متغیرهای محیطی)
@@ -249,18 +249,22 @@ JAIL_VOTE_NEEDED = 3
 JAIL_MEOW_COOLDOWN = 60  # 60 ثانیه بین هر میو
 
 # ================================================================
-# تنظیمات هاپوی خیابونی
+# ✅ تنظیمات هاپوی خیابونی (نسخه جدید - ارسال به همه گروه‌ها)
 # ================================================================
 
-STREET_HAPO_INTERVAL = 6 * 3600  # هر ۶ ساعت
-STREET_HAPO_DECISION_TIME = 60  # ۶۰ ثانیه
-STREET_HAPO_MAX_ATTEMPTS = 3
-STREET_HAPO_SUCCESS_CHANCE = 0.30  # ۳۰٪
+STREET_HAPO_INTERVAL = 6 * 3600  # هر ۶ ساعت یک بچ ارسال می‌شود
+STREET_HAPO_GROUP_DELAY = 30 * 60  # ۳۰ دقیقه فاصله بین هر گروه
+STREET_HAPO_BATCH_SIZE = 2  # تعداد گروه‌هایی که همزمان ارسال می‌شوند
+STREET_HAPO_DECISION_TIME = 60  # ۶۰ ثانیه زمان تصمیم‌گیری
+STREET_HAPO_MAX_ATTEMPTS = 3  # حداکثر ۳ تلاش
+STREET_HAPO_SUCCESS_CHANCE = 0.30  # ۳۰٪ شانس موفقیت
 
-STREET_HAPO_COSTS: List[int] = [50, 75, 100]
+STREET_HAPO_COSTS: List[int] = [50, 75, 100]  # هزینه هر تلاش
 
-STREET_HAPO_REWARD_MIN = 500
-STREET_HAPO_REWARD_MAX = 999
+STREET_HAPO_REWARD_MIN = 500  # حداقل جایزه
+STREET_HAPO_REWARD_MAX = 999  # حداکثر جایزه
+
+STREET_HAPO_IMAGE_URL = "https://raw.githubusercontent.com/KnoX4545/HopDog/main/street_hapo.jpg"
 
 STREET_HAPO_FAIL_MESSAGES: List[str] = [
     "{name} باعث شد هاپوی خیابونی از ترس سکته کنه 💔",
@@ -271,8 +275,6 @@ STREET_HAPO_FAIL_MESSAGES: List[str] = [
     "{name} هاپوی خیابونی رو با سرعت زیاد ترسوند 🏃‍♂️💨",
     "هاپوی خیابونی با نگاه {name} ترسید و قلبش ایستاد 💀"
 ]
-
-STREET_HAPO_IMAGE_URL = "https://raw.githubusercontent.com/KnoX4545/HopDog/main/street_hapo.jpg"
 
 # ================================================================
 # تنظیمات یخچال هاپویی
@@ -409,6 +411,13 @@ def check_config() -> Dict[str, Any]:
     if len(HAPO_CAPACITY) != 25:
         warnings.append(f"⚠️ ظرفیت هاپو فقط برای {len(HAPO_CAPACITY)} سطح تعریف شده (نیاز به 25 سطح)")
     
+    # ✅ بررسی تنظیمات هاپوی خیابونی
+    if STREET_HAPO_GROUP_DELAY < 60:
+        warnings.append(f"⚠️ فاصله بین گروه‌ها ({STREET_HAPO_GROUP_DELAY//60} دقیقه) کمتر از ۱ دقیقه است")
+    
+    if STREET_HAPO_INTERVAL < STREET_HAPO_GROUP_DELAY:
+        warnings.append(f"⚠️ فاصله کل ({STREET_HAPO_INTERVAL//3600} ساعت) کمتر از فاصله گروه‌ها است")
+    
     return {
         "status": "✅ تنظیمات سالم است" if not issues else "❌ تنظیمات مشکل دارد",
         "issues": issues,
@@ -434,6 +443,14 @@ if __name__ == "__main__":
     print(f"🤖 نام بات: {result['bot_name']}")
     print(f"🔖 ورژن: {result['version']}")
     
+    # ✅ نمایش تنظیمات هاپوی خیابونی
+    print(f"\n🐶 تنظیمات هاپوی خیابونی:")
+    print(f"  └─ فاصله کل: {STREET_HAPO_INTERVAL//3600} ساعت")
+    print(f"  └─ فاصله گروه‌ها: {STREET_HAPO_GROUP_DELAY//60} دقیقه")
+    print(f"  └─ زمان تصمیم‌گیری: {STREET_HAPO_DECISION_TIME} ثانیه")
+    print(f"  └─ حداکثر تلاش: {STREET_HAPO_MAX_ATTEMPTS}")
+    print(f"  └─ شانس موفقیت: {int(STREET_HAPO_SUCCESS_CHANCE * 100)}%")
+    
     if result['issues']:
         print("\n❌ خطاها:")
         for issue in result['issues']:
@@ -445,3 +462,4 @@ if __name__ == "__main__":
             print(f"  {warning}")
     
     print("\n✅ همه تنظیمات بارگذاری شدند!")
+    print("=" * 60)
