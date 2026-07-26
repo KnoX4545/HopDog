@@ -1,11 +1,11 @@
 # base_handlers.py - توابع پایه (شروع، راهنما، قوانین، خوش‌آمدگویی، پیام‌ها)
-# نسخه کامل با اصلاح اسپم و زندان - فقط کامندهای واقعی چک می‌شوند
+# نسخه کامل با اصلاح اسپم، زندان و هاپوی خیابونی
 
 import asyncio
 import logging
 import random
 import traceback
-from datetime import datetime
+from datetime import datetime, timedelta
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 
@@ -16,9 +16,13 @@ from config import (
     JAIL_DURATION_MEOW, JAIL_FINE_MEOW, JAIL_REASON_MEOW,
     STREET_HAPO_INTERVAL, STREET_HAPO_DECISION_TIME,
     STREET_HAPO_COSTS, STREET_HAPO_SUCCESS_CHANCE,
-    STREET_HAPO_IMAGE_URL
+    STREET_HAPO_IMAGE_URL, STREET_HAPO_GROUP_DELAY
 )
-from globals import get_game, SPAM_TRACKER, STREET_HAPO_LAST_SENT, get_street_hapo
+from globals import (
+    get_game, SPAM_TRACKER, STREET_HAPO_LAST_SENT, get_street_hapo,
+    get_street_hapo_last_sent, set_street_hapo_last_sent,
+    get_street_hapo_last_batch_time, set_street_hapo_last_batch_time
+)
 from database import add_group, supabase, get_all_groups, get_user_by_identifier
 from utils import format_number, get_confirm_keyboard
 from logger_config import log_security, log_error, log_transaction
@@ -57,51 +61,7 @@ REAL_COMMANDS = [
 
 
 # ================================================================
-# متن‌های قوانین
-# ================================================================
-
-RULES_PAGE1 = """🐶 *قوانین هاپویی* 📚 *(1 / 2)*
-
-👾 *سو استفاده از باگ ها و مشکلات ربات ممنوع میباشد.*
-┘─ در صورت مشاهده هرگونه باگ یا مشکلی سریعا به پشتیبانی بات گزارش بدید @KnoX33
-
-🤬 *استفاده از متن های +18 و رکیک در امکانات ربات ممنوع میباشد.*
-┘─ در برخی موارد حتی به یوزرنیم و نام اکانت شماهم توجه میشود
-
-📣 *تبلیغات در امکانات ربات ممنوع میباشد.*
-┘─ هرگونه لینک , و یا تبلیغاتی تخلف محسوب میشود
-
-🔕 *ایجاد مزاحمت برای کاربران هاپویی ممنوع میباشد.*
-┘─ بی احترامی به کاربران از طریق بات تخلف محسوب میشود
-
-🚨 *ایجاد مزاحمت برای ادمین ها و بخش پشتیبانی بات ممنوع میباشد.*
-┘─ تحت هیچ شرایطی برای ادمین های بات مزاحمت ایجاد نکنید
-
-💥 *اسپم و استفاده پشت سر هم از دستورات ربات و ایجاد اختلال در پاسخگویی ربات ممنوع میباشد.*
-┘─ در صورت اسپم دستورات , سیستم به صورت خودکار شمارا محدود میکند و در صورت تکرار این عمل با شما برخورد میشود
-
-👎 *استفاده از هویت "فیک" و "جعلی" از مجموعه هاپویی ممنوع میباشد.*
-┘─ در صورت تظاهر به نقش داشتن در مجموعه هاپویی با شما برخورد میشود
-
-📚 ادامه لیست قوانین در صفحه بعد.."""
-
-RULES_PAGE2 = """🐶 *قوانین هاپویی* 📚 *(2 / 2)*
-
-✨ ما هیچگونه مسئولیتی در قبال قرض دادن آیتم های هاپویی مانند (هاپو پوینت) یا دزدیده شدن آیتم های شما در صورتی که با رضایت خودتون و با آگاهی خودتون انجام شده باشد نداریم.
-
-❤️ در صورت همکاری و گزارش مشکلات , باگ ها , متخلفین , پیشنهادات , انتقادات و .. از سمت مدیریت هدیه دریافت میکنید.
-
-©️ *کپی برداری از هاپویی کاملا ممنوع بوده و پیگرد قانونی دارد.*
-‏┘─ ᴄᴏᴘʏʀɪɢʜᴛ | ᴀʟʟ ʀɪɢʜᴛ ʀᴇꜱᴇʀᴠᴇᴅ | 2026 HopDoG
-2024-2026 Dillimore Script Team
-
-📚 در صورت رعایت نکردن قوانین ربات با شما برخورد خواهد شد و مسئولیت این موضوع با شماست.
-
-📚 تمامی تخلفات قابل بخشش هستند.. اما به شرط تعهد."""
-
-
-# ================================================================
-# ✅ توابع تشخیص کامند واقعی
+# ✅ توابع تشخیص کامند واقعی و اسپم
 # ================================================================
 
 def is_real_command(text: str, hapo_name: str = "") -> bool:
@@ -167,6 +127,50 @@ def check_spam(user_id: int, text: str = "") -> bool:
         return True
     
     return False
+
+
+# ================================================================
+# متن‌های قوانین
+# ================================================================
+
+RULES_PAGE1 = """🐶 *قوانین هاپویی* 📚 *(1 / 2)*
+
+👾 *سو استفاده از باگ ها و مشکلات ربات ممنوع میباشد.*
+┘─ در صورت مشاهده هرگونه باگ یا مشکلی سریعا به پشتیبانی بات گزارش بدید @KnoX33
+
+🤬 *استفاده از متن های +18 و رکیک در امکانات ربات ممنوع میباشد.*
+┘─ در برخی موارد حتی به یوزرنیم و نام اکانت شماهم توجه میشود
+
+📣 *تبلیغات در امکانات ربات ممنوع میباشد.*
+┘─ هرگونه لینک , و یا تبلیغاتی تخلف محسوب میشود
+
+🔕 *ایجاد مزاحمت برای کاربران هاپویی ممنوع میباشد.*
+┘─ بی احترامی به کاربران از طریق بات تخلف محسوب میشود
+
+🚨 *ایجاد مزاحمت برای ادمین ها و بخش پشتیبانی بات ممنوع میباشد.*
+┘─ تحت هیچ شرایطی برای ادمین های بات مزاحمت ایجاد نکنید
+
+💥 *اسپم و استفاده پشت سر هم از دستورات ربات و ایجاد اختلال در پاسخگویی ربات ممنوع میباشد.*
+┘─ در صورت اسپم دستورات , سیستم به صورت خودکار شمارا محدود میکند و در صورت تکرار این عمل با شما برخورد میشود
+
+👎 *استفاده از هویت "فیک" و "جعلی" از مجموعه هاپویی ممنوع میباشد.*
+┘─ در صورت تظاهر به نقش داشتن در مجموعه هاپویی با شما برخورد میشود
+
+📚 ادامه لیست قوانین در صفحه بعد.."""
+
+RULES_PAGE2 = """🐶 *قوانین هاپویی* 📚 *(2 / 2)*
+
+✨ ما هیچگونه مسئولیتی در قبال قرض دادن آیتم های هاپویی مانند (هاپو پوینت) یا دزدیده شدن آیتم های شما در صورتی که با رضایت خودتون و با آگاهی خودتون انجام شده باشد نداریم.
+
+❤️ در صورت همکاری و گزارش مشکلات , باگ ها , متخلفین , پیشنهادات , انتقادات و .. از سمت مدیریت هدیه دریافت میکنید.
+
+©️ *کپی برداری از هاپویی کاملا ممنوع بوده و پیگرد قانونی دارد.*
+‏┘─ ᴄᴏᴘʏʀɪɢʜᴛ | ᴀʟʟ ʀɪɢʜᴛ ʀᴇꜱᴇʀᴠᴇᴅ | 2026 HopDoG
+2024-2026 Dillimore Script Team
+
+📚 در صورت رعایت نکردن قوانین ربات با شما برخورد خواهد شد و مسئولیت این موضوع با شماست.
+
+📚 تمامی تخلفات قابل بخشش هستند.. اما به شرط تعهد."""
 
 
 # ================================================================
@@ -850,59 +854,174 @@ async def meow_vote_timer(vote_key: str, context: ContextTypes.DEFAULT_TYPE):
 
 
 # ================================================================
-# هاپوی خیابونی - ارسال نوتیفیکیشن
+# ✅ هاپوی خیابونی - نسخه جدید (ارسال به همه گروه‌ها با فاصله)
 # ================================================================
 
 async def send_street_hapo_notification(context: ContextTypes.DEFAULT_TYPE):
-    """ارسال نوتیفیکیشن هاپوی خیابونی به گروه‌ها"""
+    """
+    ارسال هاپوی خیابونی به همه گروه‌ها هر ۶ ساعت
+    با فاصله ۳۰ دقیقه بین هر گروه
+    """
     try:
         chat_ids = get_all_groups()
         if not chat_ids:
+            logger.info("🐶 هیچ گروهی برای ارسال هاپوی خیابونی وجود ندارد")
             return
-        
-        street_hapo = get_street_hapo()
-        if street_hapo.active:
-            if street_hapo.is_expired():
-                street_hapo.active = False
-                street_hapo.save_status()
-            else:
-                logger.info("🐶 هاپوی خیابونی در حال حاضر فعال است")
-                return
         
         now = datetime.now().timestamp()
-        available_groups = []
-        for chat_id in chat_ids:
-            last_sent = STREET_HAPO_LAST_SENT.get(chat_id, 0)
-            if now - last_sent >= STREET_HAPO_INTERVAL:
-                available_groups.append(chat_id)
         
-        if not available_groups:
-            available_groups = chat_ids
+        # ======== بررسی زمان آخرین بچ ارسال ========
+        last_batch_time = get_street_hapo_last_batch_time()
         
-        chat_id = random.choice(available_groups)
-        success, msg = street_hapo.start_event(int(chat_id))
-        if not success:
-            logger.info(f"🐶 خطا در شروع هاپوی خیابونی: {msg}")
+        # اگر هنوز ۶ ساعت از آخرین بچ نگذشته، ارسال نکن
+        if now - last_batch_time < STREET_HAPO_INTERVAL:
+            remaining = int((STREET_HAPO_INTERVAL - (now - last_batch_time)) / 60)
+            logger.info(f"⏳ زمان تا ارسال بعدی هاپوی خیابونی: {remaining} دقیقه")
             return
         
-        STREET_HAPO_LAST_SENT[chat_id] = now
+        logger.info(f"🐶 شروع ارسال هاپوی خیابونی به {len(chat_ids)} گروه...")
         
+        # ======== فیلتر گروه‌هایی که به تازگی هاپو دریافت کرده‌اند ========
+        eligible_groups = []
+        for chat_id in chat_ids:
+            last_sent = get_street_hapo_last_sent(chat_id)
+            if now - last_sent >= STREET_HAPO_INTERVAL:
+                eligible_groups.append(chat_id)
+            else:
+                remaining = int((STREET_HAPO_INTERVAL - (now - last_sent)) / 60)
+                logger.debug(f"⏳ گروه {chat_id}: {remaining} دقیقه تا ارسال بعدی")
+        
+        if not eligible_groups:
+            logger.info("ℹ️ همه گروه‌ها به تازگی هاپو دریافت کرده‌اند")
+            return
+        
+        # ======== ثبت زمان شروع بچ ========
+        set_street_hapo_last_batch_time(now)
+        
+        logger.info(f"🐶 ارسال به {len(eligible_groups)} گروه از {len(chat_ids)} گروه کل...")
+        
+        # ======== ارسال به گروه‌ها با فاصله ۳۰ دقیقه ========
+        for index, chat_id in enumerate(eligible_groups):
+            delay_seconds = index * STREET_HAPO_GROUP_DELAY
+            
+            asyncio.create_task(
+                send_street_hapo_to_group_with_delay(
+                    context, 
+                    chat_id, 
+                    delay_seconds,
+                    index + 1,
+                    len(eligible_groups)
+                )
+            )
+        
+        logger.info(f"✅ برنامه‌ریزی ارسال به {len(eligible_groups)} گروه انجام شد")
+        logger.info(f"⏳ زمان تقریبی اتمام: {(len(eligible_groups) * STREET_HAPO_GROUP_DELAY) // 60} دقیقه دیگر")
+        
+    except Exception as e:
+        logger.error(f"❌ خطا در ارسال هاپوی خیابونی: {e}")
+        log_error(e, "ارسال هاپوی خیابونی")
+
+
+async def send_street_hapo_to_group_with_delay(
+    context: ContextTypes.DEFAULT_TYPE, 
+    chat_id: str, 
+    delay_seconds: int,
+    current_index: int,
+    total_count: int
+):
+    """
+    ارسال هاپوی خیابونی به یک گروه با تاخیر مشخص
+    """
+    try:
+        # ======== انتظار برای تاخیر ========
+        if delay_seconds > 0:
+            minutes = delay_seconds // 60
+            logger.info(f"⏳ تاخیر {minutes} دقیقه برای گروه {chat_id} ({current_index}/{total_count})")
+            await asyncio.sleep(delay_seconds)
+        
+        # ======== بررسی مجدد که آیا گروه هنوز معتبر است ========
+        all_groups = get_all_groups()
+        if chat_id not in all_groups:
+            logger.info(f"ℹ️ گروه {chat_id} دیگر فعال نیست، ارسال لغو شد")
+            return
+        
+        # ======== دریافت نمونه هاپوی خیابونی ========
+        street_hapo = get_street_hapo()
+        
+        # ======== بررسی اینکه آیا هاپوی دیگری در این گروه فعال است ========
+        if street_hapo.active:
+            logger.info(f"⏳ هاپوی خیابونی در حال حاضر فعال است، صبر برای گروه {chat_id}...")
+            for _ in range(10):
+                if not street_hapo.active:
+                    break
+                await asyncio.sleep(1)
+            
+            if street_hapo.active:
+                logger.warning(f"⚠️ هاپوی خیابونی هنوز فعال است، ارسال به {chat_id} لغو شد")
+                return
+        
+        # ======== شروع رویداد هاپوی خیابونی ========
+        success, msg = street_hapo.start_event(int(chat_id))
+        if not success:
+            logger.warning(f"⚠️ خطا در شروع هاپوی خیابونی برای گروه {chat_id}: {msg}")
+            return
+        
+        # ======== به‌روزرسانی زمان ارسال ========
+        now = datetime.now().timestamp()
+        set_street_hapo_last_sent(chat_id, now)
+        
+        # ======== ارسال پیام ========
         keyboard = [[InlineKeyboardButton("🐶 نجات هاپوی خیابونی", callback_data="street_hapo_rescue")]]
+        
         message = await context.bot.send_photo(
             chat_id=chat_id,
             photo=STREET_HAPO_IMAGE_URL,
-            caption=f"🐶 *یک هاپوی خیابونی پیدا شده!*\n\n⏳ *زمان برای نجات:* {STREET_HAPO_DECISION_TIME} ثانیه\n💰 *هزینه تلاش اول:* {STREET_HAPO_COSTS[0]} 🪙\n🍀 *شانس موفقیت:* {int(STREET_HAPO_SUCCESS_CHANCE * 100)}%\n\nبرای نجاتش کلیک کن 👇",
+            caption=f"🐶 *یک هاپوی خیابونی پیدا شده!*\n\n"
+                    f"⏳ *زمان برای نجات:* {STREET_HAPO_DECISION_TIME} ثانیه\n"
+                    f"💰 *هزینه تلاش اول:* {STREET_HAPO_COSTS[0]} 🪙\n"
+                    f"🍀 *شانس موفقیت:* {int(STREET_HAPO_SUCCESS_CHANCE * 100)}%\n\n"
+                    f"برای نجاتش کلیک کن 👇",
             reply_markup=InlineKeyboardMarkup(keyboard),
             parse_mode="Markdown"
         )
         
+        # ======== ذخیره آیدی پیام ========
         street_hapo.data["message_id"] = message.message_id
         street_hapo.save_status()
-        logger.info(f"🐶 هاپوی خیابونی به گروه {chat_id} ارسال شد")
+        
+        logger.info(f"🐶 هاپوی خیابونی به گروه {chat_id} ارسال شد ({current_index}/{total_count})")
+        
+        # ======== شروع تایمر انقضا ========
+        asyncio.create_task(street_hapo_timer(street_hapo, context))
         
     except Exception as e:
-        logger.error(f"Error sending street hapo notification: {e}")
-        log_error(e, "ارسال هاپوی خیابونی")
+        logger.error(f"❌ خطا در ارسال هاپوی خیابونی به گروه {chat_id}: {e}")
+        log_error(e, f"ارسال هاپوی خیابونی به {chat_id}")
+
+
+async def street_hapo_timer(street_hapo, context):
+    """تایمر انقضای هاپوی خیابونی"""
+    await asyncio.sleep(STREET_HAPO_DECISION_TIME)
+    
+    if not street_hapo.active or street_hapo.data.get("rescued", False):
+        return
+    
+    street_hapo.data["status"] = "expired"
+    street_hapo.active = False
+    street_hapo.save_status()
+    
+    chat_id = street_hapo.data.get("chat_id")
+    message_id = street_hapo.data.get("message_id")
+    if chat_id and message_id:
+        try:
+            await context.bot.edit_message_caption(
+                chat_id=chat_id,
+                message_id=message_id,
+                caption="⏰ *هاپوی خیابونی فرار کرد!*\n\nمتاسفانه وقت تموم شد و هاپوی خیابونی رفت... 🐾",
+                parse_mode="Markdown"
+            )
+        except Exception as e:
+            logger.warning(f"⚠️ خطا در ویرایش پیام هاپوی خیابونی: {e}")
 
 
 # ================================================================
@@ -1122,7 +1241,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         await show_jail(update, context)
                         return
                 else:
-                    # ✅ فقط اگر کامند واقعی بود، پیام بده
                     if is_command:
                         await update.message.reply_text(
                             "⛓️ *شما در زندان هستید.*\n\n"
@@ -1132,7 +1250,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                             "💰 *برای آزادی، جریمه خود را پرداخت کن.*",
                             parse_mode="Markdown"
                         )
-                    # اگر کامند نیست، نادیده بگیر
                     return
             
             # دستورات پیوی
@@ -1210,7 +1327,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         await show_hapo_menu(update, game)
                         return
                 
-                # ✅ اگر کامند نبود و هیچ دستوری تشخیص داده نشد، نادیده بگیر
                 if not is_command:
                     return
             
@@ -1241,6 +1357,11 @@ if __name__ == "__main__":
     print(f"  'سلام' → {is_real_command('سلام')} ❌")
     print(f"  'هاپ هاپ' → {is_real_command('هاپ هاپ')} ✅")
     print(f"  'چی میگی' → {is_real_command('چی میگی')} ❌")
+    
+    # تست هاپوی خیابونی
+    print("\n🐶 تنظیمات هاپوی خیابونی:")
+    print(f"  └─ فاصله کل: {STREET_HAPO_INTERVAL//3600} ساعت")
+    print(f"  └─ فاصله گروه‌ها: {STREET_HAPO_GROUP_DELAY//60} دقیقه")
     
     print("\n✅ فایل آماده استفاده است!")
     print("=" * 60)
