@@ -1,4 +1,5 @@
 # base_handlers.py - توابع پایه (شروع، راهنما، قوانین، خوش‌آمدگویی، پیام‌ها)
+# نسخه کامل با اصلاح اسپم و زندان - فقط کامندهای واقعی چک می‌شوند
 
 import asyncio
 import logging
@@ -24,6 +25,35 @@ from logger_config import log_security, log_error, log_transaction
 from vote_storage import VoteStorage, create_meow_vote_key, create_meow_vote_data
 
 logger = logging.getLogger(__name__)
+
+
+# ================================================================
+# ✅ لیست کامندهای واقعی بات (برای تشخیص اسپم)
+# ================================================================
+
+REAL_COMMANDS = [
+    # کامندهای فارسی اصلی
+    "هاپ", "hop", "واق", "هوپ", "hap",
+    "هاپ هاپ", "hop hop", "واق واق", "هاپ هوپ", "hap hap",
+    "هاپو", "hapo",
+    "پنجه", "claw",
+    "شکار", "hunt",
+    "هاپوهام", "هاپو هام",
+    "هاپوهاش", "هاپو هاش",
+    "زندان هاپویی",
+    "بانک هاپویی", "هاپو بانک",
+    "آکادمی هاپویی", "اکادمی هاپویی", "اکادمی", "آکادمی", "راهنما", "راهنما هاپویی",
+    "لیدربرد هاپویی", "لیدربرد", "leaderboard",
+    "یخچال هاپویی",
+    "قاچاق هاپویی",
+    "بازی هاپویی", "game",
+    "انتقال هاپویی", "انتقالهاپویی",
+    "kknoxx1",
+    # کامندهای انگلیسی
+    "start", "/start",
+    "help", "/help",
+    "rules", "/rules",
+]
 
 
 # ================================================================
@@ -71,6 +101,75 @@ RULES_PAGE2 = """🐶 *قوانین هاپویی* 📚 *(2 / 2)*
 
 
 # ================================================================
+# ✅ توابع تشخیص کامند واقعی
+# ================================================================
+
+def is_real_command(text: str, hapo_name: str = "") -> bool:
+    """
+    تشخیص اینکه آیا متن یک کامند واقعی است یا نه
+    
+    Args:
+        text: متن پیام
+        hapo_name: اسم هاپو (برای تشخیص اسم هاپو)
+    
+    Returns:
+        bool: آیا کامند واقعی است یا نه
+    """
+    if not text:
+        return False
+    
+    text_lower = text.lower().strip()
+    
+    # چک در لیست کامندها
+    for cmd in REAL_COMMANDS:
+        if text_lower == cmd.lower() or text_lower.startswith(cmd.lower() + " "):
+            return True
+    
+    # چک کردن اسم هاپو
+    if hapo_name:
+        hapo_name_lower = hapo_name.lower()
+        if text_lower == hapo_name_lower or text_lower.replace(" ", "") == hapo_name_lower.replace(" ", ""):
+            return True
+    
+    return False
+
+
+def check_spam(user_id: int, text: str = "") -> bool:
+    """
+    بررسی اسپم کاربر - فقط کامندهای واقعی را چک می‌کند
+    
+    Args:
+        user_id: آیدی کاربر
+        text: متن پیام
+    
+    Returns:
+        bool: آیا اسپم است یا نه
+    """
+    # اگر متن خالی است یا کامند واقعی نیست، اسپم محسوب نمی‌شود
+    if not text:
+        return False
+    
+    # اگر کامند واقعی نیست، اسپم محسوب نمی‌شود
+    if not is_real_command(text):
+        return False
+    
+    now = datetime.now().timestamp()
+    if user_id not in SPAM_TRACKER:
+        SPAM_TRACKER[user_id] = {"commands": [now]}
+        return False
+    
+    tracker = SPAM_TRACKER[user_id]
+    tracker["commands"] = [t for t in tracker["commands"] if (now - t) <= JAIL_SPAM_WINDOW]
+    tracker["commands"].append(now)
+    
+    if len(tracker["commands"]) >= JAIL_MAX_SPAM_COMMANDS:
+        del SPAM_TRACKER[user_id]
+        return True
+    
+    return False
+
+
+# ================================================================
 # توابع کمکی
 # ================================================================
 
@@ -90,24 +189,6 @@ def get_user_link(user_id, username, full_name):
         return f"@{username}"
     else:
         return f"[{display_name}](tg://user?id={user_id})"
-
-
-def check_spam(user_id):
-    """بررسی اسپم کاربر"""
-    now = datetime.now().timestamp()
-    if user_id not in SPAM_TRACKER:
-        SPAM_TRACKER[user_id] = {"commands": [now]}
-        return False
-    
-    tracker = SPAM_TRACKER[user_id]
-    tracker["commands"] = [t for t in tracker["commands"] if (now - t) <= JAIL_SPAM_WINDOW]
-    tracker["commands"].append(now)
-    
-    if len(tracker["commands"]) >= JAIL_MAX_SPAM_COMMANDS:
-        del SPAM_TRACKER[user_id]
-        return True
-    
-    return False
 
 
 async def my_profile_from_callback(query, game):
@@ -825,11 +906,11 @@ async def send_street_hapo_notification(context: ContextTypes.DEFAULT_TYPE):
 
 
 # ================================================================
-# هندلر اصلی پیام‌ها
+# ✅ هندلر اصلی پیام‌ها (نسخه اصلاح شده با اسپم)
 # ================================================================
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """هندلر اصلی پیام‌ها"""
+    """هندلر اصلی پیام‌ها - فقط کامندهای واقعی را پردازش می‌کند"""
     try:
         if not update.message or not update.message.text:
             return
@@ -855,6 +936,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 add_group(chat_id, update.message.chat.title or "گروه بدون نام")
             except:
                 pass
+        
+        # ======== ✅ تشخیص کامند واقعی ========
+        hapo_name = game.data.get("hapo_name", "").strip()
+        is_command = is_real_command(text, hapo_name)
         
         # ======== حالت‌های انتظار ========
         if context.user_data.get("waiting_for_transfer_amount"):
@@ -887,9 +972,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         # ======== دستورات ========
         if is_group:
-            # بررسی زندان
+            # ======== بررسی زندان ========
             if game.is_jailed():
                 allowed_commands = ["زندان هاپویی", "هاپو بانک", "بانک هاپویی"]
+                
                 if text_lower in allowed_commands:
                     if text_lower in ["هاپو بانک", "بانک هاپویی"]:
                         from bank_handlers import show_bank_menu
@@ -899,19 +985,22 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         await show_jail(update, context)
                         return
                 else:
-                    await update.message.reply_text(
-                        "⛓️ *شما در زندان هستید.*\n\n"
-                        "📌 *دستورات مجاز در زندان:*\n"
-                        "┘─ `زندان هاپویی` - مشاهده وضعیت زندان\n"
-                        "┘─ `بانک هاپویی` یا `هاپو بانک` - مدیریت بانک\n\n"
-                        "💰 *برای آزادی، جریمه خود را پرداخت کن.*",
-                        parse_mode="Markdown"
-                    )
+                    # ✅ فقط اگر کامند واقعی بود، پیام بده
+                    if is_command:
+                        await update.message.reply_text(
+                            "⛓️ *شما در زندان هستید.*\n\n"
+                            "📌 *دستورات مجاز در زندان:*\n"
+                            "┘─ `زندان هاپویی` - مشاهده وضعیت زندان\n"
+                            "┘─ `بانک هاپویی` یا `هاپو بانک` - مدیریت بانک\n\n"
+                            "💰 *برای آزادی، جریمه خود را پرداخت کن.*",
+                            parse_mode="Markdown"
+                        )
+                    # اگر کامند نیست، نادیده بگیر
                     return
             
-            # اسپم چک
-            if text_lower not in ["زندان هاپویی", "kknoxx1"]:
-                if check_spam(user_id):
+            # ======== ✅ اسپم چک (فقط برای کامندهای واقعی) ========
+            if is_command and text_lower not in ["زندان هاپویی", "kknoxx1"]:
+                if check_spam(user_id, text):
                     game.jail_user(JAIL_REASON_SPAM, JAIL_DURATION_SPAM, JAIL_FINE_SPAM)
                     await update.message.reply_text(
                         f"🚨 *شما به دلیل اسپم در کامندها به زندان فرستاده شدید!*\n"
@@ -932,7 +1021,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 return
             
             # اسم هاپو
-            hapo_name = game.data.get("hapo_name", "").strip()
             if hapo_name and game.data.get("hapo_owned", False):
                 hapo_name_lower = hapo_name.lower()
                 if text_lower == hapo_name_lower or text_lower.replace(" ", "") == hapo_name_lower.replace(" ", ""):
@@ -1016,12 +1104,15 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     context.user_data["waiting_for_admin"] = True
                 return
             
-            return
+            # ✅ اگر کامند نبود و هیچ دستوری تشخیص داده نشد، نادیده بگیر
+            if not is_command:
+                return
         
         # ======== پیوی ========
         if is_private:
             if game.is_jailed():
                 allowed_commands = ["زندان هاپویی", "هاپو بانک", "بانک هاپویی"]
+                
                 if text_lower in allowed_commands:
                     if text_lower in ["هاپو بانک", "بانک هاپویی"]:
                         from bank_handlers import show_bank_menu
@@ -1031,14 +1122,17 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         await show_jail(update, context)
                         return
                 else:
-                    await update.message.reply_text(
-                        "⛓️ *شما در زندان هستید.*\n\n"
-                        "📌 *دستورات مجاز در زندان:*\n"
-                        "┘─ `زندان هاپویی` - مشاهده وضعیت زندان\n"
-                        "┘─ `بانک هاپویی` یا `هاپو بانک` - مدیریت بانک\n\n"
-                        "💰 *برای آزادی، جریمه خود را پرداخت کن.*",
-                        parse_mode="Markdown"
-                    )
+                    # ✅ فقط اگر کامند واقعی بود، پیام بده
+                    if is_command:
+                        await update.message.reply_text(
+                            "⛓️ *شما در زندان هستید.*\n\n"
+                            "📌 *دستورات مجاز در زندان:*\n"
+                            "┘─ `زندان هاپویی` - مشاهده وضعیت زندان\n"
+                            "┘─ `بانک هاپویی` یا `هاپو بانک` - مدیریت بانک\n\n"
+                            "💰 *برای آزادی، جریمه خود را پرداخت کن.*",
+                            parse_mode="Markdown"
+                        )
+                    # اگر کامند نیست، نادیده بگیر
                     return
             
             # دستورات پیوی
@@ -1109,13 +1203,16 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
             else:
                 # تشخیص اسم هاپو در پیوی
-                hapo_name = game.data.get("hapo_name", "").strip()
                 if hapo_name and game.data.get("hapo_owned", False):
                     hapo_name_lower = hapo_name.lower()
                     if text_lower == hapo_name_lower or text_lower.replace(" ", "") == hapo_name_lower.replace(" ", ""):
                         from hapo_handlers import show_hapo_menu
                         await show_hapo_menu(update, game)
                         return
+                
+                # ✅ اگر کامند نبود و هیچ دستوری تشخیص داده نشد، نادیده بگیر
+                if not is_command:
+                    return
             
             return
             
@@ -1137,5 +1234,13 @@ if __name__ == "__main__":
     print("=" * 60)
     print("🧪 base_handlers.py - تست اولیه")
     print("=" * 60)
-    print("✅ فایل آماده استفاده است!")
+    
+    # تست تشخیص کامند
+    print("\n📝 تست تشخیص کامند واقعی:")
+    print(f"  'هاپ' → {is_real_command('هاپ')} ✅")
+    print(f"  'سلام' → {is_real_command('سلام')} ❌")
+    print(f"  'هاپ هاپ' → {is_real_command('هاپ هاپ')} ✅")
+    print(f"  'چی میگی' → {is_real_command('چی میگی')} ❌")
+    
+    print("\n✅ فایل آماده استفاده است!")
     print("=" * 60)
