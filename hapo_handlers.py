@@ -1,4 +1,7 @@
 # hapo_handlers.py - هندلرهای هاپو، پنجه، شکار، اسم هاپو
+# نسخه کامل با اصلاحات:
+# 1. ارتقا مقام - نمایش پیام صحیح با حفظ هاپو پوینت‌ها
+# 2. اصلاح پیام تایید و موفقیت ارتقا مقام
 
 import asyncio
 import logging
@@ -22,7 +25,7 @@ logger = logging.getLogger(__name__)
 
 
 # ================================================================
-# ✅ لیست کلمات ممنوع برای اسم هاپو (فقط فحش‌های خیلی رکیک)
+# لیست کلمات ممنوع برای اسم هاپو (فقط فحش‌های خیلی رکیک)
 # ================================================================
 
 FORBIDDEN_HAPO_NAMES = [
@@ -51,7 +54,7 @@ def is_valid_hapo_name(name: str) -> tuple:
     if not re.match(r'^[\u0600-\u06FF\uFB8A\u067E\u0686\u06AF\u2000-\u200F\u202A-\u202E\uFEFFa-zA-Z0-9\s\-_\.]+$', name):
         return False, "❌ اسم هاپو فقط می‌تواند شامل حروف، اعداد و فاصله باشد"
     
-    # ✅ فقط فحش‌های خیلی رکیک ممنوع
+    # فقط فحش‌های خیلی رکیک ممنوع
     name_lower = name.lower().strip()
     
     for bad in FORBIDDEN_HAPO_NAMES:
@@ -101,7 +104,7 @@ def get_hapo_menu_text(game):
     msg = f"🐶 *{game.data['hapo_name']}*\n"
     msg += f"💕 نام : {game.data['hapo_name']}\n"
     
-    # ✅ نمایش وضعیت غذا با پیام "کار نمیکنم"
+    # نمایش وضعیت غذا با پیام "کار نمیکنم"
     if hapo_food == 0:
         msg += f"🍖 شکم : 😢 کار نمیکنم... (۰/{max_food})\n"
     else:
@@ -111,7 +114,7 @@ def get_hapo_menu_text(game):
     msg += f"⭐️ سطح : {hapo_level}/5\n"
     msg += f"💰 هاپو پوینت های تولید شده : {format_number(hapo_harvest)} 🪙\n"
     
-    # ✅ اگر غذا ۰ باشد، تولید ۰ نمایش داده می‌شود
+    # اگر غذا ۰ باشد، تولید ۰ نمایش داده می‌شود
     if hapo_food == 0:
         msg += f"💫 تولید هاپو پوینت در ثانیه : ۰ 🪙 *(گرسنه‌ام!)*\n"
     else:
@@ -129,7 +132,7 @@ def get_hapo_menu_text(game):
         price = game.get_hapo_upgrade_price()
         msg += f"💰 هزینه ارتقا سطح : {format_number(price)} 🪙"
     
-    # ✅ اگر هاپو گرسنه است، پیام اضافه
+    # اگر هاپو گرسنه است، پیام اضافه
     if hapo_food == 0:
         msg += "\n\n😢 *هاپو گرسنه است! بهش غذا بده تا دوباره کار کنه* 🍖"
     
@@ -148,7 +151,7 @@ def get_hapo_menu_keyboard(game):
     max_level = game.get_hapo_max_level_for_rank(hapo_rank)
     hapo_food = game._to_int(game.data["hapo_food"])
     
-    # ✅ اگر غذا ۰ است، دکمه غذا دادن نمایش داده شود
+    # اگر غذا ۰ است، دکمه غذا دادن نمایش داده شود
     if hapo_food == 0:
         keyboard.append([InlineKeyboardButton("🍖 غذا دادن به هاپو", callback_data="hapo_feed_show")])
     elif is_max:
@@ -381,7 +384,7 @@ async def handle_hapo_rename_input(update: Update, context: ContextTypes.DEFAULT
     
     new_name = update.message.text.strip()
     
-    # ✅ اعتبارسنجی اسم (فحش‌های خیلی رکیک ممنوع)
+    # اعتبارسنجی اسم (فحش‌های خیلی رکیک ممنوع)
     is_valid, error_msg = is_valid_hapo_name(new_name)
     if not is_valid:
         await update.message.reply_text(
@@ -411,7 +414,7 @@ async def handle_hapo_rename_input(update: Update, context: ContextTypes.DEFAULT
     
     old_name = game.data["hapo_name"]
     
-    # ✅ بررسی نهایی قبل از تایید
+    # بررسی نهایی قبل از تایید
     if contains_bad_word(new_name):
         await update.message.reply_text(
             f"❌ *اسم «{new_name}» مجاز نیست.*\n✏️ *لطفاً اسم دیگری انتخاب کن:*",
@@ -681,11 +684,11 @@ async def handle_hunt_release(update: Update, context: ContextTypes.DEFAULT_TYPE
 
 
 # ================================================================
-# کالبک‌های هاپو (برای handle_callback)
+# ✅ کالبک‌های هاپو (برای handle_callback) - اصلاح شده
 # ================================================================
 
 async def handle_hapo_callback(query, game, data, context):
-    """هندلر کالبک‌های هاپو"""
+    """هندلر کالبک‌های هاپو - نسخه اصلاح شده"""
     user_id = query.from_user.id
     
     # ======== خرید هاپو ========
@@ -716,24 +719,46 @@ async def handle_hapo_callback(query, game, data, context):
         hapo_food = game._to_int(game.data["hapo_food"])
         hapo_harvest = game._to_int(game.data["hapo_harvest"])
         
-        # ✅ اگر غذا ۰ است، پیام بده
+        # اگر غذا ۰ است، پیام بده ولی برداشت را انجام بده
         if hapo_food == 0:
-            msg = get_hapo_menu_text(game)
-            keyboard = get_hapo_menu_keyboard(game)
-            await query.edit_message_text(
-                f"😢 *هاپو گرسنه است و کار نمیکند!*\n\n🍖 *بهش غذا بده تا دوباره کار کنه*\n\n{msg}",
-                reply_markup=keyboard,
-                parse_mode="Markdown"
-            )
-            return
+            if hapo_harvest > 0:
+                hop_point = game._to_int(game.data["hop_point"])
+                game.data["hop_point"] = str(hop_point + hapo_harvest)
+                game.data["hapo_harvest"] = "0"
+                game.save_data()
+                await query.edit_message_text(
+                    f"😢 *هاپو گرسنه است و کار نمیکند!*\n\n"
+                    f"✅ *با این حال {format_number(hapo_harvest)} هاپو پوینت برداشت شد*\n"
+                    f"💰 *هاپو پوینت هات:* {format_number(hop_point + hapo_harvest)} 🪙\n\n"
+                    f"🍖 *به هاپو غذا بده تا دوباره کار کنه!*",
+                    parse_mode="Markdown"
+                )
+                await asyncio.sleep(2)
+                msg = get_hapo_menu_text(game)
+                keyboard = get_hapo_menu_keyboard(game)
+                await query.edit_message_text(msg, reply_markup=keyboard, parse_mode="Markdown")
+                return
+            else:
+                msg = get_hapo_menu_text(game)
+                keyboard = get_hapo_menu_keyboard(game)
+                await query.edit_message_text(
+                    f"😢 *هاپو گرسنه است و کار نمیکند!*\n\n"
+                    f"❌ *هیچ هاپو پوینتی برای برداشت نیست*\n\n"
+                    f"🍖 *به هاپو غذا بده تا دوباره کار کنه!*\n\n{msg}",
+                    reply_markup=keyboard,
+                    parse_mode="Markdown"
+                )
+                return
         
+        # برداشت معمولی
         if hapo_harvest > 0:
             hop_point = game._to_int(game.data["hop_point"])
             game.data["hop_point"] = str(hop_point + hapo_harvest)
             game.data["hapo_harvest"] = "0"
             game.save_data()
             await query.edit_message_text(
-                f"✅ *{format_number(hapo_harvest)} هاپو پوینت برداشت شد*\n💰 *هاپو پوینت هات:* {format_number(hop_point + hapo_harvest)} 🪙",
+                f"✅ *{format_number(hapo_harvest)} هاپو پوینت برداشت شد*\n"
+                f"💰 *هاپو پوینت هات:* {format_number(hop_point + hapo_harvest)} 🪙",
                 parse_mode="Markdown"
             )
             await asyncio.sleep(2)
@@ -796,7 +821,9 @@ async def handle_hapo_callback(query, game, data, context):
             )
         return
     
-    # ======== ارتقا مقام ========
+    # ================================================================
+    # ✅ ارتقا مقام - پیام تایید (اصلاح شده)
+    # ================================================================
     if data == "hapo_rank_up_confirm":
         check = game.can_rank_up()
         if not check["success"]:
@@ -811,6 +838,8 @@ async def handle_hapo_callback(query, game, data, context):
         
         price = game.get_hapo_rank_up_price()
         hop_point = game._to_int(game.data["hop_point"])
+        hapo_harvest = game._to_int(game.data["hapo_harvest"])  # ✅ مقدار فعلی هاپو پوینت‌های تولید شده
+        
         if hop_point < price:
             msg = get_hapo_menu_text(game)
             keyboard = get_hapo_menu_keyboard(game)
@@ -824,13 +853,21 @@ async def handle_hapo_callback(query, game, data, context):
         hapo_rank = game._to_int(game.data["hapo_rank"])
         current_max = game.get_hapo_max_level_for_rank(hapo_rank)
         next_max = game.get_hapo_max_level_for_rank(hapo_rank + 1)
+        current_max_food = (hapo_rank + 1) * 4
+        next_max_food = (hapo_rank + 2) * 4
         
         msg = f"⚠️ *آیا از ارتقا مقام هاپو مطمئنی؟*\n\n"
         msg += f"🌟 *مقام فعلی:* {RANK_NAMES[hapo_rank]}\n"
-        msg += f"🌟 *مقام جدید:* {RANK_NAMES[hapo_rank + 1]}\n"
-        msg += f"📊 *سقف سطح فعلی:* {current_max}\n"
-        msg += f"📊 *سقف سطح جدید:* {next_max}\n"
-        msg += f"💰 *هزینه:* {format_number(price)} 🪙"
+        msg += f"🌟 *مقام جدید:* {RANK_NAMES[hapo_rank + 1]}\n\n"
+        msg += f"📊 *تغییرات پس از ارتقا:*\n"
+        msg += f"┘─ 🔄 سطح به ۱ برمی‌گردد\n"
+        msg += f"┘─ 💰 هاپو پوینت‌های تولید شده (`{format_number(hapo_harvest)} 🪙`) **قابل برداشت هستند**\n"
+        msg += f"┘─ 📈 سقف سطح از {current_max} به {next_max} افزایش می‌یابد\n"
+        msg += f"┘─ 📈 حداکثر غذا از {current_max_food} به {next_max_food} افزایش می‌یابد\n"
+        msg += f"┘─ 📈 تولید هاپو پوینت در ثانیه افزایش می‌یابد\n"
+        msg += f"┘─ 📈 ظرفیت نگهداری افزایش می‌یابد\n"
+        msg += f"┘─ 💰 قیمت ارتقا سطح به قیمت سطح ۱ برمی‌گردد\n\n"
+        msg += f"💰 *هزینه ارتقا مقام:* {format_number(price)} 🪙"
         
         await query.edit_message_text(
             msg,
@@ -839,12 +876,26 @@ async def handle_hapo_callback(query, game, data, context):
         )
         return
     
+    # ================================================================
+    # ✅ ارتقا مقام - تایید (اصلاح شده)
+    # ================================================================
     if data == "hapo_rank_up_yes":
         result = game.confirm_rank_up()
         if result["success"]:
             hop_point = game._to_int(game.data["hop_point"])
+            hapo_harvest = result.get("hapo_harvest", 0)  # ✅ مقدار حفظ شده
+            new_rank_name = result.get("new_rank_name", RANK_NAMES[game._to_int(game.data["hapo_rank"])])
+            new_max_level = result.get("new_max_level", 5)
+            new_max_food = result.get("new_max_food", 4)
+            
             await query.edit_message_text(
-                f"✅ *مقام هاپو به {result['new_rank_name']} ارتقا یافت!*\n💰 *هاپو پوینت هات:* {format_number(hop_point)} 🪙",
+                f"✅ *مقام هاپو به {new_rank_name} ارتقا یافت!*\n\n"
+                f"🌟 *مقام جدید:* {new_rank_name}\n"
+                f"⭐ *سطح:* 1/{new_max_level}\n"
+                f"🍖 *حداکثر غذا:* {new_max_food}\n"
+                f"💰 *هاپو پوینت‌های تولید شده:* {format_number(hapo_harvest)} 🪙 *(قابل برداشت)*\n"
+                f"💰 *هاپو پوینت هات:* {format_number(hop_point)} 🪙\n\n"
+                f"💡 *هاپو پوینت‌های تولید شده قبل از ارتقا حفظ شده و قابل برداشت هستند!*",
                 parse_mode="Markdown"
             )
             await asyncio.sleep(2)
@@ -889,7 +940,7 @@ async def handle_hapo_callback(query, game, data, context):
     if data.startswith("confirm_hapo_name_"):
         new_name = data.replace("confirm_hapo_name_", "")
         
-        # ✅ اعتبارسنجی مجدد
+        # اعتبارسنجی مجدد
         is_valid, error_msg = is_valid_hapo_name(new_name)
         if not is_valid:
             await query.edit_message_text(
