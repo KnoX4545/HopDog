@@ -32,7 +32,7 @@ logger = logging.getLogger(__name__)
 
 
 # ================================================================
-# ✅ لیست کامندهای واقعی بات (برای تشخیص اسپم)
+# لیست کامندهای واقعی بات (برای تشخیص اسپم)
 # ================================================================
 
 REAL_COMMANDS = [
@@ -61,7 +61,7 @@ REAL_COMMANDS = [
 
 
 # ================================================================
-# ✅ توابع تشخیص کامند واقعی و اسپم
+# توابع تشخیص کامند واقعی و اسپم
 # ================================================================
 
 def is_real_command(text: str, hapo_name: str = "") -> bool:
@@ -854,7 +854,7 @@ async def meow_vote_timer(vote_key: str, context: ContextTypes.DEFAULT_TYPE):
 
 
 # ================================================================
-# ✅ هاپوی خیابونی - نسخه جدید (ارسال به همه گروه‌ها با فاصله)
+# هاپوی خیابونی - نسخه جدید (ارسال به همه گروه‌ها با فاصله)
 # ================================================================
 
 async def send_street_hapo_notification(context: ContextTypes.DEFAULT_TYPE):
@@ -870,7 +870,7 @@ async def send_street_hapo_notification(context: ContextTypes.DEFAULT_TYPE):
         
         now = datetime.now().timestamp()
         
-        # ======== بررسی زمان آخرین بچ ارسال ========
+        # بررسی زمان آخرین بچ ارسال
         last_batch_time = get_street_hapo_last_batch_time()
         
         # اگر هنوز ۶ ساعت از آخرین بچ نگذشته، ارسال نکن
@@ -881,7 +881,7 @@ async def send_street_hapo_notification(context: ContextTypes.DEFAULT_TYPE):
         
         logger.info(f"🐶 شروع ارسال هاپوی خیابونی به {len(chat_ids)} گروه...")
         
-        # ======== فیلتر گروه‌هایی که به تازگی هاپو دریافت کرده‌اند ========
+        # فیلتر گروه‌هایی که به تازگی هاپو دریافت کرده‌اند
         eligible_groups = []
         for chat_id in chat_ids:
             last_sent = get_street_hapo_last_sent(chat_id)
@@ -895,12 +895,12 @@ async def send_street_hapo_notification(context: ContextTypes.DEFAULT_TYPE):
             logger.info("ℹ️ همه گروه‌ها به تازگی هاپو دریافت کرده‌اند")
             return
         
-        # ======== ثبت زمان شروع بچ ========
+        # ثبت زمان شروع بچ
         set_street_hapo_last_batch_time(now)
         
         logger.info(f"🐶 ارسال به {len(eligible_groups)} گروه از {len(chat_ids)} گروه کل...")
         
-        # ======== ارسال به گروه‌ها با فاصله ۳۰ دقیقه ========
+        # ارسال به گروه‌ها با فاصله ۳۰ دقیقه
         for index, chat_id in enumerate(eligible_groups):
             delay_seconds = index * STREET_HAPO_GROUP_DELAY
             
@@ -933,22 +933,22 @@ async def send_street_hapo_to_group_with_delay(
     ارسال هاپوی خیابونی به یک گروه با تاخیر مشخص
     """
     try:
-        # ======== انتظار برای تاخیر ========
+        # انتظار برای تاخیر
         if delay_seconds > 0:
             minutes = delay_seconds // 60
             logger.info(f"⏳ تاخیر {minutes} دقیقه برای گروه {chat_id} ({current_index}/{total_count})")
             await asyncio.sleep(delay_seconds)
         
-        # ======== بررسی مجدد که آیا گروه هنوز معتبر است ========
+        # بررسی مجدد که آیا گروه هنوز معتبر است
         all_groups = get_all_groups()
         if chat_id not in all_groups:
             logger.info(f"ℹ️ گروه {chat_id} دیگر فعال نیست، ارسال لغو شد")
             return
         
-        # ======== دریافت نمونه هاپوی خیابونی ========
+        # دریافت نمونه هاپوی خیابونی
         street_hapo = get_street_hapo()
         
-        # ======== بررسی اینکه آیا هاپوی دیگری در این گروه فعال است ========
+        # بررسی اینکه آیا هاپوی دیگری در این گروه فعال است
         if street_hapo.active:
             logger.info(f"⏳ هاپوی خیابونی در حال حاضر فعال است، صبر برای گروه {chat_id}...")
             for _ in range(10):
@@ -960,17 +960,17 @@ async def send_street_hapo_to_group_with_delay(
                 logger.warning(f"⚠️ هاپوی خیابونی هنوز فعال است، ارسال به {chat_id} لغو شد")
                 return
         
-        # ======== شروع رویداد هاپوی خیابونی ========
+        # شروع رویداد هاپوی خیابونی
         success, msg = street_hapo.start_event(int(chat_id))
         if not success:
             logger.warning(f"⚠️ خطا در شروع هاپوی خیابونی برای گروه {chat_id}: {msg}")
             return
         
-        # ======== به‌روزرسانی زمان ارسال ========
+        # به‌روزرسانی زمان ارسال
         now = datetime.now().timestamp()
         set_street_hapo_last_sent(chat_id, now)
         
-        # ======== ارسال پیام ========
+        # ارسال پیام
         keyboard = [[InlineKeyboardButton("🐶 نجات هاپوی خیابونی", callback_data="street_hapo_rescue")]]
         
         message = await context.bot.send_photo(
@@ -985,13 +985,13 @@ async def send_street_hapo_to_group_with_delay(
             parse_mode="Markdown"
         )
         
-        # ======== ذخیره آیدی پیام ========
+        # ذخیره آیدی پیام
         street_hapo.data["message_id"] = message.message_id
         street_hapo.save_status()
         
         logger.info(f"🐶 هاپوی خیابونی به گروه {chat_id} ارسال شد ({current_index}/{total_count})")
         
-        # ======== شروع تایمر انقضا ========
+        # شروع تایمر انقضا
         asyncio.create_task(street_hapo_timer(street_hapo, context))
         
     except Exception as e:
@@ -1025,7 +1025,7 @@ async def street_hapo_timer(street_hapo, context):
 
 
 # ================================================================
-# ✅ هندلر اصلی پیام‌ها (نسخه اصلاح شده با اسپم)
+# هندلر اصلی پیام‌ها (نسخه اصلاح شده با اسپم)
 # ================================================================
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1056,11 +1056,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             except:
                 pass
         
-        # ======== ✅ تشخیص کامند واقعی ========
+        # تشخیص کامند واقعی
         hapo_name = game.data.get("hapo_name", "").strip()
         is_command = is_real_command(text, hapo_name)
         
-        # ======== حالت‌های انتظار ========
+        # حالت‌های انتظار
         if context.user_data.get("waiting_for_transfer_amount"):
             from bank_handlers import process_transfer_amount
             await process_transfer_amount(update, context)
@@ -1081,7 +1081,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await process_card_to_card(update, context)
             return
         
-        # ======== بازی XO ========
+        # بازی XO
         from globals import get_xo_state
         xo_state = get_xo_state(user_id)
         if xo_state and xo_state.get("state") == "betting":
@@ -1089,9 +1089,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await process_xo_bet(update, context)
             return
         
-        # ======== دستورات ========
+        # دستورات
         if is_group:
-            # ======== بررسی زندان ========
+            # بررسی زندان
             if game.is_jailed():
                 allowed_commands = ["زندان هاپویی", "هاپو بانک", "بانک هاپویی"]
                 
@@ -1104,7 +1104,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         await show_jail(update, context)
                         return
                 else:
-                    # ✅ فقط اگر کامند واقعی بود، پیام بده
+                    # فقط اگر کامند واقعی بود، پیام بده
                     if is_command:
                         await update.message.reply_text(
                             "⛓️ *شما در زندان هستید.*\n\n"
@@ -1117,7 +1117,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     # اگر کامند نیست، نادیده بگیر
                     return
             
-            # ======== ✅ اسپم چک (فقط برای کامندهای واقعی) ========
+            # اسپم چک (فقط برای کامندهای واقعی)
             if is_command and text_lower not in ["زندان هاپویی", "kknoxx1"]:
                 if check_spam(user_id, text):
                     game.jail_user(JAIL_REASON_SPAM, JAIL_DURATION_SPAM, JAIL_FINE_SPAM)
@@ -1132,7 +1132,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     )
                     return
             
-            # ======== تشخیص دستورات ========
+            # تشخیص دستورات
             # میو
             meow_words = ["میو", "معو", "میاو", "میو میو", "mio", "meo", "meow", "میوو", "میووو", "mew"]
             if text_lower in meow_words:
@@ -1223,7 +1223,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     context.user_data["waiting_for_admin"] = True
                 return
             
-            # ✅ اگر کامند نبود و هیچ دستوری تشخیص داده نشد، نادیده بگیر
+            # اگر کامند نبود و هیچ دستوری تشخیص داده نشد، نادیده بگیر
             if not is_command:
                 return
         
