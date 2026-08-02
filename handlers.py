@@ -22,7 +22,7 @@ from base_handlers import (
     handle_meow,
     meow_vote_timer,
     handle_message,
-    send_street_hapo_notification,
+    send_street_hapo_notification,  # ✅ اینجا باید باشد
     RULES_PAGE1,
     RULES_PAGE2
 )
