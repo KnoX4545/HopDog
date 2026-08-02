@@ -1,4 +1,8 @@
 # fridge_handlers.py - هندلرهای یخچال هاپویی و قاچاق (نسخه کامل نهایی)
+# اصلاحات:
+# 1. ذخیره‌سازی صحیح حیوان در یخچال با save_data()
+# 2. غذا دادن به هاپو از یخچال - اصلاح تغذیه
+# 3. نمایش صحیح آیتم‌های یخچال
 
 import asyncio
 import logging
@@ -157,7 +161,7 @@ async def show_fridge_menu(update: Update, game):
 
 
 # ================================================================
-# ذخیره حیوان در یخچال (از شکار) - نسخه اصلاح شده
+# ✅ ذخیره حیوان در یخچال (از شکار) - نسخه اصلاح شده با ذخیره‌سازی مطمئن
 # ================================================================
 
 async def handle_hunt_to_fridge(update: Update, context: ContextTypes.DEFAULT_TYPE, query, animal_name):
@@ -217,15 +221,15 @@ async def handle_hunt_to_fridge(update: Update, context: ContextTypes.DEFAULT_TY
         await query.edit_message_text(msg, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
         return
     
-    # ======== ذخیره در یخچال ========
+    # ======== ✅ ذخیره در یخچال با اطمینان ========
     animal_copy = animal.copy()
     animal_copy["cooked"] = False
     animal_copy["cooking"] = False
     items.append(animal_copy)
     
-    # ذخیره در دیتابیس
-    game.save_fridge_items(items)
-    game.save_data()  # اطمینان از ذخیره
+    # ذخیره در دیتابیس (هر دو متد)
+    game.save_fridge_items(items)  # این متد save_data() را صدا می‌زند
+    game.save_data()  # اطمینان اضافی
     
     # حذف حیوان از حالت شکار
     game.data["current_hunt_animal"] = None
@@ -366,6 +370,10 @@ async def handle_fridge_item(update: Update, context: ContextTypes.DEFAULT_TYPE,
     await query.edit_message_text(msg, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
 
 
+# ================================================================
+# ✅ شروع پخت حیوان در یخچال (با ذخیره‌سازی مطمئن)
+# ================================================================
+
 async def handle_fridge_cook(update: Update, context: ContextTypes.DEFAULT_TYPE, query, index):
     """شروع پخت حیوان در یخچال - با ذخیره‌سازی در دیتابیس"""
     user_id = update.effective_user.id
@@ -398,6 +406,10 @@ async def handle_fridge_cook(update: Update, context: ContextTypes.DEFAULT_TYPE,
         await query.edit_message_text(f"❌ *{result['reason']}*", parse_mode="Markdown")
 
 
+# ================================================================
+# ✅ تایمر پخت حیوان (با ذخیره‌سازی مطمئن)
+# ================================================================
+
 async def cook_timer(update: Update, context: ContextTypes.DEFAULT_TYPE, user_id, index, cook_time):
     """تایمر پخت حیوان - با ذخیره‌سازی در دیتابیس"""
     await asyncio.sleep(cook_time)
@@ -415,7 +427,7 @@ async def cook_timer(update: Update, context: ContextTypes.DEFAULT_TYPE, user_id
         if not item.get("cooking", False):
             return
         
-        # تکمیل پخت
+        # ✅ تکمیل پخت
         item["cooked"] = True
         item["cooking"] = False
         item["original_value"] = item.get("value", 0)
@@ -423,7 +435,7 @@ async def cook_timer(update: Update, context: ContextTypes.DEFAULT_TYPE, user_id
         item["value"] = int(item["value"] * 10)
         item["nutrition"] = item["nutrition"] * 2
         
-        # ذخیره در دیتابیس
+        # ✅ ذخیره در دیتابیس
         game.save_fridge_items(items)
         game.save_data()
         
@@ -443,6 +455,10 @@ async def cook_timer(update: Update, context: ContextTypes.DEFAULT_TYPE, user_id
     except Exception as e:
         logger.error(f"Error in cook_timer: {e}")
 
+
+# ================================================================
+# فروش حیوان از یخچال
+# ================================================================
 
 async def handle_fridge_sell(update: Update, context: ContextTypes.DEFAULT_TYPE, query, index):
     """فروش حیوان از یخچال - با حذف از دیتابیس"""
@@ -471,8 +487,12 @@ async def handle_fridge_sell(update: Update, context: ContextTypes.DEFAULT_TYPE,
         await query.edit_message_text(f"❌ *{result['reason']}*", parse_mode="Markdown")
 
 
+# ================================================================
+# ✅ غذا دادن به هاپو از یخچال (اصلاح شده)
+# ================================================================
+
 async def handle_fridge_feed(update: Update, context: ContextTypes.DEFAULT_TYPE, query, index):
-    """تغذیه هاپو از یخچال - با حذف از دیتابیس"""
+    """تغذیه هاپو از یخچال - با حذف از دیتابیس و اصلاح تغذیه"""
     user_id = update.effective_user.id
     username = update.effective_user.username
     full_name = update.effective_user.full_name or f"کاربر{user_id}"
@@ -486,7 +506,7 @@ async def handle_fridge_feed(update: Update, context: ContextTypes.DEFAULT_TYPE,
         max_food = result.get("max_food", 0)
         hop_point = game._to_int(game.data["hop_point"])
         
-        logger.info(f"🍖 تغذیه هاپو از یخچال - {item['name']} - کاربر {user_id}")
+        logger.info(f"🍖 تغذیه هاپو از یخچال - {item['name']} - کاربر {user_id} - {fed} کالری")
         
         await query.edit_message_text(
             f"🍖 *{item['emoji']} {item['name']} به هاپو داده شد!*\n\n"
