@@ -1,4 +1,5 @@
 # game.py - کلاس اصلی بازی (توابع پایه)
+# نسخه کامل با اصلاح سود بانکی (روزهای گذشته)
 
 import random
 import json
@@ -319,22 +320,29 @@ class HopDogGame:
         self.data["bank_transactions"] = transactions[:3]
         self.save_data()
 
+    # ================================================================
+    # ✅ سود بانکی - اصلاح شده برای روزهای گذشته (حداکثر ۳۰ روز)
+    # ================================================================
+
     def apply_bank_interest(self):
-        """اعمال سود بانکی برای روزهای گذشته (حداکثر ۳۰ روز)"""
+        """✅ اعمال سود بانکی برای روزهای گذشته (حداکثر ۳۰ روز)"""
         if not self.data["bank_opened"]:
             return
         
         now = datetime.now().timestamp()
         last_time = self._to_float(self.data.get("bank_last_interest_at", 0))
         
+        # اگر اولین بار است، زمان را ثبت کن
         if last_time == 0:
             self.data["bank_last_interest_at"] = self._to_str(now)
             self.save_data()
             return
         
+        # محاسبه تعداد روزهای گذشته (حداکثر ۳۰ روز)
         elapsed = now - last_time
         days_passed = int(elapsed // (24 * 3600))
         
+        # محدودیت حداکثر ۳۰ روز
         if days_passed > 30:
             days_passed = 30
             self.data["bank_last_interest_at"] = self._to_str(now - 30 * 24 * 3600)
@@ -356,8 +364,11 @@ class HopDogGame:
                     )
             
             self.data["bank_balance"] = self._to_str(bank_balance)
+            # تنظیم زمان آخرین سود به امروز
             self.data["bank_last_interest_at"] = self._to_str(now)
             self.save_data()
+            logger.info(f"💰 سود بانکی برای کاربر {self.user_id}: {days_passed} روز، سود کل: {bank_balance - self._to_int(self.data.get('_prev_balance', 0))}")
+            self.data["_prev_balance"] = str(bank_balance)
             return
 
     def get_next_interest_time(self):
