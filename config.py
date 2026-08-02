@@ -249,7 +249,7 @@ JAIL_VOTE_NEEDED = 3
 JAIL_MEOW_COOLDOWN = 60  # 60 ثانیه بین هر میو
 
 # ================================================================
-# ✅ تنظیمات هاپوی خیابونی (نسخه جدید - ارسال به همه گروه‌ها)
+# تنظیمات هاپوی خیابونی (نسخه جدید - ارسال به همه گروه‌ها)
 # ================================================================
 
 STREET_HAPO_INTERVAL = 6 * 3600  # هر ۶ ساعت یک بچ ارسال می‌شود
@@ -411,12 +411,19 @@ def check_config() -> Dict[str, Any]:
     if len(HAPO_CAPACITY) != 25:
         warnings.append(f"⚠️ ظرفیت هاپو فقط برای {len(HAPO_CAPACITY)} سطح تعریف شده (نیاز به 25 سطح)")
     
-    # ✅ بررسی تنظیمات هاپوی خیابونی
+    # بررسی تنظیمات هاپوی خیابونی
     if STREET_HAPO_GROUP_DELAY < 60:
         warnings.append(f"⚠️ فاصله بین گروه‌ها ({STREET_HAPO_GROUP_DELAY//60} دقیقه) کمتر از ۱ دقیقه است")
     
     if STREET_HAPO_INTERVAL < STREET_HAPO_GROUP_DELAY:
         warnings.append(f"⚠️ فاصله کل ({STREET_HAPO_INTERVAL//3600} ساعت) کمتر از فاصله گروه‌ها است")
+    
+    # بررسی تنظیمات بانک
+    if BANK_INTEREST_RATE > 0.1:
+        warnings.append(f"⚠️ نرخ سود بانکی ({BANK_INTEREST_RATE*100}%) بسیار بالا است")
+    
+    if BANK_MAX_DAILY_INTEREST < 1000:
+        warnings.append(f"⚠️ حداکثر سود روزانه ({BANK_MAX_DAILY_INTEREST}) بسیار کم است")
     
     return {
         "status": "✅ تنظیمات سالم است" if not issues else "❌ تنظیمات مشکل دارد",
@@ -443,13 +450,25 @@ if __name__ == "__main__":
     print(f"🤖 نام بات: {result['bot_name']}")
     print(f"🔖 ورژن: {result['version']}")
     
-    # ✅ نمایش تنظیمات هاپوی خیابونی
+    # نمایش تنظیمات هاپوی خیابونی
     print(f"\n🐶 تنظیمات هاپوی خیابونی:")
     print(f"  └─ فاصله کل: {STREET_HAPO_INTERVAL//3600} ساعت")
     print(f"  └─ فاصله گروه‌ها: {STREET_HAPO_GROUP_DELAY//60} دقیقه")
     print(f"  └─ زمان تصمیم‌گیری: {STREET_HAPO_DECISION_TIME} ثانیه")
     print(f"  └─ حداکثر تلاش: {STREET_HAPO_MAX_ATTEMPTS}")
     print(f"  └─ شانس موفقیت: {int(STREET_HAPO_SUCCESS_CHANCE * 100)}%")
+    
+    # نمایش تنظیمات بانک
+    print(f"\n🏦 تنظیمات بانک:")
+    print(f"  └─ نرخ سود: {BANK_INTEREST_RATE*100}%")
+    print(f"  └─ حداکثر سود روزانه: {BANK_MAX_DAILY_INTEREST:,} 🪙")
+    print(f"  └─ هزینه خرید بانک: {BANK_PURCHASE_COST:,} 🪙")
+    
+    # نمایش تنظیمات یخچال
+    print(f"\n❄️ تنظیمات یخچال:")
+    print(f"  └─ سطح مورد نیاز: {FRIDGE_REQUIRED_LEVEL}")
+    print(f"  └─ هزینه خرید: {FRIDGE_PURCHASE_COST:,} 🪙")
+    print(f"  └─ حداکثر سطح: {FRIDGE_MAX_LEVEL}")
     
     if result['issues']:
         print("\n❌ خطاها:")
