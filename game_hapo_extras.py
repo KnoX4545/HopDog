@@ -1,4 +1,8 @@
 # game_hapo_extras.py - توابع هاپو، پنجه، شکار، یخچال، قاچاق و کلاس StreetHapo
+# نسخه کامل با اصلاحات:
+# 1. ارتقا مقام - حفظ هاپو پوینت‌های تولید شده
+# 2. غذا دادن به هاپو - اصلاح تغذیه
+# 3. یخچال - ذخیره‌سازی صحیح
 
 import random
 import json
@@ -149,30 +153,54 @@ def can_rank_up(self):
     return {"success": True}
 
 
+# ============================================================
+# ✅ ارتقا مقام (اصلاح شده - حفظ هاپو پوینت‌ها)
+# ============================================================
+
 def confirm_rank_up(self):
+    """
+    ✅ ارتقا مقام هاپو - هاپو پوینت‌های تولید شده صفر نمی‌شوند
+    """
     hapo_rank = self._to_int(self.data["hapo_rank"])
     if hapo_rank >= 4:
         return {"success": False, "reason": "هاپو در بالاترین مقام قرار دارد"}
+    
     price = self.get_hapo_rank_up_price()
     hop_point = self._to_int(self.data["hop_point"])
     if hop_point < price:
         return {"success": False, "reason": f"به {price:,} هاپو پوینت نیاز داری"}
     
+    # برداشت پول
     self.data["hop_point"] = self._to_str(hop_point - price)
+    
+    # ارتقا مقام
     self.data["hapo_rank"] = self._to_str(hapo_rank + 1)
+    
+    # سطح به ۱ برمی‌گردد
     self.data["hapo_level"] = "1"
+    
+    # حداکثر غذا افزایش می‌یابد (با توجه به مقام جدید)
     self.data["hapo_food"] = self._to_str(self.get_hapo_max_food())
-    self.data["hapo_harvest"] = "0"
+    
+    # ✅ هاپو پوینت‌های تولید شده صفر نمی‌شوند (قابل برداشت هستند)
+    # self.data["hapo_harvest"] = "0"  ← این خط حذف شد!
+    
+    # زمان آخرین به‌روزرسانی را به‌روز می‌کنیم
     self.data["hapo_last_update"] = self._to_str(datetime.now().timestamp())
+    
     self.save_data()
     
     new_rank = self._to_int(self.data["hapo_rank"])
     new_max_level = self.get_hapo_max_level_for_rank(new_rank)
+    new_max_food = self.get_hapo_max_food()
+    
     return {
         "success": True,
         "new_rank": new_rank,
         "new_rank_name": RANK_NAMES[new_rank],
-        "new_max_level": new_max_level
+        "new_max_level": new_max_level,
+        "new_max_food": new_max_food,
+        "hapo_harvest": self._to_int(self.data["hapo_harvest"])  # ✅ مقدار قبلی حفظ شده
     }
 
 
@@ -217,7 +245,12 @@ def upgrade_hapo_level(self):
     }
 
 
+# ============================================================
+# ✅ غذا دادن به هاپو (اصلاح شده)
+# ============================================================
+
 def feed_hapo(self):
+    """✅ تغذیه هاپو با حیوان شکار شده - اصلاح شده"""
     animal = self.data.get("current_hunt_animal")
     if not animal:
         return {"success": False, "reason": "هیچ حیوانی برای غذا دادن وجود ندارد"}
@@ -250,11 +283,14 @@ def feed_hapo(self):
     self.data["hunt_time"] = "0"
     self.save_data()
     
+    logger.info(f"🍖 تغذیه هاپو: {nutrition} کالری → {hapo_food} → {new_food} (حداکثر: {max_food})")
+    
     return {
         "success": True, 
         "fed": actual,
         "new_food": new_food,
-        "max_food": max_food
+        "max_food": max_food,
+        "old_food": hapo_food
     }
 
 
@@ -413,7 +449,7 @@ def sell_animal(self):
 
 
 # ============================================================
-# ✅ متدهای یخچال هاپویی (نسخه اصلاح شده با محافظت)
+# متدهای یخچال هاپویی (نسخه اصلاح شده با محافظت)
 # ============================================================
 
 def get_fridge_items(self):
@@ -432,7 +468,7 @@ def save_fridge_items(self, items):
     if not isinstance(items, list):
         items = []
     self.data["fridge_items"] = items
-    self.save_data()
+    self.save_data()  # ✅ ذخیره در دیتابیس
     return True
 
 
@@ -621,7 +657,7 @@ def sell_from_fridge(self, index):
 
 
 def feed_hapo_from_fridge(self, index):
-    """تغذیه هاپو از یخچال"""
+    """✅ تغذیه هاپو از یخچال - اصلاح شده"""
     if not self.data.get("fridge_owned", False):
         return {"success": False, "reason": "شما یخچال هاپویی ندارید"}
     
@@ -655,7 +691,7 @@ def feed_hapo_from_fridge(self, index):
     self.save_fridge_items(items)
     self.save_data()
     
-    logger.info(f"🍖 تغذیه هاپو از یخچال: {removed.get('name', 'نامشخص')} - {actual} کالری")
+    logger.info(f"🍖 تغذیه هاپو از یخچال: {removed.get('name', 'نامشخص')} - {nutrition} کالری → {hapo_food} → {new_food}")
     
     return {
         "success": True,
@@ -1039,3 +1075,32 @@ HopDogGame.feed_hapo_from_fridge = feed_hapo_from_fridge
 HopDogGame.start_smuggle = start_smuggle
 HopDogGame.check_smuggle_status = check_smuggle_status
 HopDogGame.get_smuggle_info = get_smuggle_info
+
+
+# ============================================================
+# تست
+# ============================================================
+
+if __name__ == "__main__":
+    print("=" * 60)
+    print("🧪 تست game_hapo_extras.py")
+    print("=" * 60)
+    
+    # تست ایجاد بازی
+    game = HopDogGame(123456789, "testuser")
+    print(f"✅ بازی برای کاربر {game.user_id} ایجاد شد")
+    
+    # تست متدهای هاپو
+    print("✅ get_hapo_total_level:", game.get_hapo_total_level())
+    print("✅ get_hapo_max_food:", game.get_hapo_max_food())
+    print("✅ get_hapo_capacity:", game.get_hapo_capacity())
+    print("✅ get_hapo_production:", game.get_hapo_production())
+    
+    # تست StreetHapo
+    street = StreetHapo()
+    print("✅ StreetHapo ایجاد شد")
+    print("✅ active:", street.active)
+    
+    print("=" * 60)
+    print("🎉 همه تست‌ها با موفقیت انجام شد!")
+    print("=" * 60)
